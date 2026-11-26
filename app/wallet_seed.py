@@ -74,7 +74,8 @@ _LEGACY_SIA_BASE = 1626
 _LEGACY_SIA_LENGTHS = (28, 29)
 _LEGACY_SIA_WORD = re.compile(r"[a-z]{3,12}")
 _JSON_STRING_ESCAPES = re.compile(r'(?:\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))+')
-_PASTED_WORD_SEPARATOR = re.compile(r"\s*,\s+|\s+,\s*|\s+")
+# Keep numbered identifiers and dotted hostnames intact while splitting lists and prose.
+_PASTED_WORD = re.compile(r"[^\W_]+(?:\.[^\W_]+)*")
 
 
 def field_name(key: str) -> str:
@@ -173,18 +174,18 @@ def phrase_words(text: str) -> list[str]:
 
 
 def contains_pasted_phrase(text: str) -> bool:
-    """Scan one value for a recovery phrase pasted as whitespace-separated words."""
-    # A comma can accompany whitespace. A bare comma stays part of its token.
-    words = _PASTED_WORD_SEPARATOR.split(text.lower())
+    """Check for valid recovery phrases anywhere in a decoded value."""
+    words = _PASTED_WORD.findall(decode_phrase_text(text).lower())
     return contains_bip39_phrase(words) or _contains_legacy_sia_phrase(words)
 
 
-def contains_bip39_phrase(words: Sequence[str]) -> bool:
+def contains_bip39_phrase(words: Sequence[str], *, whole: bool = False) -> bool:
     """Check every BIP-39 length within each run of English BIP-39 words."""
     if len(words) < _BIP39_LENGTHS[0]:
         return False
     wordlist = _wordlist()
-    return _contains_checked_phrase([wordlist.get(word, -1) for word in words], _BIP39_LENGTHS, _valid_checksum)
+    lengths = (len(words),) if whole else _BIP39_LENGTHS
+    return _contains_checked_phrase([wordlist.get(word, -1) for word in words], lengths, _valid_checksum)
 
 
 @lru_cache(maxsize=1)
@@ -196,13 +197,14 @@ def _legacy_sia_wordlist() -> dict[str, int]:
     return prefixes
 
 
-def _contains_legacy_sia_phrase(words: Sequence[str]) -> bool:
+def _contains_legacy_sia_phrase(words: Sequence[str], *, whole: bool = False) -> bool:
     if len(words) < _LEGACY_SIA_LENGTHS[0]:
         return False
     wordlist = _legacy_sia_wordlist()
     # siad recognizes the first three letters of each English word.
     indices = [wordlist.get(word[:3], -1) if _LEGACY_SIA_WORD.fullmatch(word) else -1 for word in words]
-    return _contains_checked_phrase(indices, _LEGACY_SIA_LENGTHS, _valid_legacy_sia_checksum)
+    lengths = (len(words),) if whole else _LEGACY_SIA_LENGTHS
+    return _contains_checked_phrase(indices, lengths, _valid_legacy_sia_checksum)
 
 
 def _contains_checked_phrase(

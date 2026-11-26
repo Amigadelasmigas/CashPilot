@@ -2122,6 +2122,22 @@ class ProxiedStartSpec(BaseModel):
     """The proxy as the UI stores it now, so a start applies an edit."""
 
     proxy: ProxySpec
+    expected_container: str | None = None
+    expected_containers: dict[str, str] | None = None
+    group_approval: str | None = None
+
+
+class ProxiedRestartSpec(BaseModel):
+    report_stopped: bool = False
+
+
+# An offer is local to this worker and becomes invalid when the worker restarts.
+_PROXY_START_APPROVAL_KEY = os.urandom(32)
+
+
+def _sign_proxy_start(slug: str, proxy_id: int, targets: dict[str, str]) -> str:
+    payload = json.dumps([slug, proxy_id, targets], sort_keys=True).encode()
+    return hmac.digest(_PROXY_START_APPROVAL_KEY, payload, "sha256").hex()
 
 
 _EXIT_NODE_RE = re.compile(r"^[A-Za-z0-9._:-]{1,253}$")
@@ -2187,6 +2203,8 @@ def _deploy_target_error(exc: orchestrator.DeployTargetChanged) -> HTTPException
 def _proxy_http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, orchestrator.DeployTargetChanged):
         return _deploy_target_error(exc)
+    if isinstance(exc, proxy_tunnel.RecoveryConflict):
+        return HTTPException(status_code=409, detail={"error": "proxy_recovery_conflict", "message": str(exc)})
     if isinstance(exc, proxy_tunnel.ProxyTunnelError):
         return HTTPException(status_code=exc.status_code, detail=str(exc))
     if isinstance(exc, orchestrator.ContainerNetworkError):
@@ -2415,6 +2433,7 @@ async def api_proxied_stop(request: Request, slug: str, proxy_id: int) -> dict[s
     return {"status": "stopped", **result}
 
 
+@app.post("/api/proxied/{slug}/{proxy_id}/start-checked")
 @app.post("/api/proxied/{slug}/{proxy_id}/start")
 async def api_proxied_start(
     request: Request, slug: str, proxy_id: int, spec: ProxiedStartSpec | None = None
@@ -2422,6 +2441,18 @@ async def api_proxied_start(
     """Start a proxied copy. With a body, the tunnel's settings are rewritten
     from it first; a UI older than this worker sends none."""
     _verify_api_key(request)
+    if spec and spec.expected_containers is not None:
+        proof = spec.group_approval or ""
+        if not re.fullmatch(r"[0-9a-f]{64}", proof) or not hmac.compare_digest(
+            proof, _sign_proxy_start(slug, proxy_id, spec.expected_containers)
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "invalid_proxy_start_approval",
+                    "message": "This approval does not match the requested copies. Click Start again to review them.",
+                },
+            )
     proxy: dict[str, Any] | None = None
     own_ip: str | None = None
     if spec is not None:
@@ -2429,14 +2460,29 @@ async def api_proxied_start(
         proxy = spec.proxy.plain()
         own_ip = await _own_egress_ip()
     try:
-        result = await asyncio.to_thread(proxy_tunnel.start, slug, proxy_id, proxy, own_ip)
+        expectation = {"expected_container": spec.expected_container} if spec and spec.expected_container else {}
+        if spec and spec.expected_containers is not None:
+            expectation["expected_containers"] = spec.expected_containers
+        result = await asyncio.to_thread(proxy_tunnel.start, slug, proxy_id, proxy, own_ip, **expectation)
+    except proxy_tunnel.StartTargetsChanged as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "confirm_proxy_start_targets",
+                "message": str(exc),
+                "expected_containers": exc.targets,
+                "group_approval": _sign_proxy_start(slug, proxy_id, exc.targets),
+            },
+        ) from None
     except Exception as exc:  # noqa: BLE001
         raise _proxy_http_error(exc) from None
     return {"status": "started", **result}
 
 
 @app.post("/api/proxied/{slug}/{proxy_id}/restart")
-async def api_proxied_restart(request: Request, slug: str, proxy_id: int) -> dict[str, Any]:
+async def api_proxied_restart(
+    request: Request, slug: str, proxy_id: int, spec: ProxiedRestartSpec | None = None
+) -> dict[str, Any]:
     """Restart a running proxied copy where it is, for a health signal a restart clears.
 
     Never a stop and a start, and never a copy its owner or the cap stopped
@@ -2446,6 +2492,10 @@ async def api_proxied_restart(request: Request, slug: str, proxy_id: int) -> dic
     try:
         result = await asyncio.to_thread(proxy_tunnel.restart, slug, proxy_id)
     except Exception as exc:  # noqa: BLE001
+        if spec and spec.report_stopped and isinstance(exc, proxy_tunnel.CopyNotRunning):
+            raise HTTPException(
+                status_code=409, detail={"error": "proxied_copy_stopped", "message": str(exc)}
+            ) from None
         raise _proxy_http_error(exc) from None
     return {"status": "restarted", **result}
 

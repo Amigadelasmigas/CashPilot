@@ -30,7 +30,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app import auth, catalog, database, main, orchestrator, step_up, worker_api
+from app import auth, catalog, database, main, orchestrator, step_up, wallet_seed, worker_api
 
 OWNER = {"uid": 1, "u": "owner", "r": "owner"}
 SLUG = "sia-hostd"
@@ -128,6 +128,79 @@ def _record_legacy_deployment():
     asyncio.run(database.save_deployment(slug=SLUG, container_id="c0", spec=spec, worker_id=1))
     # A second save, so the prior spec (the one a redeploy replaced) holds it too.
     asyncio.run(database.save_deployment(slug=SLUG, container_id="c0", spec=spec, worker_id=1))
+
+
+def test_desktop_remove_with_data_kept_retains_an_unconfirmed_recovery_phrase(db):
+    async def prepare():
+        worker = await database.upsert_worker(CLIENT_ID, system_info='{"device_type": "desktop"}')
+        await database.save_deployment(SLUG, "a" * 64, worker_id=worker, spec={"env": {**ENV, KEY: PHRASE}})
+        await database.save_deployment(SLUG, "b" * 64, worker_id=worker, spec={"env": ENV})
+        return worker
+
+    worker = asyncio.run(prepare())
+    with (
+        patch.object(auth, "get_current_user", return_value=OWNER),
+        patch.object(main, "_proxy_to_worker", AsyncMock(return_value={"status": "removed"})),
+    ):
+        response = TestClient(main.app).delete(f"/api/services/{SLUG}?worker_id={worker}")
+    assert response.status_code == 200, response.text
+    assert asyncio.run(database.get_deployment(SLUG)) is None
+    assert PHRASE in asyncio.run(database.get_saved_wallet_phrases({wallet_seed.field_name(KEY)}))
+    removed, retained = asyncio.run(database.forget_env_value(SLUG, worker, KEY, confirmed_wallet_seed=PHRASE))
+    assert removed and not retained
+    assert PHRASE not in asyncio.run(database.get_saved_wallet_phrases({wallet_seed.field_name(KEY)}))
+
+
+def test_deploy_on_another_worker_preserves_the_desktops_fleet_only_recovery_phrase(db):
+    async def go():
+        container_id = "a" * 64
+        desktop = await database.upsert_worker(
+            "desktop",
+            containers=json.dumps([{"slug": SLUG, "container_id": container_id[:12]}]),
+            system_info='{"device_type": "desktop"}',
+        )
+        await database.save_deployment(SLUG, container_id, spec={"env": {**ENV, KEY: PHRASE}})
+        await database.save_deployment(SLUG, "b" * 64, spec={"env": ENV}, worker_id=1)
+        return desktop
+
+    desktop = asyncio.run(go())
+    spec = asyncio.run(database.get_deployment_spec(SLUG, desktop))
+    assert spec and spec["env"][KEY] == PHRASE
+    assert KEY not in asyncio.run(database.get_deployment_spec(SLUG, 1))["env"]
+
+
+@pytest.mark.parametrize("inventory", ["empty", "ambiguous", "seedless-spec"])
+def test_cross_worker_save_keeps_a_fleet_only_phrase_when_the_owner_spec_cannot_hold_it(db, inventory):
+    async def go():
+        seen = json.dumps([{"slug": SLUG, "container_id": "a" * 12}])
+        desktop = await database.upsert_worker("desktop", containers="[]" if inventory == "empty" else seen)
+        if inventory == "ambiguous":
+            await database.upsert_worker("another-desktop", containers=seen)
+        if inventory == "seedless-spec":
+            await database.save_deployment(SLUG, "c" * 64, worker_id=desktop, spec={"env": ENV})
+        await database.save_deployment(SLUG, "a" * 64, spec={"env": {**ENV, KEY: PHRASE}})
+        await database.save_deployment(SLUG, "b" * 64, worker_id=1, spec={"env": ENV})
+        assert PHRASE in await database.get_saved_wallet_phrases({wallet_seed.field_name(KEY)})
+        assert KEY not in (await database.get_deployment_spec(SLUG, 1))["env"]
+
+    asyncio.run(go())
+
+
+def test_desktop_keep_data_keeps_the_fleet_only_phrase_with_empty_inventory(db):
+    async def prepare():
+        desktop = await database.upsert_worker("desktop", containers="[]", system_info='{"device_type": "desktop"}')
+        await database.save_deployment(SLUG, "a" * 64, spec={"env": {**ENV, KEY: PHRASE}})
+        return desktop
+
+    desktop = asyncio.run(prepare())
+    with (
+        patch.object(auth, "get_current_user", return_value=OWNER),
+        patch.object(main, "_proxy_to_worker", AsyncMock(return_value={"status": "removed"})),
+    ):
+        reply = TestClient(main.app).delete(f"/api/services/{SLUG}?worker_id={desktop}")
+    assert reply.status_code == 200, reply.text
+    assert asyncio.run(database.get_deployment(SLUG)) is None
+    assert PHRASE in asyncio.run(database.get_saved_wallet_phrases({wallet_seed.field_name(KEY)}))
 
 
 class TestThePhraseIsNeverStoredOrSentAsAVariable:

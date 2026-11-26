@@ -48,6 +48,8 @@ def _own_held_marker(tmp_path):
         patch.object(proxy_tunnel, "FAILED_MARKER", str(tmp_path / ".proxied_failed")),
         patch.object(proxy_tunnel, "KEPT_MARKER", str(tmp_path / ".proxied_kept")),
         patch.object(proxy_tunnel, "NEW_MARKER", str(tmp_path / ".proxied_new")),
+        patch.object(proxy_tunnel, "CREATED_MARKER", str(tmp_path / ".proxied_created")),
+        patch.object(proxy_tunnel, "MOVE_MARKER", str(tmp_path / ".proxied_moves")),
     ):
         yield
 
@@ -535,7 +537,7 @@ class TestOrder:
     def test_an_earner_left_stopped_by_a_reboot_starts_only_once_its_tunnel_is_ready(self):
         earner = _container("cashpilot-x-p1", "x", proxy=1, status="exited")
         tunnel = _container("cashpilot-tunnel-x-p1", "x", proxy=1, role="tunnel")
-        client = MagicMock()
+        client = _client_with(earner, tunnel)
         client.containers.list.return_value = [earner, tunnel]
         tunnel.exec_run.return_value = (1, b"")  # /run/ready not written yet
         with (
@@ -1053,8 +1055,9 @@ class TestStartAppliesTheStoredProxy:
         earner, tunnel = self._pair()
         with (
             patch.object(orchestrator, "_get_client", return_value=_client_with(earner, tunnel)),
+            patch.object(proxy_tunnel, "_recorded_containers", return_value={earner.name: earner.id}),
             patch.object(proxy_tunnel, "resolve_proxy_ip", side_effect=proxy_tunnel.ProxyTunnelError("no such host")),
-            pytest.raises(proxy_tunnel.ProxyTunnelError),
+            pytest.raises(proxy_tunnel.ProxyTunnelError, match="no such host"),
         ):
             proxy_tunnel.start("x", 1, _socks(host="gw.example.net"), None)
         tunnel.start.assert_not_called()
