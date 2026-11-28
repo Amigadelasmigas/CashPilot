@@ -28,6 +28,8 @@ on:
       - "app/catalog.py"
       - "scripts/catalog_i18n.py"
       - "scripts/i18n_check.py"
+      # The web UI's own messages and their translations.
+      - "app/i18n/**"
       - ".github/workflows/catalog-check.yml"
   push:
     branches: [main]
@@ -80,6 +82,13 @@ jobs:
         run: |
           python scripts/catalog_i18n.py --check
           python scripts/i18n_check.py services/_i18n/en.yml services/_i18n/*.yml
+
+      # The web UI's messages (app/i18n/). Every locale file must translate
+      # every key of en.json with the same placeholders, tags and links. A
+      # stale translation only warns: the UI shows its English until the next
+      # translation pass.
+      - name: Web UI translations cover every English message
+        run: python scripts/i18n_check.py app/i18n/en.json app/i18n/*.json
 
       - name: README service lists and doc counts match the catalog
         run: python scripts/generate_readme_tables.py --check
