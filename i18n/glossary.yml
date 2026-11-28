@@ -69,7 +69,7 @@ terms:
   secure-vm:
     en: "Secure VM"
     kind: "brand"
-    note: "Desktop's one Windows 11 Pro virtual machine that runs the earners that exist only as desktop apps. A feature name, so it stays in English; a sentence around it may explain it (\"the Secure VM, a virtual machine\")."
+    note: "The one virtual machine per computer that CashPilot puts earners in, as an extra layer. On Desktop it is a Windows 11 Pro VM that runs the earners that exist only as desktop apps. In the web UI it is a QEMU/KVM VM on a Linux host that runs a CashPilot worker and its containers, fenced off the LAN, the host and the tailnet. A feature name, so it stays in English; a sentence around it may explain it (\"the Secure VM, a virtual machine\")."
     es: "Secure VM"
     pt-BR: "Secure VM"
     fr: "Secure VM"
@@ -138,7 +138,7 @@ terms:
   earner:
     en: "earner"
     kind: "term"
-    note: "One earning app that CashPilot runs for the user: a provider's client in a container (or in the Secure VM on Desktop). Not the person. Plural \"earners\"."
+    note: "One earning app that CashPilot runs for the user: a provider's client in a container (or in the Secure VM). Not the person. Plural \"earners\"."
     es: "app de ingresos"
     pt-BR: "app de renda"
     fr: "app de gains"
