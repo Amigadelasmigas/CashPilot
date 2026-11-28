@@ -1363,7 +1363,14 @@ class TestTheUiDeploysARoute:
                     _request(), pid, main.ProxyCopyRequest(worker_id=1, slug="proxybase-xyz"), {}
                 )
             nothing = (list(ui.calls), await database.list_proxied_copies(pid))
-            with ui.active(), patch.object(main, "require_step_up", checked):
+            real_sign = main._approve_spec
+
+            async def sign(*args, **kwargs):
+                # Signed under the copy's lock, so a long wait for it never lets the approval expire.
+                signed_locked.append(main._proxy_copy_lock(pid, 1, "proxybase-xyz").locked())
+                return await real_sign(*args, **kwargs)
+
+            with ui.active(), patch.object(main, "require_step_up", checked), patch.object(main, "_approve_spec", sign):
                 await main.api_add_proxied_copy(
                     _request(),
                     pid,
@@ -1372,7 +1379,9 @@ class TestTheUiDeploysARoute:
                 )
             return refused.value, nothing, pid
 
+        signed_locked = []
         refused, nothing, pid = _run(go)
+        assert signed_locked == [True]
         assert refused.status_code == 403 and refused.detail["error"] == "step_up_required"
         assert nothing == ([], []), "a refused copy reaches no worker and leaves no record"
         assert checked.await_count == 2

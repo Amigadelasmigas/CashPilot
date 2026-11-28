@@ -8813,8 +8813,6 @@ async def _refresh_proxied_copies(
             if "proxied_if_running" not in await _worker_features(worker_id):
                 raise ValueError(t("api.worker_too_old_rebuild_without"))
             earner = await _proxied_earner(recorded, docker_conf, worker_id, pid)
-            if approve:
-                earner = await _approve_spec(worker_id, slug, earner)
             # Its new ids are held from the shared-id check until the ledger row is
             # written, and taken before the copy lock, as a deploy takes them.
             async with _device_id_claim(slug, svc, earner["env"]), _proxy_copy_lock(pid, worker_id, slug):
@@ -8851,6 +8849,9 @@ async def _refresh_proxied_copies(
                 approved = (expected or {}).get(f"p{pid}", "none")
                 if approved == "none":
                     raise ValueError(t("api.current_container_needs_replacement_approval"))
+                if approve:
+                    # Signed under the lock, just before the send, so it never expires waiting.
+                    earner = await _approve_spec(worker_id, slug, earner)
                 await _send_worker_deploy(
                     worker_id,
                     slug,
@@ -8951,8 +8952,9 @@ async def api_add_proxied_copy(
     # A copy keeps its own wallet or node identity once it has run, so the worker
     # checks it as a direct deploy (_validate_critical_spec): on another image it
     # runs only with the owner's password, asked here before anything is recorded.
-    if await _step_up_critical(request, slug, svc, recorded.get("custom_image") or "", body.step_up_password):
-        earner = await _approve_spec(worker_id, slug, earner)
+    # The approval itself is signed under the copy's lock, just before the send,
+    # so a long wait for that lock never lets it expire.
+    approve = await _step_up_critical(request, slug, svc, recorded.get("custom_image") or "", body.step_up_password)
     # The record goes in before the worker is asked, under the proxy's lock: a
     # deploy that times out may still finish on the worker, and a copy with no
     # record would be outside the cap and the delete guard.
@@ -9004,6 +9006,8 @@ async def api_add_proxied_copy(
         # An edit made while this waited (a rotated password) is what the copy gets.
         definition = fresh["definition"]
         try:
+            if approve:
+                earner = await _approve_spec(worker_id, slug, earner)
             result = await _send_worker_deploy(
                 worker_id,
                 slug,
