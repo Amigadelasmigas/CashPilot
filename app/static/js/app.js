@@ -1581,7 +1581,7 @@ const CP = (() => {
           : `
           <div class="empty-state">
             <div class="empty-state-title">${unreachable > 0 ? t('app.services.unreachable_n', { n: escapeHtml(String(unreachable)) }) : t('app.services.unreachable_all')}</div>
-            <div class="empty-state-text">${t('app.services.unreachable_text', { n: unreachable === 1 ? 1 : 2 })}</div>
+            <div class="empty-state-text">${unreachable > 0 ? t('app.services.unreachable_text', { n: unreachable }) : t('app.services.unreachable_text_all')}</div>
             <a href="/fleet" class="btn btn-ghost">${t('app.services.check_fleet')}</a>
           </div>`;
         return;
@@ -2013,7 +2013,7 @@ const CP = (() => {
     // contradiction.
     const known = svc.balance_known !== false && svc.balance != null;
     return {
-      level: 'fail', tag: t('app.attn.tag.account_disabled'), what: t('app.attn.disabled_by', { name: svc.name }),
+      level: 'fail', tag: t('app.attn.tag.account_disabled'), what: svc.name,
       why: known
         ? t('app.attn.disabled_why_balance', { name, amount: escapeHtml(formatCurrency(svc.balance, svc.currency || 'USD')) })
         : t('app.attn.disabled_why', { name }),
@@ -2181,6 +2181,18 @@ const CP = (() => {
     if (!r) return '';
     const where = [r.exit_ip, r.exit_country ? `(${r.exit_country})` : ''].filter(Boolean).join(' ');
     return `<span class="badge badge-routed" title="${t('app.route.badge_title')}">${where ? t('app.route.via_proxy_at', { where: escapeHtml(where) }) : t('app.route.via_proxy')}</span>`;
+  }
+
+  // The security layers this copy really got (app/layers_ui.py): fenced or
+  // not, and Standard or gVisor. Nothing when the worker does not report them.
+  function layersBadge(inst) {
+    const l = inst && inst.layers;
+    if (!l || (l.fence == null && l.runtime == null)) return '';
+    const parts = [];
+    if (l.fence != null) parts.push(l.fence ? t('layers.earner.fenced') : t('layers.earner.not_fenced'));
+    if (l.runtime) parts.push(l.runtime === 'gvisor' ? t('layers.runtime.gvisor') : t('layers.runtime.runc'));
+    const tone = l.fence === false ? 'warn' : 'plain';
+    return `<span class="badge badge-layers badge-layers-${tone}" title="${escapeHtml(t('layers.badge.tip'))}">${escapeHtml(parts.join(' · '))}</span>`;
   }
 
   // The deploy form's Route box: the box's own IP, or one of the owner's
@@ -2607,7 +2619,7 @@ const CP = (() => {
       <td class="c-name">${nameHtml}<div class="cell-sub cell-mono c-name-image">${subtitle}</div></td>
       <td class="c-status">${partialDown
         ? `<span class="badge badge-stopped" title="${t('app.row.down_title', { down: downCount, total: details.length })}"><span class="status-dot stopped"></span> ${t('app.row.n_up', { up: details.length - downCount, total: details.length })}</span>`
-        : `<span class="badge badge-${statusClass}"><span class="status-dot ${statusClass}"></span> ${statusLabel}</span>${instanceLabel}`}${unmanagedLabel}${customLabel}${outdatedBadge}${!isMulti && details[0] ? ` ${routeBadge(details[0])}` : ''}</td>
+        : `<span class="badge badge-${statusClass}"><span class="status-dot ${statusClass}"></span> ${statusLabel}</span>${instanceLabel}`}${unmanagedLabel}${customLabel}${outdatedBadge}${!isMulti && details[0] ? ` ${routeBadge(details[0])} ${layersBadge(details[0])}` : ''}</td>
       <td class="c-health c-num" data-label="${t('app.label.health')}">${healthBadge}</td>
       <td class="c-bal c-num">${balanceHtml}</td>
       <td class="c-chg c-num"><span class="delta">${deltaStr}</span></td>
@@ -2658,7 +2670,7 @@ const CP = (() => {
             <span class="instance-node-label">${nodeLabel}</span>
             ${subLabel ? `<span class="instance-ctr">${subLabel}</span>` : ''}
           </td>
-          <td class="c-status"><span class="badge badge-${iStatus}"><span class="status-dot ${iStatus}"></span> ${iStatusLabel}</span> ${routeBadge(inst)}</td>
+          <td class="c-status"><span class="badge badge-${iStatus}"><span class="status-dot ${iStatus}"></span> ${iStatusLabel}</span> ${routeBadge(inst)} ${layersBadge(inst)}</td>
           <td class="c-health c-empty"></td>
           <td class="c-bal c-empty"></td>
           <td class="c-chg c-empty"></td>
@@ -3349,7 +3361,7 @@ const CP = (() => {
     if (replaced.length) notes.push(t('app.vol.replaced', { volumes: replaced.join(', ') }));
     if (unverified.length) notes.push(t('app.vol.unverified', { volumes: unverified.join(', ') }));
     if (unread.length) notes.push(t('app.vol.unread', { volumes: unread.join(', ') }));
-    if (notes.length) toast(t('app.vol.done_but', { done, notes: notes.join(t('app.vol.and')) }), 'error');
+    if (notes.length) toast(t('app.vol.done_but', { done, notes: notes.reduce((first, next) => t('app.vol.next', { first, next })) }), 'error');
     else toast(done, 'success');
   }
 
@@ -4897,7 +4909,7 @@ const CP = (() => {
     el.innerHTML = onlyCopies
       ? `${t('app.rename.copies_note', { slug: escapeHtml(slug) })}
         <button class="btn btn-secondary btn-sm" data-action="renameDevices" data-a1="${escapeHtml(slug)}">${t('app.rename.rebuild_copies')}</button>`
-      : `${t('app.rename.shared_note', { n: lines.length + skipped.length + copyLines.length, slug: escapeHtml(slug) })}
+      : `${t('app.rename.shared_note', { n: lines.length + skipped.length, slug: escapeHtml(slug) })}
       ${lines.length || copyLines.length ? `<button class="btn btn-secondary btn-sm" data-action="renameDevices" data-a1="${escapeHtml(slug)}">${t('app.rename.give_own')}</button>` : ''}
       ${skipped.map((line, i) => `<br>${escapeHtml(line)}
         <button class="btn btn-secondary btn-sm" data-action="redeployWithValues" data-a1="${escapeHtml(slug)}" data-a2="${escapeHtml(String(skippedIds[i]))}">${t('app.rename.redeploy_values')}</button>`).join('')}`;

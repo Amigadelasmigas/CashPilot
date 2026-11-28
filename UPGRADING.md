@@ -21,6 +21,57 @@ commands, and [Backing up node identities](docs/backup.md) covers the rest.
 
 ---
 
+## After 3.0.1: each host folder a service binds is listed on its own
+
+**Affects you if** your worker runs behind the socket proxy, you set
+`CASHPILOT_PROXY_BIND_MOUNTS`, and a service binds a folder *inside* one of the
+folders you listed. For example, you listed `/mnt/user/storj` and Storj binds
+`/mnt/user/storj/identity` and `/mnt/user/storj/data`. Until 3.0.1 the worker
+let a deploy bind any folder under a listed one. A container that could write
+into a listed folder could then plant a link to `/` there and bind it with a
+second deploy. Now a deploy binds a host path only when it equals one entry
+of the list exactly (a trailing slash aside). A folder under a listed one is
+refused, and so is a path written with `//`, `.` or `..`.
+
+Containers that already run keep running. The worker refuses the next deploy
+or redeploy of such a service, before it stops the running container, and the
+message names the exact path to add.
+
+**What to do.** In the `.env` next to your compose file, list each folder a
+service binds, and take out the parent folder unless a service binds it
+itself. Two entries where one is inside the other bind neither, because a
+container that binds the outer one could put a link where the inner one is:
+
+```sh
+# Before
+CASHPILOT_PROXY_BIND_MOUNTS=/mnt/user/storj
+# After
+CASHPILOT_PROXY_BIND_MOUNTS=/mnt/user/storj/identity,/mnt/user/storj/data
+```
+
+Then run `docker compose up -d` once, so the proxy and the worker read the
+new list.
+
+A container that already binds a folder above one of your new entries keeps
+that mount until it is recreated, and it can still write into that entry.
+Such a folder is the parent you took out, or any folder between it and the
+entry, which the old rule also allowed. The worker checks the list only at
+the next deploy, never the mounts of a running container. So before you
+deploy anything that binds the new entries, redeploy each of those
+containers with binds that are on the new list, or remove it (`docker rm`
+leaves the files of a bound folder on the host). Leave every other container
+as it is, the socket proxy included. This lists every container's bind
+sources, so you can find the ones whose source is a folder above a new entry:
+
+```sh
+docker ps -aq | xargs docker inspect --format '{{.Name}}: {{range .Mounts}}{{if eq .Type "bind"}}{{.Source}} {{end}}{{end}}'
+```
+
+Named volumes and installs that leave `CASHPILOT_PROXY_BIND_MOUNTS` unset
+need nothing.
+
+---
+
 ## After 3.0.1: the read-only key and metrics work from `.env`
 
 **Affects you if** you set `CASHPILOT_READONLY_API_KEY`,
@@ -1067,11 +1118,13 @@ no longer mounts the socket.
 
        CASHPILOT_COMPOSE_DIR=/the/folder/with/docker-compose.yml
 
-   If a service keeps its data in a host folder (Storj, for example), add that
-   folder too, comma-separated for several. It also counts as a
-   `CASHPILOT_ALLOWED_VOLUME_ROOTS` entry, so you need not list it twice:
+   If a service keeps its data in a host folder (Storj, for example), add each
+   folder it binds, comma-separated. The worker binds a listed path only as
+   itself, never a folder under it, so list the folders themselves, not their
+   parent. Each entry also counts as a `CASHPILOT_ALLOWED_VOLUME_ROOTS` entry,
+   so you need not list it twice:
 
-       CASHPILOT_PROXY_BIND_MOUNTS=/mnt/user/storj
+       CASHPILOT_PROXY_BIND_MOUNTS=/mnt/user/storj/identity,/mnt/user/storj/data
 
    Named volumes (Mysterium's identity, EarnApp's device id) need nothing,
    unless a container already keeps that data in a host folder (one created

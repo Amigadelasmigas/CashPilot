@@ -65,6 +65,7 @@ from app import (
     income_export,
     ipgeo,
     lan_isolation,
+    layers_ui,
     log_redaction,
     login_rate_limit,
     machine_economics,
@@ -144,7 +145,8 @@ _background_tasks: set[asyncio.Task] = set()
 
 def _spawn(coro) -> asyncio.Task:
     """Fire-and-forget a coroutine while keeping a reference and logging errors."""
-    task = asyncio.create_task(coro)
+    # Detached from the request's language: what the task writes is background text.
+    task = asyncio.create_task(coro, context=i18n.detached())
     _background_tasks.add(task)
 
     def _on_done(task: asyncio.Task) -> None:
@@ -314,11 +316,18 @@ async def _get_all_worker_containers(workers: list[dict[str, Any]] | None = None
                             "fatal_at": c.get("fatal_at"),
                             # Why the worker's fence guard keeps this copy stopped, and
                             # what brings it back (lan_fence.guard). Absent when it does not.
-                            "held": c.get("held"),
+                            # In the reader's language when the worker sent its key (i18n.reword).
+                            "held": i18n.reword(c.get("held"), c.get("held_reason")),
                             # What the container was created with, for the drift
                             # check (app/drift.py). None from a worker too old to send it.
                             "shape": c.get("shape"),
                             "_arch": sys_info.get("arch"),
+                            # The layers this copy really got: behind the LAN fence or
+                            # not, and runc or gVisor (app/layers_ui.py). None = not reported.
+                            "_layers": {
+                                "fence": layers_ui.fence(c, sys_info),
+                                "runtime": layers_ui.kind(c.get("runtime"), sys_info.get("layers")),
+                            },
                             # The worker's isolation mode, for the drift advice on
                             # a fence-gated node still on the host's network.
                             "_isolation_mode": (
@@ -603,6 +612,7 @@ def _docker_time(value: Any) -> datetime | None:
         return None
 
 
+@i18n.owner_text
 async def _container_down_check(statuses: list[dict[str, Any]]) -> None:
     """Alert when a CashPilot-managed container has stayed exited past the grace period.
 
@@ -680,7 +690,7 @@ async def _container_down_check(statuses: list[dict[str, Any]]) -> None:
         for slug, message in alerting.items():
             _container_down_bell[slug] = {"kind": "container", "platform": slug, "error": message}
             if alert_id := await database.record_alert("container", slug, message):
-                _spawn(_push_alert("container", slug, f"CashPilot: {slug} has stopped running", message, alert_id))
+                _spawn(_push_alert("container", slug, t("alert.title.stopped", name=slug), message, alert_id))
 
         _collector_alerts = [a for a in _collector_alerts if a.get("kind") != "container"]
         _collector_alerts.extend(_container_down_bell.values())
@@ -704,29 +714,27 @@ def _container_down_message(slug: str, copies: list[dict[str, Any]]) -> str:
     since = min(c["_down_since"] for c in copies).strftime("%Y-%m-%d %H:%M")
     nodes = ", ".join(sorted({str(c.get("_node") or "?") for c in copies}))
     codes = sorted({c["exit_code"] for c in copies if isinstance(c.get("exit_code"), int)})
-    how = f" (exit code {', '.join(str(code) for code in codes)})" if codes else ""
-    message = f"{name} has not been running since {since} UTC on {nodes}{how}, so it is not earning."
+    if codes:
+        message = t(
+            "alert.container.down_exit",
+            name=name,
+            since=since,
+            nodes=nodes,
+            codes=", ".join(str(code) for code in codes),
+        )
+    else:
+        message = t("alert.container.down", name=name, since=since, nodes=nodes)
     if catalog.fence_gated(catalog.get_service(slug)):
         # What the worker's guard says holds it; a reason only a redeploy clears
         # must reach the operator here, not only on the Fleet page.
         if held := sorted({str(c["held"]) for c in copies if c.get("held")}):
-            return message + f" The worker keeps it stopped: {'; '.join(held)}."
+            return message + " " + t("alert.container.held", reasons="; ".join(held))
         # No restart policy on purpose: the worker starts it once the LAN fence is confirmed.
-        return message + (
-            " The worker starts it as soon as the LAN fence is confirmed; while it stays down, the Fleet page "
-            "says what holds it. If you stopped it on purpose, stop it from the dashboard, which keeps this alert "
-            "quiet, and start it there when you want it back."
-        )
+        return message + " " + t("alert.container.fence_wait")
     policies = sorted({str(c["restart_policy"]) for c in copies if c.get("restart_policy")} - set(_RESTARTING_POLICIES))
     if policies:
-        message += (
-            f' Its restart policy is "{", ".join(policies)}", so Docker will not start it again by itself;'
-            " redeploying it from CashPilot sets unless-stopped."
-        )
-    return message + (
-        " Start it from the dashboard. If you stopped it on purpose, stop it from the dashboard too: "
-        "a stop made there keeps this alert quiet."
-    )
+        message += " " + t("alert.container.restart_policy", policies=", ".join(policies))
+    return message + " " + t("alert.container.start_it")
 
 
 # Services whose provider has disabled the account: slug -> the message shown.
@@ -758,10 +766,7 @@ _ACCOUNT_DISABLED_COOLDOWN_HOURS = 24 * 365
 
 def _account_disabled_message(slug: str) -> str:
     name = (catalog.get_service(slug) or {}).get("name") or slug
-    return (
-        f"{name} has disabled this account. Restarting will not help: only {name} can turn it back on, "
-        f"so contact their support. CashPilot leaves its containers as they are."
-    )
+    return t("alert.account_disabled", name=name)
 
 
 def _declares_account_disabled(slug: str) -> bool:
@@ -790,6 +795,7 @@ async def _balance_read_at(slug: str) -> datetime | None:
         return None
 
 
+@i18n.owner_text
 async def _account_disabled_check(statuses: list[dict[str, Any]]) -> None:
     """Raise one alert per service whose provider disabled the account; clear it when the account is back.
 
@@ -834,7 +840,9 @@ async def _account_disabled_check(statuses: list[dict[str, Any]]) -> None:
             ):
                 name = (catalog.get_service(slug) or {}).get("name") or slug
                 _spawn(
-                    _push_alert("account_disabled", slug, f"CashPilot: {name} disabled your account", message, alert_id)
+                    _push_alert(
+                        "account_disabled", slug, t("alert.title.account_disabled", name=name), message, alert_id
+                    )
                 )
         _collector_alerts = _with_account_disabled(_collector_alerts)
     except Exception as exc:  # noqa: BLE001 - a diagnostic must not break the health check
@@ -866,6 +874,7 @@ _deployment_first_missing: dict[tuple[str, Any], datetime] = {}
 _missing_bell: dict[str, dict[str, Any]] = {}
 
 
+@i18n.owner_text
 async def _missing_deployment_check(workers: list[dict[str, Any]] | None = None) -> None:
     """Alert when CashPilot records a deployment that no worker runs any more.
 
@@ -936,7 +945,11 @@ async def _missing_deployment_check(workers: list[dict[str, Any]] | None = None)
             }
             if alert_id := await database.record_alert("missing", slug, message):
                 name = (catalog.get_service(slug) or {}).get("name") or slug
-                title = f"CashPilot: {name} " + ("runs on no box" if item["everywhere"] else "is gone from a box")
+                title = (
+                    t("alert.title.missing_everywhere", name=name)
+                    if item["everywhere"]
+                    else t("alert.title.missing_box", name=name)
+                )
                 _spawn(_push_alert("missing", slug, title, message, alert_id))
         _collector_alerts = [a for a in _collector_alerts if a.get("kind") != "missing"]
         _collector_alerts.extend(_missing_bell.values())
@@ -963,17 +976,13 @@ def _missing_deployment_message(slug: str, item: dict[str, Any]) -> str:
     name = (catalog.get_service(slug) or {}).get("name") or slug
     boxes = ", ".join(b["name"] for b in item["boxes"])
     if item["everywhere"]:
-        where = f" (it was deployed on {boxes})" if boxes else ""
-        return (
-            f"CashPilot records {name} as deployed{where}, but no box runs it, so it is not earning. "
-            "Deploy it again, or forget the deployment if you removed it on purpose."
-        )
+        if boxes:
+            return t("alert.missing.everywhere_on", name=name, boxes=boxes)
+        return t("alert.missing.everywhere", name=name)
     still = ", ".join(item["still_on"])
-    return (
-        f"{name} was deployed on {boxes}, but {'that box no longer runs' if len(item['boxes']) == 1 else 'those boxes no longer run'} it"
-        f"{f' (it still runs on {still})' if still else ''}. "
-        "Deploy it there again, or forget it on that box if you removed it on purpose."
-    )
+    if still:
+        return t("alert.missing.boxes_still", name=name, boxes=boxes, n=len(item["boxes"]), still=still)
+    return t("alert.missing.boxes", name=name, boxes=boxes, n=len(item["boxes"]))
 
 
 # When each proxied-copy fault was first seen, keyed by alert subject. See _proxied_copy_check.
@@ -1012,6 +1021,7 @@ def _proxied_reportable(worker: dict[str, Any] | None) -> list[dict[str, Any]] |
     return [e for e in entries if isinstance(e, dict)]
 
 
+@i18n.owner_text
 async def _proxied_copy_check(workers: list[dict[str, Any]] | None = None) -> None:
     """Alert when a proxied copy or its tunnel that CashPilot expects is gone or down.
 
@@ -1103,7 +1113,7 @@ async def _proxied_copy_check(workers: list[dict[str, Any]] | None = None) -> No
                         "what": "tunnel_stuck",
                         "tunnel": staged,
                         "age": change.get("age_seconds"),
-                        "reason": str(change.get("reason") or "")[:300],
+                        "reason": str(i18n.reword(change.get("reason"), change.get("reason_wire")) or "")[:300],
                         "copies": [],
                     },
                 )
@@ -1168,18 +1178,14 @@ def _proxied_alert_text(fault: dict[str, Any], since: datetime) -> tuple[str, st
     svc, box, proxy = fault["svc"], fault["box"], fault["proxy"]
     if fault["what"] == "recovery_skipped":
         return (
-            f"CashPilot: skipped recovery for {svc} on {box}",
-            f"CashPilot skipped recovery for {svc} through {proxy} on {box}. "
-            "A container in the tunnel does not match the worker's saved ID, or the worker has no saved ID "
-            "for it yet. Review the copies under Proxies on the Fleet page.",
+            t("alert.proxied.recovery_skipped_title", svc=svc, box=box),
+            t("alert.proxied.recovery_skipped", svc=svc, proxy=proxy, box=box),
         )
     if fault["what"] == "start_needs_approval":
         earner = fault["earner"]
         return (
-            f"CashPilot: {svc} on {box} needs your approval to start",
-            f"The traffic cap of {proxy} no longer holds, but CashPilot did not start {svc} ({earner}) on {box} "
-            "again: that would replace a container the worker cannot match to its saved ID. Press Start for "
-            "this copy under Proxies on the Fleet page to review the containers.",
+            t("alert.proxied.needs_approval_title", svc=svc, box=box),
+            t("alert.proxied.needs_approval", proxy=proxy, svc=svc, earner=earner, box=box),
         )
     if fault["what"] == "tunnel_stuck":
         tunnel, copies = fault["tunnel"], ", ".join(sorted(fault["copies"]))
@@ -1187,38 +1193,43 @@ def _proxied_alert_text(fault: dict[str, Any], since: datetime) -> tuple[str, st
             minutes = max(int(fault.get("age") or 0), 0) // 60
         except (TypeError, ValueError):
             minutes = 0
-        age = f"{minutes // 60} h {minutes % 60} min" if minutes >= 60 else f"{minutes} min"
-        reason = fault.get("reason", "").strip() or "the worker did not say why"
-        reason = reason if reason.endswith((".", "!", "?")) else reason + "."
+        if minutes >= 60:
+            age = t("alert.proxied.age_hours", h=minutes // 60, m=minutes % 60)
+        else:
+            age = t("alert.proxied.age_minutes", m=minutes)
+        # The message ends the reason with its own full stop, in its own script.
+        reason = fault.get("reason", "").strip().rstrip(".") or t("alert.proxied.no_reason")
         return (
-            f"CashPilot: the tunnel change of {proxy} on {box} is stuck",
-            f"The tunnel change of {proxy} on {box} started {age} ago, and the worker cannot finish it. "
-            f"Reason: {reason} The copies already in the new tunnel {tunnel} ({copies}) wait for it, and "
-            "CashPilot cannot tell whether they earn until it finishes. The worker tries again on every "
-            "heartbeat, so this clears by itself once the cause is fixed. If the proxy is down or its login "
-            "is wrong, fix it under Proxies on the Fleet page.",
+            t("alert.proxied.tunnel_stuck_title", proxy=proxy, box=box),
+            t("alert.proxied.tunnel_stuck", proxy=proxy, box=box, age=age, reason=reason, tunnel=tunnel, copies=copies),
         )
     if fault["what"] == "tunnel":
         tunnel, copies = fault["tunnel"], ", ".join(sorted(fault["copies"]))
-        how = "is gone" if fault["gone"] else f"has not been running since {since:%Y-%m-%d %H:%M} UTC"
+        if fault["gone"]:
+            return (
+                t("alert.proxied.tunnel_gone_title", tunnel=tunnel, box=box),
+                t("alert.proxied.tunnel_gone", tunnel=tunnel, proxy=proxy, box=box, copies=copies),
+            )
         return (
-            f"CashPilot: {tunnel} " + ("is gone from " + box if fault["gone"] else "has stopped running"),
-            f"The tunnel {tunnel} of {proxy} on {box} {how}, so the copies that leave through it ({copies}) "
-            "have no way out and are not earning. Start one of them from the Fleet page, which brings the "
-            "tunnel back, or remove them there if you removed the tunnel on purpose.",
+            t("alert.proxied.tunnel_down_title", tunnel=tunnel),
+            t(
+                "alert.proxied.tunnel_down",
+                tunnel=tunnel,
+                proxy=proxy,
+                box=box,
+                since=f"{since:%Y-%m-%d %H:%M}",
+                copies=copies,
+            ),
         )
     earner = fault["earner"]
     if fault["what"] == "copy_missing":
         return (
-            f"CashPilot: {earner} is gone from {box}",
-            f"{svc} through {proxy} ({earner}) was added on {box}, but that box no longer runs it, so it is "
-            "not earning. Add the copy again from the Fleet page, or remove it there if you removed it on purpose.",
+            t("alert.proxied.copy_missing_title", earner=earner, box=box),
+            t("alert.proxied.copy_missing", svc=svc, proxy=proxy, earner=earner, box=box),
         )
     return (
-        f"CashPilot: {earner} has stopped running",
-        f"{svc} through {proxy} ({earner}) has not been running since {since:%Y-%m-%d %H:%M} UTC on {box}, so it "
-        "is not earning. Start it from the Fleet page. If you stopped it on purpose, stop it from there too: "
-        "a stop made there keeps this alert quiet.",
+        t("alert.proxied.copy_down_title", earner=earner),
+        t("alert.proxied.copy_down", svc=svc, proxy=proxy, earner=earner, since=f"{since:%Y-%m-%d %H:%M}", box=box),
     )
 
 
@@ -1243,16 +1254,17 @@ def _stall_text(name: str, box: str, stall: traffic_stall.Stall, hours: int) -> 
     """
 
     def mb(rate: float) -> str:
-        return "under 0.1 MB" if rate < 0.1 * traffic_stall.MB else f"{rate / traffic_stall.MB:.1f} MB"
+        if rate < 0.1 * traffic_stall.MB:
+            return t("alert.stall.under_tenth_mb", mb=i18n.decimal(0.1))
+        return t("alert.stall.mb", mb=i18n.decimal(rate / traffic_stall.MB))
 
     return (
-        f"CashPilot: {name} on {box} carries almost no traffic",
-        f"{name} on {box} has sent {mb(stall.sent)} an hour for {hours} hours; its other copies sent "
-        f"{mb(stall.peers)} an hour. It runs but gets almost no work: look at its logs, and restart it from the "
-        "dashboard if this lasts. CashPilot does not restart it by itself.",
+        t("alert.stall.title", name=name, box=box),
+        t("alert.stall", name=name, box=box, sent=mb(stall.sent), hours=hours, peers=mb(stall.peers)),
     )
 
 
+@i18n.owner_text
 async def _traffic_stall_check(workers: list[dict[str, Any]], statuses: list[dict[str, Any]]) -> None:
     """Alert when a running copy carries almost no traffic while the service's other copies are busy.
 
@@ -1337,6 +1349,7 @@ _docker_bell: dict[str, dict[str, str]] = {}
 DOCKER_LOST_DOC = "https://geiserx.github.io/CashPilot/faq/#worker-lost-docker"
 
 
+@i18n.owner_text
 async def _worker_docker_check(workers: list[dict[str, Any]] | None = None) -> None:
     """Alert when an online worker has not been able to reach Docker for CONTAINER_DOWN_GRACE.
 
@@ -1440,25 +1453,19 @@ def _docker_alert_text(name: str, worker: dict[str, Any], since: datetime) -> tu
     end lost its tail for a long worker name.
     """
     access = placement.system_info(worker).get("docker_access")
-    cause = (
-        " A Docker update that replaces its socket causes this. Mounting the socket's folder in the proxy, "
-        "not the socket file, stops it from happening again."
-    )
+    cause = " " + t("alert.docker.cause")
     if access == "socket":
-        fix = "Fix: on that machine, restart the worker container. It holds the Docker socket itself."
+        fix = t("alert.docker.fix_socket")
         cause = ""
     elif access == "proxy":
-        fix = "Fix: on that machine, run docker restart cashpilot-socket-proxy."
+        fix = t("alert.docker.fix_proxy")
     else:
         # A worker from before docker_access: a compose install has the proxy
         # since 2026-11-06, an Unraid or older one holds the socket itself.
-        fix = (
-            "Fix: on that machine, run docker restart cashpilot-socket-proxy, or restart the worker if it has no proxy."
-        )
+        fix = t("alert.docker.fix_either")
     return (
-        f"CashPilot: worker '{name}' cannot reach Docker",
-        f"Worker '{name}' cannot reach Docker since {since:%Y-%m-%d %H:%M} UTC. {fix} How: {DOCKER_LOST_DOC} "
-        f"Its containers keep running, but CashPilot cannot start, stop or update them.{cause}",
+        t("alert.docker.title", name=name),
+        t("alert.docker", name=name, since=f"{since:%Y-%m-%d %H:%M}", fix=fix, doc=DOCKER_LOST_DOC) + cause,
     )
 
 
@@ -1516,6 +1523,7 @@ async def _push_alert(kind: str, subject: str, title: str, message: str, alert_i
             )
 
 
+@i18n.owner_text
 async def _detect_payout(result: Any) -> dict[str, str] | None:
     """Notice a balance drop that looks like a cashout, and ask.
 
@@ -1574,7 +1582,7 @@ async def _detect_payout(result: Any) -> dict[str, str] | None:
                 _push_alert(
                     "payout",
                     result.platform,
-                    f"CashPilot: {result.platform} balance dropped — was this a payout?",
+                    t("alert.title.payout", name=result.platform),
                     probable["reason"],
                     alert_id,
                 )
@@ -1612,10 +1620,13 @@ async def _pending_payout_alerts(seen: set[str] | None = None) -> list[dict[str,
             {
                 "kind": "payout",
                 "platform": platform,
-                "error": f"Balance dropped by {payouts.format_amount(amount, currency)} {currency}".rstrip()
-                + " — was this a payout? Confirm or reject it."
+                "error": (
+                    t("alert.payout.pending", amount=payouts.format_amount(amount, currency), currency=currency)
+                    if currency.strip()
+                    else t("alert.payout.pending_no_unit", amount=payouts.format_amount(amount, currency))
+                )
                 if isinstance(amount, int | float)
-                else "A balance drop looks like a payout — confirm or reject it.",
+                else t("alert.payout.pending_unknown"),
             }
         )
     return pending
@@ -1672,10 +1683,7 @@ async def _offline_worker_alerts() -> list[dict[str, str]]:
                     # dedupe match on client_id, because two hosts can share a
                     # hostname and hostnames churn across recreates.
                     "client_id": w.get("client_id") or w["name"],
-                    "error": (
-                        f"Offline since {w['last_heartbeat']} UTC. Its containers keep running "
-                        "and earning, but CashPilot cannot see or manage them until it reconnects."
-                    ),
+                    "error": t("alert.worker.offline_since", since=w["last_heartbeat"]),
                 }
             )
     return entries
@@ -1695,27 +1703,14 @@ def _quiet_days_by_platform() -> dict[str, int]:
 def _flatline_message(flat: dict[str, Any]) -> str:
     name = (catalog.get_service(flat["platform"]) or {}).get("name") or flat["platform"]
     days = flat.get("days_flat")
-    span = f" ({days} days)" if days else ""
+    span = " " + t("alert.flatline.span", days=days) if days else ""
     if flat.get("last_increase") is None:
-        return (
-            f"{name} has not earned anything since CashPilot started reading it"
-            f"{' on ' + str(flat['since']) if flat.get('since') else ''}{span}. "
-            "Common causes: the device is not linked to your account, the provider has no demand for your "
-            "IP or region yet, or the node cannot be reached from outside. "
-            "This clears by itself when the balance grows."
-        )
+        if flat.get("since"):
+            return t("alert.flatline.never_since", name=name, since=str(flat["since"]), span=span)
+        return t("alert.flatline.never", name=name, span=span)
     gap = flat.get("usual_gap_days")
-    rhythm = (
-        f"it usually earns every {'day' if gap == 1 else f'{gap} days'}"
-        if gap
-        else "it earned before, though too rarely to say how often"
-    )
-    return (
-        f"{name} hasn't earned since {flat['last_increase']}{span}; {rhythm}. "
-        "Common causes: no demand for your IP or region right now, the device was unlinked from your "
-        "account, or the node cannot be reached from outside. Services often go quiet for a while and "
-        "pick up again; this clears by itself when the balance grows."
-    )
+    rhythm = t("alert.flatline.rhythm", gap=gap) if gap else t("alert.flatline.rhythm_rare")
+    return t("alert.flatline.quiet", name=name, last=flat["last_increase"], span=span, rhythm=rhythm)
 
 
 # One push per quiet spell. The default 24 h cooldown would repeat the push
@@ -1724,6 +1719,7 @@ def _flatline_message(flat: dict[str, Any]) -> str:
 _FLATLINE_COOLDOWN_HOURS = 24 * 365 * 10
 
 
+@i18n.owner_text
 async def _flatline_check(
     collected: set[str] | None = None,
     deployments: list[dict[str, Any]] | None = None,
@@ -1784,7 +1780,7 @@ async def _flatline_check(
                 "flatline", platform, message, cooldown_hours=_FLATLINE_COOLDOWN_HOURS
             ):
                 name = (catalog.get_service(platform) or {}).get("name") or platform
-                _spawn(_push_alert("flatline", platform, f"CashPilot: {name} has gone quiet", message, alert_id))
+                _spawn(_push_alert("flatline", platform, t("alert.title.flatline", name=name), message, alert_id))
     except Exception as exc:
         logger.warning("Flatline check failed: %s", exc)
         # The check's own failure must not render as health: an empty return
@@ -2039,6 +2035,7 @@ async def _device_still_deployed(slug: str, device_id: str) -> bool:
     return False
 
 
+@i18n.owner_text
 async def _retry_device_links() -> None:
     """Retry the registrations a provider asked to try again later, with backoff."""
     now = datetime.now(UTC)
@@ -2068,15 +2065,16 @@ async def _retry_device_links() -> None:
             # (_unlinked_devices_warning says why). The next collection puts
             # the device in the owner's bell with its full id and link.
             message = (
-                f"{svc.get('name') or slug} never accepted the device {notify.mask_device_id(device_id)} "
-                f"after a day of retries, so it earns for nobody. {_DEVICE_ID_IN_BELL}"
+                t("alert.device.gave_up", name=svc.get("name") or slug, device=notify.mask_device_id(device_id))
+                + " "
+                + _device_id_in_bell()
             )
             if alert_id := await database.record_alert("notice", slug, message):
                 _spawn(
                     _push_alert(
                         "notice",
                         slug,
-                        f"CashPilot: {svc.get('name') or slug} device not on your account",
+                        t("alert.title.device", name=svc.get("name") or slug),
                         message,
                         alert_id,
                     )
@@ -2165,7 +2163,8 @@ def _unlinked_devices(result: Any, retrying: set[str] | frozenset[str] = frozens
 
 
 #: Said in place of the id and its link wherever a notice leaves the owner's bell.
-_DEVICE_ID_IN_BELL = "The owner sees the full ID and the link to add it in CashPilot's notification bell."
+def _device_id_in_bell() -> str:
+    return t("alert.device.in_bell")
 
 
 def _unlinked_devices_warning(result: Any, retrying: set[str] | frozenset[str] = frozenset()) -> str:
@@ -2181,12 +2180,27 @@ def _unlinked_devices_warning(result: Any, retrying: set[str] | frozenset[str] =
         return ""
     svc = catalog.get_service(result.platform) or {}
     name = svc.get("name") or result.platform
-    which = "A deployed device is" if len(devices) == 1 else f"{len(devices)} deployed devices are"
-    earns = "earns" if len(devices) == 1 else "earn"
     masked = ", ".join(d["masked"] for d in devices)
-    return f"{which} not on your {name} account and {earns} for nobody: {masked}. {_DEVICE_ID_IN_BELL}"
+    return t("alert.device.unlinked", n=len(devices), name=name, masked=masked) + " " + _device_id_in_bell()
 
 
+def _collector_failed_title(platform: str, kind: str | None) -> str:
+    """The push title of a failed collection, naming the cause when it is known.
+
+    The push is the only channel an unattended install has, so the taxonomy
+    must reach it too: "rotate your cookie" and "provider hiccup" are
+    different asks.
+    """
+    if kind == "auth":
+        return t("alert.title.collector_auth", name=platform)
+    if kind == "transient":
+        return t("alert.title.collector_transient", name=platform)
+    if kind == "shape":
+        return t("alert.title.collector_shape", name=platform)
+    return t("alert.title.collector", name=platform)
+
+
+@i18n.owner_text
 async def _run_collection() -> None:
     """Collect earnings from all deployed services that have collectors."""
     global _collector_alerts, _collected_ok_last_run, _collector_says_disabled, _collected_since_start
@@ -2296,16 +2310,11 @@ async def _run_collection() -> None:
                         # The push is the only channel an unattended install
                         # has, so the taxonomy must reach it too: "rotate your
                         # cookie" and "provider hiccup" are different asks.
-                        cause = {
-                            "auth": " (credential rejected)",
-                            "transient": " (provider unreachable)",
-                            "shape": " (page changed)",
-                        }.get(error_kind or "", "")
                         _spawn(
                             _push_alert(
                                 "collector",
                                 result.platform,
-                                f"CashPilot: {result.platform} collector failed{cause}",
+                                _collector_failed_title(result.platform, error_kind),
                                 safe_error,
                                 alert_id,
                             )
@@ -2325,10 +2334,10 @@ async def _run_collection() -> None:
                             # In memory only, never record_alert: the owner's
                             # bell is the one place the full ids are shown.
                             notice["devices"] = devices
-                            notice["device_steps"] = str(
-                                ((catalog.get_service(result.platform) or {}).get("device_link") or {}).get("steps")
-                                or ""
-                            ).strip()
+                            linked = catalog.localized_service(
+                                catalog.get_service(result.platform) or {}, i18n.current()
+                            )
+                            notice["device_steps"] = str((linked.get("device_link") or {}).get("steps") or "").strip()
                         alerts.append(notice)
                         # Push out-of-band with the same once-per-window dedupe
                         # errors get. A notice used to reach ONLY the bell,
@@ -2340,7 +2349,7 @@ async def _run_collection() -> None:
                                 _push_alert(
                                     "notice",
                                     result.platform,
-                                    f"CashPilot: {result.platform} needs attention",
+                                    t("alert.title.notice", name=result.platform),
                                     safe_warning,
                                     alert_id,
                                 )
@@ -3126,6 +3135,7 @@ async def _auto_restart(
     logger.warning("Restarted %s %s on worker %s by itself: %s", slug, copy, wid, " ".join(means)[:300])
 
 
+@i18n.owner_text
 async def _raise_worker_offline_alert(w: dict[str, Any]) -> None:
     """Record + push + bell an offline worker, keyed by client_id.
 
@@ -3135,10 +3145,7 @@ async def _raise_worker_offline_alert(w: dict[str, Any]) -> None:
     another's. The display name travels in the message and title only.
     """
     cid = w.get("client_id") or w["name"]
-    msg = (
-        f"Worker '{w['name']}': no heartbeat for over {_stale_after_seconds(w) // 60} minutes. Its "
-        "containers keep running and earning, but CashPilot cannot see or manage them until it reconnects."
-    )
+    msg = t("alert.worker.offline", name=w["name"], minutes=_stale_after_seconds(w) // 60)
     if alert_id := await database.record_alert("worker", cid, msg):
         # The push floor, checked only on a FRESH row (a deduped record never
         # gets here): a new episode inside the floor keeps its row and bell
@@ -3153,7 +3160,7 @@ async def _raise_worker_offline_alert(w: dict[str, Any]) -> None:
                 _push_alert(
                     "worker",
                     cid,
-                    f"CashPilot: worker '{w['name']}' went offline",
+                    t("alert.title.worker_offline", name=w["name"]),
                     msg,
                     alert_id,
                 )
@@ -3215,6 +3222,17 @@ async def _warm_session_epochs() -> None:
         auth.set_user_pwd_epoch(uid, ts)
 
 
+async def _restore_background_locale() -> None:
+    """Write alerts in the owner's language from the first collection on, not English until they visit."""
+    try:
+        saved = await database.get_config(i18n.BACKGROUND_KEY)
+    except Exception as exc:  # noqa: BLE001 - English alerts are the safe default
+        logger.warning("Could not read the owner's language for alerts: %s", type(exc).__name__)
+        return
+    if isinstance(saved, str) and saved:
+        i18n.set_background(saved)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -3230,6 +3248,7 @@ async def lifespan(app: FastAPI):
     captcha.check_startup()
     await database.init_db()
     await database.connect_shared()
+    await _restore_background_locale()
     # Warm the per-user session-epoch cache (password changes + delete/demote
     # revocations) so invalidated sessions are rejected without a DB hit in the
     # request path — and, crucially, so those invalidations survive a restart.
@@ -3570,8 +3589,8 @@ class _SameOriginMiddleware(BaseHTTPMiddleware):
         ):
             return JSONResponse(
                 {
-                    "detail": "Cross-site request refused",
-                    "hint": "Behind a reverse proxy, pass the original Host header or send X-Forwarded-Host.",
+                    "detail": t("api.cross_site_request_refused"),
+                    "hint": t("api.behind_reverse_proxy_pass_original"),
                 },
                 status_code=403,
             )
@@ -3806,7 +3825,8 @@ async def api_mode(request: Request) -> dict[str, Any]:
 @app.get("/api/services")
 async def api_list_services(request: Request) -> list[dict[str, Any]]:
     _require_auth_api(request)
-    return catalog.get_services()
+    locale = i18n.current()
+    return [catalog.localized_service(svc, locale) for svc in catalog.get_services()]
 
 
 def _collector_needs_setup(slug: str, config: dict[str, str]) -> bool:
@@ -4130,6 +4150,8 @@ async def api_services_deployed(request: Request) -> list[dict[str, Any]]:
                 "hints": _windowed_hints.get((slug, inst.get("_worker_id"), int(inst.get("instance") or 1)), []),
                 "fatal": inst.get("fatal"),
                 "held": inst.get("held"),
+                # Fence and runtime, for the badge on the row; external copies get none.
+                "layers": None if inst.get("deployed_by") == "external" else inst.get("_layers"),
             }
             # A copy routed through a proxy from its deploy: the row shows
             # the exit IP and country it leaves from.
@@ -4315,10 +4337,13 @@ async def api_services_available(request: Request) -> list[dict[str, Any]]:
             worker_node_counts[slug].add(node)
 
     recorded_routes = await _recorded_routes()
+    locale = i18n.current()
     available = []
     for svc in services:
         if svc.get("status") in _UNDEPLOYABLE_STATUSES:
             continue  # Known non-functional — hide completely
+        # The page's language, before the grade below copies the cons.
+        svc = catalog.localized_service(svc, locale)
         docker_conf = svc.get("docker", {})
         has_image = bool(docker_conf and docker_conf.get("image"))
         slug = svc.get("slug", "")
@@ -4349,6 +4374,7 @@ async def api_get_service(request: Request, slug: str) -> dict[str, Any]:
     if svc.get("custom") and not auth.require_role(user, "owner"):
         # Plain-text variables and the command are the owner's, as /api/config is.
         svc = custom_services.redacted(svc)
+    svc = catalog.localized_service(svc, i18n.current())
 
     # Enrich with deployment status (same logic as /api/services/available)
     deployments = await database.get_deployments()
@@ -5221,6 +5247,9 @@ async def _deploy(
             if recorded_route is not None:
                 await _refuse_direct_on_proxied_only(svc, slug, worker_id)
                 await _confirm_leave_route(request, svc, slug, worker_id, password)
+                # A runtime choice the worker cannot take refuses the deploy: ask
+                # before the routed copy goes, so a refusal stops nothing.
+                await _runtime_choice_for(worker_id, slug)
                 await _remove_routed_copies(worker_id, slug, [recorded_route])
                 options["leave_route"] = True
         held = await _reserve_pending_identities(slug, worker_id, 1, spec.get("env"))
@@ -6055,7 +6084,10 @@ async def _refuse_shared_device_ids(slug: str, svc: dict[str, Any], env: dict[st
             detail={
                 "error": "identity_in_use",
                 "message": t(
-                    "api.already_runs_two_boxes_one", label=label, name=svc.get("name") or slug, names=", ".join(names)
+                    "api.already_runs_two_boxes_one",
+                    label=label,
+                    name=svc.get("name") or slug,
+                    names=i18n.join_and(names),
                 ),
             },
         )
@@ -6522,8 +6554,8 @@ async def _reserve_pending_identities(
         instance = await database.hold_pending_identities(slug, worker_id, copy, env)
     except Exception as exc:
         logger.exception("Could not record the device ids of %s on worker %s", slug, worker_id)
-        what = f"copy {copy_note} and the copies after it were not deployed" if copy_note else "nothing was deployed"
-        raise HTTPException(status_code=503, detail=t("api.device_ids_deploy_sends_could", what=what)) from exc
+        copy_text = str(copy_note) if copy_note else "none"
+        raise HTTPException(status_code=503, detail=t("api.device_ids_deploy_sends_could", copy=copy_text)) from exc
     return (instance, dict(env)) if instance else None
 
 
@@ -7649,19 +7681,19 @@ def _safe_worker_detail(resp: Any) -> dict[str, Any] | None:
         ):
             return {
                 "error": error,
-                "message": "Starting this copy requires replacing containers in its shared tunnel.",
+                "message": t("api.starting_copy_requires_replacing_containers"),
                 "expected_containers": targets,
                 "group_approval": proof,
             }
         return None
     if error == "proxied_copy_stopped":
-        return {"error": error, "message": "The proxied copy is stopped."}
+        return {"error": error, "message": t("api.proxied_copy_stopped")}
     if error == "deploy_target_changed":
         actual = detail.get("current_container")
         if isinstance(actual, str) and _DEPLOY_TARGET_ID.fullmatch(actual):
             return {
                 "error": error,
-                "message": "The container changed or needs approval. Review it and use Redeploy.",
+                "message": t("api.container_changed_needs_approval_review"),
                 "current_container": actual,
             }
         return None
@@ -7677,6 +7709,9 @@ def _safe_worker_detail(resp: Any) -> dict[str, Any] | None:
         "self_update_unavailable",
         "isolation_check_busy",
         "isolation_check_unavailable",
+        # The gVisor check's own answers (app/gvisor_check.py).
+        "gvisor_check_busy",
+        "gvisor_check_unavailable",
         # A deploy refused for a wallet or identity volume (app/step_up.py).
         "critical_volume_mount",
         "step_up_required",
@@ -8281,6 +8316,40 @@ async def _confirm_deploy_targets(worker_id: int, slug: str, keys: list[str]) ->
         await _ask_deploy_confirmation(worker_id, slug, targets, old=old)
 
 
+async def _runtime_choice_for(worker_id: int, slug: str, *, routed: bool = False) -> str | None:
+    """The runtime choice a deploy of ``slug`` sends to this worker, or None for Docker's default.
+
+    Refused when a choice is stored but the worker cannot take it: deploying
+    under Docker's default instead would show the owner a layer the earner
+    does not have. A copy routed through a proxy takes no choice (the worker
+    runs it under Docker's default), so an earner set to gVisor is refused there.
+    """
+    worker = await database.get_worker(worker_id) or {}
+    info = placement.system_info(worker)
+    if placement.is_desktop(info) or placement.is_android(info):
+        return None
+    if routed:
+        stored = (await layers_ui.choices(worker))["earners"].get(slug)
+        # A choice the catalog or an env pin overrules is not the earner's runtime: no refusal.
+        if stored == layers_ui.GVISOR and not layers_ui.overruled(slug, info, stored):
+            raise HTTPException(
+                status_code=409, detail=t("api.runtime_choice_routed", worker=worker.get("name") or f"#{worker_id}")
+            )
+        return None
+    choice = await layers_ui.for_new_deploy(worker, slug)
+    if choice and layers_ui.FEATURE not in (info.get("features") or []):
+        raise HTTPException(
+            status_code=409,
+            detail=t("api.runtime_choice_worker_too_old", runtime=choice, worker=worker.get("name") or f"#{worker_id}"),
+        )
+    if choice == layers_ui.GVISOR and (why := layers_ui.locked(slug, info, choice)):
+        raise HTTPException(
+            status_code=409,
+            detail=t("api.runtime_choice_cannot", worker=worker.get("name") or f"#{worker_id}", why=why),
+        )
+    return choice
+
+
 async def _send_worker_deploy(
     worker_id: int,
     slug: str,
@@ -8324,6 +8393,14 @@ async def _send_worker_deploy(
 
     locks = _worker_deploy_locks.setdefault(asyncio.get_running_loop(), {})
     async with locks.setdefault((worker_id, slug), asyncio.Lock()):
+        # The owner's runtime choice for this earner on this worker (app/layers_ui.py),
+        # picked and recorded under this lock: a second deploy of the earner reads
+        # what the first one recorded, never a default changed in between.
+        if proxy_id is not None:
+            await _runtime_choice_for(worker_id, slug, routed=True)
+        elif "runtime_choice" not in body and (choice := await _runtime_choice_for(worker_id, slug)):
+            body["runtime_choice"] = choice
+        sent = body.get("runtime_choice") if proxy_id is None else None
         # A Desktop's lookup answers checked or refuses: it never falls back to the old route.
         current, checked = await _worker_deploy_target(worker_id, slug, instance, proxy_id)
         if not checked and current != expected:
@@ -8344,7 +8421,29 @@ async def _send_worker_deploy(
             body["replace_existing"] = True
         if sign_earner:
             body["earner"] = await _approve_spec(worker_id, slug, body["earner"])
-        return await send(checked=checked)
+        result = await send(checked=checked)
+        # The worker took it: a default this earner inherited is now its own (app/layers_ui.py).
+        await _remember_runtime_choice(worker_id, slug, sent)
+    return result
+
+
+async def _remember_runtime_choice(worker_id: int, slug: str, choice: Any) -> None:
+    """Record the choice a deploy the worker took was sent with. Never fails the deploy.
+
+    The earner already runs: a failed write only means a later change of the
+    worker default can move it, so it is logged and the deploy's own
+    bookkeeping goes on.
+    """
+    if not isinstance(choice, str):
+        return
+    try:
+        worker = await database.get_worker(worker_id)
+        if worker:
+            await layers_ui.remember(worker, slug, choice)
+    except Exception as exc:
+        logger.warning(
+            "Could not record the runtime choice of %s on worker %s: %s", slug, worker_id, type(exc).__name__
+        )
 
 
 async def _proxy_worker_deploy(
@@ -8423,27 +8522,36 @@ async def _proxy_worker_restore(
             detail=t("api.worker_has_not_finished_enrolling"),
         )
     target = step_up.restore_target(slug, client_id, restore["sha256"])
-    body = {
-        **spec,
-        "bundle_b64": restore["bundle_b64"],
-        "passphrase": restore["passphrase"],
-        "approval": step_up.sign(key, step_up.ACTION_RESTORE, target),
-    }
-    # The worker pulls the image, creates the container and writes and reads
-    # the backup back before it answers; a deploy's time plus the copy.
-    result = await _proxy_to_worker(
-        worker_id,
-        "POST",
-        f"/api/containers/{slug}/restore",
-        json=body,
-        timeout=_deploy_timeout(slug) + 120,
-        marked=True,
-        # The owner's yes to plain HTTP, checked against the URL the passphrase goes to.
-        allow_plain_http=restore.get("allow_plain_http") is True,
-    )
-    # The worker restored it: whatever fails after this, the restore happened.
-    restore["answered"] = True
-    restore["state_id"] = result.get("state_id") if isinstance(result, dict) else None
+    locks = _worker_deploy_locks.setdefault(asyncio.get_running_loop(), {})
+    # Picked and recorded under the deploy lock, as a deploy does (_send_worker_deploy).
+    async with locks.setdefault((worker_id, slug), asyncio.Lock()):
+        # Signed once the lock is held: a deploy ahead of it can run for minutes,
+        # and the approval's lifetime must start when the request goes out.
+        body = {
+            **spec,
+            "bundle_b64": restore["bundle_b64"],
+            "passphrase": restore["passphrase"],
+            "approval": step_up.sign(key, step_up.ACTION_RESTORE, target),
+        }
+        # A restore recreates the earner: it keeps the runtime the owner chose, as a deploy does.
+        if "runtime_choice" not in body and (choice := await _runtime_choice_for(worker_id, slug)):
+            body["runtime_choice"] = choice
+        # The worker pulls the image, creates the container and writes and reads
+        # the backup back before it answers; a deploy's time plus the copy.
+        result = await _proxy_to_worker(
+            worker_id,
+            "POST",
+            f"/api/containers/{slug}/restore",
+            json=body,
+            timeout=_deploy_timeout(slug) + 120,
+            marked=True,
+            # The owner's yes to plain HTTP, checked against the URL the passphrase goes to.
+            allow_plain_http=restore.get("allow_plain_http") is True,
+        )
+        # The worker restored it: whatever fails after this, the restore happened.
+        restore["answered"] = True
+        restore["state_id"] = result.get("state_id") if isinstance(result, dict) else None
+        await _remember_runtime_choice(worker_id, slug, body.get("runtime_choice"))
     return result
 
 
@@ -9237,7 +9345,7 @@ async def _remove_copy(proxy_id: int, worker_id: int, slug: str) -> Any:
         return {
             "status": "removed",
             "containers": [],
-            "note": "That worker no longer exists; only the record was removed.",
+            "note": t("api.worker_no_longer_exists_only"),
         }
     async with _proxy_copy_lock(proxy_id, worker_id, slug):
         await _record_removed_proxied_copies(worker_id, slug, proxy_id)
@@ -9252,8 +9360,7 @@ async def _remove_copy(proxy_id: int, worker_id: int, slug: str) -> Any:
                     status_code=202,
                     content={
                         "status": "removing",
-                        "note": "The worker has not confirmed yet. CashPilot asks it again with each of its "
-                        "heartbeats and drops the copy once it confirms.",
+                        "note": t("api.worker_has_not_confirmed_yet"),
                     },
                 )
             await database.set_proxied_copy_removing(proxy_id, worker_id, slug, False)
@@ -9567,6 +9674,7 @@ async def _restart_capped_copies(proxy_id: int, worker_id: int, slugs: set[str])
         _proxy_cap_starting.difference_update((proxy_id, worker_id, slug) for slug in slugs)
 
 
+@i18n.owner_text
 async def _stop_capped_proxy(proxy: dict[str, Any], targets: set[tuple[int, str]]) -> None:
     pid = proxy["id"]
     unstopped = _proxy_cap_unstopped.setdefault(pid, {})
@@ -9614,21 +9722,24 @@ async def _stop_capped_proxy(proxy: dict[str, Any], targets: set[tuple[int, str]
         _proxy_cap_stopping.difference_update((pid, *pair) for pair in targets)
     message = await _proxy_cap_message(proxy)
     if alert_id := await database.record_alert("proxy_cap", str(pid), message):
-        name = (proxy.get("definition") or {}).get("name") or f"proxy {pid}"
-        _spawn(_push_alert("proxy_cap", str(pid), f"CashPilot: {name} reached its traffic cap", message, alert_id))
-    _set_proxy_cap_bell(pid, (proxy.get("definition") or {}).get("name") or f"proxy {pid}", message)
+        name = (proxy.get("definition") or {}).get("name") or t("alert.proxy_cap.proxy", id=pid)
+        _spawn(_push_alert("proxy_cap", str(pid), t("alert.title.proxy_cap", name=name), message, alert_id))
+    _set_proxy_cap_bell(pid, (proxy.get("definition") or {}).get("name") or t("alert.proxy_cap.proxy", id=pid), message)
 
 
 async def _proxy_cap_message(proxy: dict[str, Any]) -> str:
-    reason = (proxy.get("state") or {}).get("cap_reason") or "This proxy reached its traffic cap"
+    reason = (proxy.get("state") or {}).get("cap_reason") or t("alert.proxy_cap.reason")
     unstopped = _proxy_cap_unstopped.get(proxy["id"]) or {}
     if not unstopped:
-        return f"Stopped: {reason}."
+        return t("alert.proxy_cap.stopped", reason=reason)
     names: dict[int, str] = {}
     with contextlib.suppress(Exception):
         names = {w["id"]: w["name"] for w in await database.list_workers()}
-    still = ", ".join(f"{slug} on {names.get(wid, f'worker {wid}')}" for wid, slug in sorted(unstopped))
-    return f"{reason}. Could not stop yet, retrying on every heartbeat: {still}."
+    still = ", ".join(
+        t("alert.proxy_cap.on", slug=slug, worker=names[wid] if wid in names else t("alert.proxy_cap.worker", id=wid))
+        for wid, slug in sorted(unstopped)
+    )
+    return t("alert.proxy_cap.unstopped", reason=reason, still=still)
 
 
 def _set_proxy_cap_bell(proxy_id: int, name: str, message: str) -> None:
@@ -10255,12 +10366,16 @@ async def _evaluate_obligations() -> tuple[obligations.Evaluation, datetime]:
     now = await _obligations_now()
     facts = await _obligation_facts(now)
     state = await database.get_obligation_state()
-    evaluation = obligations.evaluate(catalog.get_services(), facts, state, now.date())
+    # The panel reads it in the page's language, the hourly push in the owner's.
+    locale = i18n.current()
+    services = [catalog.localized_service(svc, locale) for svc in catalog.get_services()]
+    evaluation = obligations.evaluate(services, facts, state, now.date())
     if evaluation.anchors:
         await database.set_obligation_anchors(evaluation.anchors)
     return evaluation, now
 
 
+@i18n.owner_text
 async def _run_obligations() -> None:
     """Hourly: push each reminder that reached a new stage, once.
 
@@ -13483,6 +13598,7 @@ async def _fleet_exits() -> list[str] | None:
     return sorted(found)
 
 
+@i18n.owner_text
 async def _ingest_activity(worker_id: int, cid: str, name: str, payload: dict[str, Any]) -> None:
     """Store one Activity window and raise its alerts. Raises on a database failure."""
     if len(json.dumps(payload, separators=(",", ":"))) > activity_ui.MAX_PAYLOAD_BYTES:
@@ -13509,11 +13625,15 @@ async def _ingest_activity(worker_id: int, cid: str, name: str, payload: dict[st
     for f in activity_ui.alert_findings(window):
         subject = f"{cid}:{f['container']}" + (f":{f['detail']}" if f["detail"] else "")
         cooldown = activity_ui.MAIL_COOLDOWN_HOURS if f["kind"] == "activity_mail" else activity_ui.LAN_COOLDOWN_HOURS
-        message = f"On {name}: {f['message']}"
+        message = t("alert.activity.on", name=name, message=f["message"])
         if alert_id := await database.record_alert(f["kind"], subject, message, cooldown_hours=cooldown):
             raised = True
-            what = "sent mail" if f["kind"] == "activity_mail" else "reached into your network"
-            _spawn(_push_alert(f["kind"], subject, f"CashPilot: {f['container']} {what}", message, alert_id))
+            title = (
+                t("alert.title.activity_mail", name=f["container"])
+                if f["kind"] == "activity_mail"
+                else t("alert.title.activity_lan", name=f["container"])
+            )
+            _spawn(_push_alert(f["kind"], subject, title, message, alert_id))
     if raised:
         await _refresh_activity_bell()
 
@@ -13543,6 +13663,7 @@ async def _refresh_activity_bell() -> None:
     _collector_alerts = [a for a in _collector_alerts if not str(a.get("kind", "")).startswith("activity_")] + bell
 
 
+@i18n.owner_text
 async def _activity_spikes(workers: list[dict[str, Any]], now: float | None = None) -> None:
     """Bell-only alerts for an hour far above a container's usual one.
 
@@ -13569,13 +13690,14 @@ async def _activity_spikes(workers: list[dict[str, Any]], now: float | None = No
             floor = activity_ui.SPIKE_OPENS_FLOOR if what == "opens" else activity_ui.SPIKE_BYTES_FLOOR
             if not activity_ui.spike(history, latest, floor):
                 continue
-            if what == "opens":
-                detail = f"opened {int(latest or 0)} connections in the last hour"
-            else:
-                detail = f"{what} {activity_ui.human_bytes(latest or 0)} in the last hour"
-            message = (
-                f"On {w.get('name') or cid}: {container} {detail}, more than {activity_ui.SPIKE_RATIO} times "
-                "its usual hour this week."
+            message = t(
+                "alert.activity.spike",
+                box=w.get("name") or cid,
+                container=container,
+                what=what,
+                count=int(latest or 0),
+                amount=activity_ui.human_bytes(latest or 0),
+                ratio=activity_ui.SPIKE_RATIO,
             )
             await database.record_alert(
                 "activity_spike",
@@ -13739,6 +13861,17 @@ async def api_worker_secure_vm_selftest(request: Request, worker_id: int) -> dic
     """
     _require_owner(request)
     return await _proxy_to_worker(worker_id, "POST", "/api/secure-vm/selftest", timeout=15)
+
+
+@app.post("/api/workers/{worker_id}/gvisor-check")
+async def api_worker_gvisor_check(request: Request, worker_id: int) -> dict[str, Any]:
+    """Does gVisor really protect the earners on this worker's host? (app/gvisor_check.py)
+
+    Owner only, and POST: the worker starts a short probe container per gVisor
+    runtime an earner would get.
+    """
+    _require_owner(request)
+    return await _proxy_to_worker(worker_id, "POST", "/api/layers/gvisor-check", timeout=180)
 
 
 @app.post("/api/workers/{worker_id}/isolation")
@@ -14477,7 +14610,7 @@ async def api_identity_change(request: Request, identity_id: int) -> dict[str, A
                     "api.already_runs_two_boxes_one_2",
                     label=label,
                     name=svc.get("name") or slug,
-                    value=", ".join(await _worker_names(others)),
+                    value=i18n.join_and(await _worker_names(others)),
                 ),
             },
         )
@@ -15094,11 +15227,13 @@ from app.routers import activity as activity_router  # noqa: E402
 from app.routers import auth as auth_router  # noqa: E402
 from app.routers import credential_storage as credential_storage_router  # noqa: E402
 from app.routers import importers as importers_router  # noqa: E402
+from app.routers import layers as layers_router  # noqa: E402
 from app.routers import obligations as obligations_router  # noqa: E402
 from app.routers import pages as pages_router  # noqa: E402
 from app.routers import users as users_router  # noqa: E402
 
 app.include_router(activity_router.router)
+app.include_router(layers_router.router)
 app.include_router(auth_router.router)
 app.include_router(pages_router.router)
 app.include_router(users_router.router)

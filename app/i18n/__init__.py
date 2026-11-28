@@ -30,10 +30,12 @@ A tag matches by language first, then region: ``es-MX`` gets ``es``,
 from __future__ import annotations
 
 import contextvars
+import functools
 import hashlib
 import json
 import math
 import re
+from collections.abc import Awaitable, Callable
 from functools import cache, lru_cache
 from pathlib import Path
 from typing import Any
@@ -214,12 +216,62 @@ def from_request(request: Any, saved: str | None = None) -> str:
     return resolve(saved, request.cookies.get(COOKIE), request.headers.get("accept-language"))
 
 
-_current: contextvars.ContextVar[str] = contextvars.ContextVar("cashpilot_locale", default=SOURCE)
+_current: contextvars.ContextVar[str | None] = contextvars.ContextVar("cashpilot_locale", default=None)
+#: The language of what CashPilot writes with no request behind it: alerts, the
+#: bell, and the ntfy, Telegram and webhook pushes. It follows the owner: the
+#: language of the owner's last page, kept under BACKGROUND_KEY in the config table.
+_background = SOURCE
+BACKGROUND_KEY = "_background_locale"
 
 
 def current() -> str:
-    """The locale of the request being served (English outside one)."""
-    return _current.get()
+    """The locale of the request being served; outside one, the background locale."""
+    return _current.get() or _background
+
+
+def background() -> str:
+    return _background
+
+
+def set_background(locale: str) -> bool:
+    """Make ``locale`` the language of text written outside a request. True when that changed it."""
+    global _background
+    chosen = locale if locale in NAMES else SOURCE
+    changed = chosen != _background
+    _background = chosen
+    return changed
+
+
+def detached() -> contextvars.Context:
+    """A copy of the current context with no request locale.
+
+    Work that a request starts but that outlives it (a collection, a push)
+    writes background text, so it must not keep the language of the request
+    that happened to start it.
+    """
+    ctx = contextvars.copy_context()
+    ctx.run(_current.set, None)
+    return ctx
+
+
+def owner_text[T](fn: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+    """Run an async function that writes alerts in the background language.
+
+    An alert is for the owner, whichever request raises it: a worker's
+    heartbeat, a deploy, a restore. The request keeps its own language for its
+    response, because API clients (the MCP server, Desktop's server join) send
+    no language and match on the English of an error.
+    """
+
+    @functools.wraps(fn)
+    async def run(*args: Any, **kwargs: Any) -> T:
+        token = _current.set(None)
+        try:
+            return await fn(*args, **kwargs)
+        finally:
+            _current.reset(token)
+
+    return run
 
 
 def use(locale: str) -> None:
@@ -484,14 +536,24 @@ def format_message(text: str, params: dict[str, Any] | None = None, locale: str 
     return _render(parse(text), params or {}, locale, "", html)
 
 
+#: Locales that write a decimal comma (3,5): CLDR's decimal mark for each.
+DECIMAL_COMMA = frozenset({"es", "pt-BR", "fr", "de", "it", "nl", "pl", "ru", "uk", "tr", "id", "vi"})
+
+
+def decimal(value: float, digits: int = 1, locale: str | None = None) -> str:
+    """``value`` with ``digits`` decimals and the current locale's decimal mark, ungrouped."""
+    text = f"{value:.{digits}f}"
+    return text.replace(".", ",") if (locale or current()) in DECIMAL_COMMA else text
+
+
 def join_and(items: list[str] | tuple[str, ...]) -> str:
-    """``items`` joined with the current locale's "and": "a and b", "a and b and c"."""
+    """``items`` joined as the current locale writes a list: "a and b", "a, b and c"."""
     if not items:
         return ""
     text = str(items[0])
-    for item in items[1:]:
-        text = t("i18n.list_and", first=text, last=item)
-    return text
+    for item in items[1:-1]:
+        text = t("i18n.list_sep", first=text, next=item)
+    return t("i18n.list_and", first=text, last=items[-1]) if len(items) > 1 else text
 
 
 def t(key: str, /, **params: Any) -> str:
@@ -505,6 +567,87 @@ def t(key: str, /, **params: Any) -> str:
     if key.endswith("_html"):
         return Markup(format_message(text, params, rules, html=True))
     return format_message(text, params, rules)
+
+
+#: The keys a worker may name in a reason it sends: nothing else in en.json.
+REASON_PREFIX = "reason."
+
+
+class Reason(str):
+    """A sentence in English that also carries its message key and arguments.
+
+    The worker writes why it holds a node, or why a tunnel change is stuck, with
+    no page to take a language from, and the UI words it later for its reader.
+    A Reason is a str with the English text, so a log line, a comparison and an
+    older UI read it as before. ``wire()`` adds the key and the arguments to a
+    heartbeat, and ``reword()`` on the UI side turns them into the reader's
+    language. Arguments are strings or numbers, so they cross JSON unchanged.
+    """
+
+    code: str
+    params: dict[str, Any]
+
+    def __new__(cls, key: str, /, **params: Any) -> Reason:
+        if not key.startswith(REASON_PREFIX):
+            raise ValueError(f"a reason key starts with {REASON_PREFIX!r}: {key!r}")
+        values = {
+            k: v if isinstance(v, (int, float)) and not isinstance(v, bool) else str(v) for k, v in params.items()
+        }
+        obj = super().__new__(cls, format_message(source()[key], values, SOURCE))
+        obj.code = key
+        obj.params = values
+        return obj
+
+    def localized(self) -> str:
+        """The reason in the current locale."""
+        return t(self.code, **self.params)
+
+
+def say(value: Any) -> Any:
+    """A Reason in the current locale, anything else as it is."""
+    return value.localized() if isinstance(value, Reason) else value
+
+
+def wire(value: Any) -> dict[str, Any] | None:
+    """What a heartbeat carries beside a reason's English: its key and arguments, or None."""
+    return {"code": value.code, "params": dict(value.params)} if isinstance(value, Reason) else None
+
+
+def reword(text: Any, wired: Any) -> Any:
+    """A reason from a worker in the current locale, or ``text`` as the worker sent it.
+
+    ``text`` stays when the worker sent no key (an older worker, or Desktop),
+    when the key is not a reason this release knows, or when its arguments do
+    not fill it.
+    """
+    if not isinstance(wired, dict):
+        return text
+    key, params = wired.get("code"), wired.get("params")
+    if not isinstance(key, str) or not key.startswith(REASON_PREFIX) or key not in source():
+        return text
+    if not isinstance(params, dict) or not all(
+        isinstance(k, str) and isinstance(v, (str, int, float)) and not isinstance(v, bool) for k, v in params.items()
+    ):
+        return text
+    if not _arg_names(parse(source()[key])) <= set(params):
+        return text
+    try:
+        return t(key, **params)
+    except Exception:  # noqa: BLE001 - the worker's English is the fallback
+        return text
+
+
+def _arg_names(parts: tuple | list) -> set[str]:
+    """Every argument a parsed message reads, in any branch."""
+    names: set[str] = set()
+    for part in parts:
+        if isinstance(part, str) or part[0] == "#":
+            continue
+        names.add(part[1])
+        if part[0] != "arg":
+            for branch in part[2].values():
+                names |= _arg_names(branch)
+    return names
 
 
 def bundle_js(locale: str) -> str:
