@@ -217,7 +217,8 @@ that cannot forget a worker on request (3.0.x and older) gets no request.
 If a guard pass or a red test is still running after 60 seconds, `remove`
 changes nothing: it does not stop the guest or delete anything. Run it again.
 If `remove` cannot delete the guest's disk, it keeps a note of where the disk
-is and says so. Run it again once the disk can be deleted.
+is and says so. Run it again once the disk can be deleted. Until that `remove`
+finishes, `install` refuses to start.
 
 ## Unraid
 
