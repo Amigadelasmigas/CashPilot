@@ -2063,6 +2063,10 @@
     "text": " — weg van een machine",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — image-update",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — ontbreekt",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "deze back-up bevat {have}, maar {slug} bewaart {want}. Het is geen back-up van {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "Er loopt een uitrol van {slug}, dus deze is niet gelezen voor een back-up. Probeer het opnieuw zodra de uitrol klaar is.",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "{outer} en {inner} staan allebei in {bind_mounts_env}, en een container die {outer} koppelt, kan een link plaatsen waar {inner} staat. Houd er maar één van in {bind_mounts_env} in het .env-bestand naast je compose-bestand en voer daarna docker compose up -d uit",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "Er loopt een verwijdering van {slug} op deze machine, dus {action, select, start {is hij niet gestart} backup {is hij niet gelezen voor een back-up} other {is er niets uitgerold}}. Probeer het opnieuw als die klaar is.",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "Er loopt nog een uitrol van {slug}, dus deze is niet opnieuw gestart. Start hem opnieuw zodra de uitrol klaar is.",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "Een herstel van {slug} is niet voltooid, dus de gegevens kunnen half geschreven zijn en {action, select, start {hij is niet gestart} backup {hij is niet gelezen voor een back-up} other {hij is niet uitgerold}}. Verwijder de dienst samen met zijn gegevens (Van deze machine verwijderen, in het dashboardpaneel van de dienst, biedt dat aan) en herstel daarna de back-up opnieuw.",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "{name} is gestart voordat het herstel klaar was, dus het herstel is ongedaan gemaakt",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "Er loopt nog een uitrol van {slug}, dus de dienst is niet gestopt. Stop de dienst opnieuw zodra de uitrol klaar is.",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "Er loopt al een update.",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "{hidden, plural, one {# container} other {# containers}} op {w, plural, one {# onbereikbare worker} other {# onbereikbare workers}} {hidden, plural, =1 {wordt} one {wordt} other {worden}} hierboven niet meegeteld. Ze blijven draaien en verdienen terwijl hun worker offline is. CashPilot kan ze alleen nu niet zien.",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "Image-updates voor {name}",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "Image-updates op {name}",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop werkt zijn eigen apps bij.",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "Docker is nu niet bereikbaar op deze machine, dus de apps erop worden niet gecontroleerd.",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "Nu offline.",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "Werk deze worker bij om image-updates te krijgen.",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "App",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "Updates",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "Van",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "Resultaat",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "Naar",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "Wanneer",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "De container van een app verandert alleen als de registry een nieuwe build heeft. De nieuwe container moet {seconds, plural, one {# seconde} other {# seconden}} zonder fouten draaien, anders zet CashPilot de oude terug. Een build die niet door deze controle komt, wordt op die machine niet opnieuw geprobeerd.",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "Elke app op elke machine",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "Wat de updates hebben gedaan",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "Dagelijkse controle om",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "Hoe het werkt",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "Laatste dagelijkse controle: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "Kan de updates niet laden: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "Updates laden",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "Installeert de nieuwe builds van de images van je apps, één app tegelijk per machine.",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "Automatisch bijwerken",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "Overnemen",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "Alleen melden",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "Uit",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "Nog geen dagelijkse controle.",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "Nog geen apps uitgerold.",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "Nog geen machines.",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "Nog niets.",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "Automatische updates staan uit op deze installatie. Zet ze aan om eenmaal per dag de nieuwe build van elke app te krijgen.",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "Automatische updates aanzetten",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "Keuzes per machine en per app",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "De eigen keuze van een app gaat voor de keuze van zijn machine, en de keuze van een machine gaat voor die van de vloot.",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "Nieuwe build",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "Mislukt",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "Actie van jou nodig",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "Teruggedraaid",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "Niet geïnstalleerd",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "Bijgewerkt",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "Nu controleren",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "Kan de controle niet starten: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "Controleren…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "Kan niet opslaan: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "Update-instellingen opgeslagen",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "Controle gestart. De resultaten verschijnen hier naarmate de machines antwoorden.",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "Image-updates van apps",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "Deze telefoon draait een oudere CashPilot Android-release dan de nieuwste gepubliceerde ({ref}). Installeer de nieuwere APK vanaf de releasepagina op GitHub.",
