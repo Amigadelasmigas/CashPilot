@@ -9563,6 +9563,102 @@
     "text": "{name} नाम का एक कंटेनर, जिसे CashPilot ने नहीं बनाया, वह नाम रखता है जिसकी नए टनल को ज़रूरत है।",
     "source": "713d0d61b762"
   },
+  "secure_vm.add_intro": {
+    "text": "इस होस्ट पर सुरक्षा घेरे वाली एक VM के अंदर कमाई ऐप चलाता है। इसे होस्ट पर root के रूप में चलाएँ। यह आपकी फ़्लीट कुंजी माँगता है और पहले दिखाता है कि यह क्या करेगा।",
+    "source": "feb047d466da"
+  },
+  "secure_vm.cmd.bad_host_name": {
+    "text": "वर्कर का नाम {name} किसी Secure VM के होस्ट का नाम नहीं हो सकता। वर्कर का नाम बदलें: अधिकतम 64 वर्ण, जिनमें केवल अक्षर, अंक, स्पेस, बिंदु, डैश और अंडरस्कोर हों।",
+    "source": "07b126d20986"
+  },
+  "secure_vm.cmd.bad_ui_url": {
+    "text": "UI का पता एक सामान्य http:// या https:// पता होना चाहिए।",
+    "source": "d930d5f46015"
+  },
+  "secure_vm.cmd.ipv6_ui": {
+    "text": "Secure VM, UI तक IPv4 पर पहुँचती है। यह पेज किसी IPv4 पते या नाम से खोलें, IPv6 पते से नहीं।",
+    "source": "554cf6fb0b55"
+  },
+  "secure_vm.cmd.not_a_host": {
+    "text": "यह वर्कर Secure VM को होस्ट नहीं कर सकता।",
+    "source": "8bf56cbfbaf6"
+  },
+  "secure_vm.cmd.public_http": {
+    "text": "यह पेज किसी सार्वजनिक पते पर सामान्य http पर खुला है। Secure VM का वर्कर अपनी कुंजी कभी इस तरह नहीं भेजता, इसलिए उसका नामांकन नहीं हो पाएगा। UI को https पर, या किसी निजी पते से खोलें, और फिर से कोशिश करें।",
+    "source": "79a13dc39212"
+  },
+  "secure_vm.cmd.same_name": {
+    "text": "दो वर्करों का नाम {name} है। एक का नाम बदलें, ताकि Secure VM पहचान सके कि कौन-सा कंप्यूटर उसका होस्ट है।",
+    "source": "34e8f02bdb7d"
+  },
+  "secure_vm.docs": {
+    "text": "Secure VM कैसे काम करती है",
+    "source": "32dc3fc87f22"
+  },
+  "secure_vm.flag": {
+    "text": "{host} पर Secure VM",
+    "source": "86c424a38212"
+  },
+  "secure_vm.flag_tip": {
+    "text": "यह वर्कर {host} पर एक Secure VM के अंदर चलता है। इसके कमाई ऐप उस होस्ट, उसके LAN या आपके tailnet तक नहीं पहुँच सकते।",
+    "source": "0c13c3bf76a5"
+  },
+  "secure_vm.install": {
+    "text": "Secure VM जोड़ें",
+    "source": "08ca6684aa69"
+  },
+  "secure_vm.no_kvm": {
+    "text": "इस होस्ट में KVM नहीं है, इसलिए यह Secure VM नहीं चला सकता। gVisor और LAN सुरक्षा घेरा यहाँ फिर भी काम करते हैं।",
+    "source": "858c23823fbd"
+  },
+  "secure_vm.remove": {
+    "text": "Secure VM हटाएँ",
+    "source": "83e2231c8d0e"
+  },
+  "secure_vm.remove_note": {
+    "text": "VM, उसकी डिस्क, उसका सुरक्षा घेरा और उसके द्वारा जोड़ी गई हर चीज़ हटाता है, जाँचता है कि कुछ भी बचा नहीं है, और इस पेज से उसके वर्कर को भुला देता है।",
+    "source": "887619c0e750"
+  },
+  "secure_vm.selftest.asked": {
+    "text": "अनुरोध भेजा गया। होस्ट एक मिनट के भीतर स्व-परीक्षण चलाता है, और उसके कुछ ही देर बाद परिणाम यहाँ दिखता है।",
+    "source": "e7b2cd319154"
+  },
+  "secure_vm.selftest.button": {
+    "text": "स्व-परीक्षण चलाएँ",
+    "source": "565661c7c5fa"
+  },
+  "secure_vm.selftest.green": {
+    "text": "स्व-परीक्षण हरा: VM, UI और इंटरनेट तक पहुँचती है, और किसी और चीज़ तक नहीं।",
+    "source": "95ce5bf92a05"
+  },
+  "secure_vm.selftest.never": {
+    "text": "अभी तक कोई स्व-परीक्षण परिणाम नहीं।",
+    "source": "169875028cab"
+  },
+  "secure_vm.selftest.recent": {
+    "text": "पिछले 5 मिनट में एक स्व-परीक्षण चला। होस्ट हर 5 मिनट में अधिकतम एक बार इसे चलाता है।",
+    "source": "7973755f9113"
+  },
+  "secure_vm.selftest.red": {
+    "text": "स्व-परीक्षण लाल: VM अपने बाहर किसी चीज़ तक पहुँच गई।",
+    "source": "388a4db850b1"
+  },
+  "secure_vm.selftest.tip": {
+    "text": "होस्ट VM के अंदर से अपने स्वयं के पतों, आपके LAN और आपके tailnet की जाँच करता है। परिणाम दो मिनट के भीतर आता है।",
+    "source": "76052e027532"
+  },
+  "secure_vm.status": {
+    "text": "स्थिति",
+    "source": "920e413c7d41"
+  },
+  "secure_vm.title": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "secure_vm.verify": {
+    "text": "होस्ट पर स्व-परीक्षण",
+    "source": "ee157fbe84f4"
+  },
   "settings.about.desc_html": {
     "text": "CashPilot नवीनतम रिलीज़ के लिए GitHub जाँचता है। नीचे दिया अपडेट बटन (<strong>{update_to}</strong>, <strong>{pull}</strong> या <strong>{repull}</strong>) आपके लिए एक बार चलने वाले हेल्पर कंटेनर से दस्तावेज़ में दिया गया <code>docker compose pull &amp;&amp; docker compose up -d</code> चलाता है — यह उस इमेज सीरीज़ का नवीनतम पैच इंस्टॉल करता है जिसे आपकी compose फ़ाइल पिन करती है। नई सीरीज़ पर जाने के लिए अब भी इमेज टैग बदलने पड़ते हैं: पहले <a href=\"https://github.com/GeiserX/CashPilot/blob/main/UPGRADING.md\" target=\"_blank\" rel=\"noopener noreferrer\">UPGRADING.md</a> पढ़ें, फिर पहले UI होस्ट और उसके बाद हर वर्कर अपडेट करें। जो इंस्टॉल Compose से प्रबंधित नहीं हैं, उन्हें इसके बजाय मैन्युअल कमांड मिलते हैं।",
     "source": "353851ce9241"

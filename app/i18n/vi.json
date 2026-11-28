@@ -9563,6 +9563,102 @@
     "text": "Một container tên {name} không do CashPilot tạo đang giữ cái tên mà đường hầm mới cần.",
     "source": "713d0d61b762"
   },
+  "secure_vm.add_intro": {
+    "text": "Chạy các ứng dụng kiếm tiền bên trong một VM có hàng rào trên máy chủ này. Hãy chạy lệnh này trên máy chủ với quyền root. Lệnh sẽ hỏi khóa đội máy của bạn và cho biết trước những gì nó sẽ làm.",
+    "source": "feb047d466da"
+  },
+  "secure_vm.cmd.bad_host_name": {
+    "text": "Tên worker {name} không dùng được làm tên máy chủ của một Secure VM. Hãy đổi tên worker thành tối đa 64 ký tự gồm chữ cái, chữ số, dấu cách, dấu chấm, dấu gạch ngang và dấu gạch dưới.",
+    "source": "07b126d20986"
+  },
+  "secure_vm.cmd.bad_ui_url": {
+    "text": "Địa chỉ UI phải là một địa chỉ http:// hoặc https:// thông thường.",
+    "source": "d930d5f46015"
+  },
+  "secure_vm.cmd.ipv6_ui": {
+    "text": "Secure VM kết nối tới UI qua IPv4. Hãy mở trang này qua một địa chỉ IPv4 hoặc một tên, không phải một địa chỉ IPv6.",
+    "source": "554cf6fb0b55"
+  },
+  "secure_vm.cmd.not_a_host": {
+    "text": "Worker này không thể làm máy chủ cho một Secure VM.",
+    "source": "8bf56cbfbaf6"
+  },
+  "secure_vm.cmd.public_http": {
+    "text": "Trang này đang được mở qua http thường trên một địa chỉ công khai. Worker của một Secure VM không bao giờ gửi khóa của nó theo cách đó, nên nó không thể ghi danh. Hãy mở UI qua https, hoặc từ một địa chỉ riêng, rồi thử lại.",
+    "source": "79a13dc39212"
+  },
+  "secure_vm.cmd.same_name": {
+    "text": "Có hai worker cùng tên {name}. Hãy đổi tên một trong hai, để Secure VM có thể biết máy tính nào là máy chủ của nó.",
+    "source": "34e8f02bdb7d"
+  },
+  "secure_vm.docs": {
+    "text": "Cách Secure VM hoạt động",
+    "source": "32dc3fc87f22"
+  },
+  "secure_vm.flag": {
+    "text": "Secure VM trên {host}",
+    "source": "86c424a38212"
+  },
+  "secure_vm.flag_tip": {
+    "text": "Worker này chạy bên trong một Secure VM trên {host}. Các ứng dụng kiếm tiền của nó không thể truy cập máy chủ đó, LAN của máy chủ đó hoặc tailnet của bạn.",
+    "source": "0c13c3bf76a5"
+  },
+  "secure_vm.install": {
+    "text": "Thêm Secure VM",
+    "source": "08ca6684aa69"
+  },
+  "secure_vm.no_kvm": {
+    "text": "Máy chủ này không có KVM, nên không thể chạy Secure VM. gVisor và hàng rào LAN vẫn hoạt động ở đây.",
+    "source": "858c23823fbd"
+  },
+  "secure_vm.remove": {
+    "text": "Gỡ Secure VM",
+    "source": "83e2231c8d0e"
+  },
+  "secure_vm.remove_note": {
+    "text": "Gỡ VM, ổ đĩa của nó, hàng rào của nó và mọi thứ nó đã thêm, kiểm tra rằng không còn gì sót lại, và khiến trang này quên worker của nó.",
+    "source": "887619c0e750"
+  },
+  "secure_vm.selftest.asked": {
+    "text": "Đã yêu cầu. Máy chủ sẽ chạy bài tự kiểm tra trong vòng một phút, và kết quả sẽ hiện ở đây ngay sau đó.",
+    "source": "e7b2cd319154"
+  },
+  "secure_vm.selftest.button": {
+    "text": "Chạy bài tự kiểm tra",
+    "source": "565661c7c5fa"
+  },
+  "secure_vm.selftest.green": {
+    "text": "Tự kiểm tra XANH: VM truy cập được UI và internet, ngoài ra không truy cập được gì khác.",
+    "source": "95ce5bf92a05"
+  },
+  "secure_vm.selftest.never": {
+    "text": "Chưa có kết quả tự kiểm tra.",
+    "source": "169875028cab"
+  },
+  "secure_vm.selftest.recent": {
+    "text": "Một bài tự kiểm tra đã chạy trong 5 phút vừa qua. Máy chủ chạy tối đa một bài mỗi 5 phút.",
+    "source": "7973755f9113"
+  },
+  "secure_vm.selftest.red": {
+    "text": "Tự kiểm tra ĐỎ: VM đã truy cập được một thứ nằm bên ngoài nó.",
+    "source": "388a4db850b1"
+  },
+  "secure_vm.selftest.tip": {
+    "text": "Máy chủ thăm dò các địa chỉ của chính nó, LAN của bạn và tailnet của bạn từ bên trong VM. Kết quả sẽ có trong vòng hai phút.",
+    "source": "76052e027532"
+  },
+  "secure_vm.status": {
+    "text": "Trạng thái",
+    "source": "920e413c7d41"
+  },
+  "secure_vm.title": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "secure_vm.verify": {
+    "text": "Tự kiểm tra trên máy chủ",
+    "source": "ee157fbe84f4"
+  },
   "settings.about.desc_html": {
     "text": "CashPilot kiểm tra GitHub để tìm bản phát hành mới nhất. Nút cập nhật bên dưới (<strong>{update_to}</strong>, <strong>{pull}</strong> hoặc <strong>{repull}</strong>) chạy giúp bạn lệnh đã được ghi trong tài liệu <code>docker compose pull &amp;&amp; docker compose up -d</code>, từ một container trợ giúp chạy một lần — nó cài bản vá mới nhất của dòng image mà tệp compose của bạn ghim. Chuyển sang một dòng mới hơn vẫn cần sửa các tag image: hãy đọc <a href=\"https://github.com/GeiserX/CashPilot/blob/main/UPGRADING.md\" target=\"_blank\" rel=\"noopener noreferrer\">UPGRADING.md</a> trước, rồi cập nhật máy chủ UI trước và mọi worker sau đó. Các bản cài đặt không do Compose quản lý sẽ nhận các lệnh thủ công thay thế.",
     "source": "353851ce9241"

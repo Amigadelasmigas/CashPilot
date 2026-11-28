@@ -9563,6 +9563,102 @@
     "text": "Ein Container namens {name}, den CashPilot nicht erstellt hat, belegt den Namen, den der neue Tunnel braucht.",
     "source": "713d0d61b762"
   },
+  "secure_vm.add_intro": {
+    "text": "Führt Verdienst-Apps in einer VM hinter einer Sperre auf diesem Host aus. Führe diesen Befehl auf dem Host als root aus. Er fragt nach deinem Flottenschlüssel und zeigt dir zuerst, was er tun wird.",
+    "source": "feb047d466da"
+  },
+  "secure_vm.cmd.bad_host_name": {
+    "text": "Der Worker-Name {name} kann nicht als Name für den Host einer Secure VM dienen. Benenne den Worker um: höchstens 64 Buchstaben, Ziffern, Leerzeichen, Punkte, Bindestriche und Unterstriche.",
+    "source": "07b126d20986"
+  },
+  "secure_vm.cmd.bad_ui_url": {
+    "text": "Die UI-Adresse muss eine einfache Adresse mit http:// oder https:// sein.",
+    "source": "d930d5f46015"
+  },
+  "secure_vm.cmd.ipv6_ui": {
+    "text": "Eine Secure VM erreicht die UI über IPv4. Öffne diese Seite über eine IPv4-Adresse oder einen Namen, nicht über eine IPv6-Adresse.",
+    "source": "554cf6fb0b55"
+  },
+  "secure_vm.cmd.not_a_host": {
+    "text": "Dieser Worker kann keine Secure VM hosten.",
+    "source": "8bf56cbfbaf6"
+  },
+  "secure_vm.cmd.public_http": {
+    "text": "Diese Seite ist über einfaches http unter einer öffentlichen Adresse geöffnet. Der Worker einer Secure VM sendet seinen Schlüssel nie auf diesem Weg, daher könnte er nicht aufgenommen werden. Öffne die UI über https oder von einer privaten Adresse aus und versuche es erneut.",
+    "source": "79a13dc39212"
+  },
+  "secure_vm.cmd.same_name": {
+    "text": "Zwei Worker heißen {name}. Benenne einen davon um, damit eine Secure VM erkennen kann, welcher Rechner ihr Host ist.",
+    "source": "34e8f02bdb7d"
+  },
+  "secure_vm.docs": {
+    "text": "So funktioniert die Secure VM",
+    "source": "32dc3fc87f22"
+  },
+  "secure_vm.flag": {
+    "text": "Secure VM auf {host}",
+    "source": "86c424a38212"
+  },
+  "secure_vm.flag_tip": {
+    "text": "Dieser Worker läuft in einer Secure VM auf {host}. Seine Verdienst-Apps können weder diesen Host noch dessen LAN noch dein Tailnet erreichen.",
+    "source": "0c13c3bf76a5"
+  },
+  "secure_vm.install": {
+    "text": "Secure VM hinzufügen",
+    "source": "08ca6684aa69"
+  },
+  "secure_vm.no_kvm": {
+    "text": "Dieser Host hat kein KVM und kann daher keine Secure VM ausführen. gVisor und die LAN-Sperre funktionieren hier trotzdem.",
+    "source": "858c23823fbd"
+  },
+  "secure_vm.remove": {
+    "text": "Secure VM entfernen",
+    "source": "83e2231c8d0e"
+  },
+  "secure_vm.remove_note": {
+    "text": "Entfernt die VM, ihre Festplatte, ihre Sperre und alles, was sie hinzugefügt hat, prüft, dass nichts übrig bleibt, und lässt diese Seite ihren Worker vergessen.",
+    "source": "887619c0e750"
+  },
+  "secure_vm.selftest.asked": {
+    "text": "Angefordert. Der Host führt den Selbsttest innerhalb einer Minute aus, und das Ergebnis erscheint kurz danach hier.",
+    "source": "e7b2cd319154"
+  },
+  "secure_vm.selftest.button": {
+    "text": "Selbsttest ausführen",
+    "source": "565661c7c5fa"
+  },
+  "secure_vm.selftest.green": {
+    "text": "Selbsttest grün: Die VM erreicht die UI und das Internet, sonst nichts.",
+    "source": "95ce5bf92a05"
+  },
+  "secure_vm.selftest.never": {
+    "text": "Noch kein Selbsttest-Ergebnis.",
+    "source": "169875028cab"
+  },
+  "secure_vm.selftest.recent": {
+    "text": "In den letzten 5 Minuten lief ein Selbsttest. Der Host führt höchstens alle 5 Minuten einen aus.",
+    "source": "7973755f9113"
+  },
+  "secure_vm.selftest.red": {
+    "text": "Selbsttest ROT: Die VM hat etwas außerhalb ihrer selbst erreicht.",
+    "source": "388a4db850b1"
+  },
+  "secure_vm.selftest.tip": {
+    "text": "Der Host prüft aus der VM heraus seine eigenen Adressen, dein LAN und dein Tailnet. Das Ergebnis kommt innerhalb von zwei Minuten.",
+    "source": "76052e027532"
+  },
+  "secure_vm.status": {
+    "text": "Status",
+    "source": "920e413c7d41"
+  },
+  "secure_vm.title": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "secure_vm.verify": {
+    "text": "Selbsttest auf dem Host",
+    "source": "ee157fbe84f4"
+  },
   "settings.about.desc_html": {
     "text": "CashPilot prüft auf GitHub, welches das neueste Release ist. Die Update-Schaltfläche unten (<strong>{update_to}</strong>, <strong>{pull}</strong> oder <strong>{repull}</strong>) führt das dokumentierte <code>docker compose pull &amp;&amp; docker compose up -d</code> für dich aus, über einen einmaligen Helfer-Container – sie installiert den neuesten Patch der Image-Reihe, die deine Compose-Datei festlegt. Der Wechsel auf eine neuere Reihe bedeutet weiterhin, die Image-Tags zu bearbeiten: Lies zuerst <a href=\"https://github.com/GeiserX/CashPilot/blob/main/UPGRADING.md\" target=\"_blank\" rel=\"noopener noreferrer\">UPGRADING.md</a>, aktualisiere dann zuerst den UI-Host und danach jeden Worker. Installationen, die nicht von Compose verwaltet werden, bekommen stattdessen die manuellen Befehle.",
     "source": "353851ce9241"

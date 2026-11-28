@@ -9563,6 +9563,102 @@
     "text": "Un container chiamato {name}, non creato da CashPilot, occupa il nome di cui il nuovo tunnel ha bisogno.",
     "source": "713d0d61b762"
   },
+  "secure_vm.add_intro": {
+    "text": "Esegue le app di guadagno in una VM protetta da una barriera su questo host. Esegui questo comando sull'host come root. Ti chiede la chiave della flotta e prima mostra cosa farà.",
+    "source": "feb047d466da"
+  },
+  "secure_vm.cmd.bad_host_name": {
+    "text": "Il nome del worker {name} non può fare da nome per l'host di una Secure VM. Rinomina il worker con al massimo 64 caratteri tra lettere, cifre, spazi, punti, trattini e trattini bassi.",
+    "source": "07b126d20986"
+  },
+  "secure_vm.cmd.bad_ui_url": {
+    "text": "L'indirizzo della UI deve essere un indirizzo http:// o https:// semplice.",
+    "source": "d930d5f46015"
+  },
+  "secure_vm.cmd.ipv6_ui": {
+    "text": "Una Secure VM raggiunge la UI tramite IPv4. Apri questa pagina tramite un indirizzo IPv4 o un nome, non un indirizzo IPv6.",
+    "source": "554cf6fb0b55"
+  },
+  "secure_vm.cmd.not_a_host": {
+    "text": "Questo worker non può ospitare una Secure VM.",
+    "source": "8bf56cbfbaf6"
+  },
+  "secure_vm.cmd.public_http": {
+    "text": "Questa pagina è aperta in semplice http su un indirizzo pubblico. Il worker di una Secure VM non invia mai la sua chiave in questo modo, quindi non potrebbe registrarsi. Apri la UI in https, o da un indirizzo privato, e riprova.",
+    "source": "79a13dc39212"
+  },
+  "secure_vm.cmd.same_name": {
+    "text": "Due worker si chiamano {name}. Rinominane uno, così che una Secure VM possa capire quale computer è il suo host.",
+    "source": "34e8f02bdb7d"
+  },
+  "secure_vm.docs": {
+    "text": "Come funziona la Secure VM",
+    "source": "32dc3fc87f22"
+  },
+  "secure_vm.flag": {
+    "text": "Secure VM su {host}",
+    "source": "86c424a38212"
+  },
+  "secure_vm.flag_tip": {
+    "text": "Questo worker è in esecuzione in una Secure VM su {host}. Le sue app di guadagno non possono raggiungere quell'host, la sua LAN né la tua tailnet.",
+    "source": "0c13c3bf76a5"
+  },
+  "secure_vm.install": {
+    "text": "Aggiungi una Secure VM",
+    "source": "08ca6684aa69"
+  },
+  "secure_vm.no_kvm": {
+    "text": "Questo host non ha KVM, quindi non può eseguire una Secure VM. gVisor e la barriera LAN funzionano comunque qui.",
+    "source": "858c23823fbd"
+  },
+  "secure_vm.remove": {
+    "text": "Rimuovi la Secure VM",
+    "source": "83e2231c8d0e"
+  },
+  "secure_vm.remove_note": {
+    "text": "Rimuove la VM, il suo disco, la sua barriera e tutto ciò che ha aggiunto, verifica che non resti nulla e fa dimenticare a questa pagina il suo worker.",
+    "source": "887619c0e750"
+  },
+  "secure_vm.selftest.asked": {
+    "text": "Richiesto. L'host esegue l'autotest entro un minuto e il risultato compare qui poco dopo.",
+    "source": "e7b2cd319154"
+  },
+  "secure_vm.selftest.button": {
+    "text": "Esegui l'autotest",
+    "source": "565661c7c5fa"
+  },
+  "secure_vm.selftest.green": {
+    "text": "Autotest verde: la VM raggiunge la UI e internet, e nient'altro.",
+    "source": "95ce5bf92a05"
+  },
+  "secure_vm.selftest.never": {
+    "text": "Ancora nessun risultato dell'autotest.",
+    "source": "169875028cab"
+  },
+  "secure_vm.selftest.recent": {
+    "text": "Un autotest è stato eseguito negli ultimi 5 minuti. L'host ne esegue al massimo uno ogni 5 minuti.",
+    "source": "7973755f9113"
+  },
+  "secure_vm.selftest.red": {
+    "text": "Autotest ROSSO: la VM ha raggiunto qualcosa al di fuori di sé.",
+    "source": "388a4db850b1"
+  },
+  "secure_vm.selftest.tip": {
+    "text": "L'host sonda i propri indirizzi, la tua LAN e la tua tailnet dall'interno della VM. Il risultato arriva entro due minuti.",
+    "source": "76052e027532"
+  },
+  "secure_vm.status": {
+    "text": "Stato",
+    "source": "920e413c7d41"
+  },
+  "secure_vm.title": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "secure_vm.verify": {
+    "text": "Autotest sull'host",
+    "source": "ee157fbe84f4"
+  },
   "settings.about.desc_html": {
     "text": "CashPilot controlla su GitHub l'ultima release. Il pulsante di aggiornamento qui sotto (<strong>{update_to}</strong>, <strong>{pull}</strong> o <strong>{repull}</strong>) esegue per te il comando documentato <code>docker compose pull &amp;&amp; docker compose up -d</code>, da un container helper monouso — installa l'ultima patch della serie di immagini fissata dal tuo file compose. Passare a una serie più recente richiede comunque di modificare i tag delle immagini: leggi prima <a href=\"https://github.com/GeiserX/CashPilot/blob/main/UPGRADING.md\" target=\"_blank\" rel=\"noopener noreferrer\">UPGRADING.md</a>, poi aggiorna prima l'host della UI e dopo ogni worker. Le installazioni non gestite da Compose ricevono invece i comandi manuali.",
     "source": "353851ce9241"
