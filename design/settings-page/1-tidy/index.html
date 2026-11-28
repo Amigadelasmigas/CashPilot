@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings - CashPilot (design 1: tidy in place)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<script>if (location.search.indexOf('frame') !== -1) document.documentElement.classList.add('framed');</script>
+<style>
+/* ===== Only the new parts. Everything else is app/static/css/style.css. ===== */
+
+/* ----- Index: groups, current section, attention dot ----- */
+.settings-layout { grid-template-columns: 200px minmax(0, 1fr); gap: 32px; }
+.idx-group { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); margin: 14px 0 4px 11px; }
+.idx-group:first-child { margin-top: 0; }
+.settings-index a { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-left-width: 2px; }
+.settings-index a[aria-current="true"] { color: var(--text-primary); border-left-color: var(--accent); font-weight: 600; }
+.settings-index a.idx-slot { color: var(--text-muted); border-left-style: dashed; }
+.idx-dot { flex: none; width: 7px; height: 7px; background: var(--warning); }
+
+/* ----- Section card ----- */
+.s-card {
+  background: var(--bg-card); background-image: var(--gradient-card);
+  border: 1px solid var(--border-color); padding: 16px 18px 12px; margin-bottom: 16px; scroll-margin-top: 64px;
+}
+.s-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px 16px; flex-wrap: wrap; }
+.s-titles { min-width: 0; flex: 1 1 340px; }
+.s-title { font-family: var(--font-mono); font-size: var(--fs-4); font-weight: 500; margin: 0; line-height: 1.3; letter-spacing: -0.01em; }
+.s-sum { color: var(--text-secondary); font-size: var(--fs-2); margin: 3px 0 0; max-width: 76ch; line-height: 1.45; }
+.s-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-top: 2px; }
+.s-body { margin-top: 14px; }
+.s-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.s-toolbar .grp { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.s-foot { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.s-foot-end { justify-content: flex-end; }
+.sub-h { font-size: var(--fs-2); font-weight: 600; color: var(--text-secondary); margin: 18px 0 6px; display: flex; gap: 8px; align-items: baseline; }
+.sub-h:first-child { margin-top: 0; }
+.sub-h .n { font-family: var(--font-mono); color: var(--accent); font-weight: 500; }
+
+/* Status chip: a square plus words, so colour is never the only signal. */
+.chip { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: var(--fs-1);
+  line-height: 22px; padding: 0 8px; border: 1px solid var(--border-light); color: var(--text-secondary); white-space: nowrap; }
+.chip::before { content: ''; width: 7px; height: 7px; background: currentColor; flex: none; }
+.chip-ok { color: var(--success); border-color: rgba(70, 179, 127, 0.45); }
+.chip-warn { color: var(--warning); border-color: rgba(224, 165, 60, 0.45); }
+.chip-fail { color: var(--error); border-color: rgba(240, 106, 95, 0.45); }
+.chip-muted { color: var(--text-muted); }
+.chip-plain::before { display: none; }
+
+/* Callout: one line of state that matters, above the controls. */
+.callout { border-left: 2px solid var(--border-strong); background: var(--bg-tertiary); padding: 8px 12px; font-size: var(--fs-2);
+  color: var(--text-primary); max-width: 84ch; margin: 0 0 12px; }
+.callout-warn { border-left-color: var(--warning); }
+.callout-ok { border-left-color: var(--success); }
+.callout-fail { border-left-color: var(--error); }
+.callout strong { font-weight: 600; }
+.callout + .callout { margin-top: -6px; }
+
+/* Learn more / How-to disclosures */
+.learn { margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 8px; }
+.learn > summary, .howto > summary, .mini-disc > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 8px; }
+.learn > summary::-webkit-details-marker, .howto > summary::-webkit-details-marker, .mini-disc > summary::-webkit-details-marker { display: none; }
+.learn > summary { color: var(--text-secondary); font-size: var(--fs-2); }
+.learn > summary:hover, .mini-disc > summary:hover { color: var(--text-primary); }
+.learn > summary::before, .howto > summary::before, .mini-disc > summary::before {
+  content: ''; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform 0.15s; margin: 0 2px; }
+.learn[open] > summary::before, .howto[open] > summary::before, .mini-disc[open] > summary::before { transform: rotate(45deg); }
+.learn-body { font-size: var(--fs-2); color: var(--text-secondary); max-width: 76ch; padding: 8px 0 4px; line-height: 1.5; }
+.learn-body p { margin: 0 0 8px; }
+.learn-body ul { margin: 0 0 8px; padding-left: 18px; }
+.learn-body li { margin-bottom: 3px; }
+.howto { border: 1px solid var(--border-light); margin-top: 12px; }
+.howto > summary { padding: 8px 12px; font-weight: 600; color: var(--text-primary); width: 100%; }
+.howto > summary:hover { background: var(--bg-hover); }
+.howto[open] > summary { border-bottom: 1px solid var(--border-color); }
+.howto-body { padding: 12px 14px 4px; }
+.mini-disc { margin-top: 8px; }
+.mini-disc > summary { font-size: var(--fs-2); color: var(--text-secondary); }
+
+/* Numbered steps */
+.steps { list-style: none; counter-reset: st; padding: 0; margin: 0; }
+.steps > li { counter-increment: st; position: relative; padding-left: 36px; margin-bottom: 14px; font-size: var(--fs-2); color: var(--text-secondary); max-width: 80ch; }
+.steps > li::before { content: counter(st); position: absolute; left: 0; top: -1px; width: 22px; height: 22px; display: grid; place-items: center;
+  border: 1px solid var(--accent); color: var(--accent); font-family: var(--font-mono); font-size: var(--fs-1); }
+.steps > li > strong:first-child { color: var(--text-primary); font-weight: 600; display: block; margin-bottom: 4px; }
+.undo { font-size: var(--fs-2); color: var(--text-secondary); border-top: 1px dashed var(--border-color); padding: 8px 0 10px; margin: 0; }
+
+/* Code with a copy button */
+.codebox { position: relative; background: var(--bg-input); border: 1px solid var(--border-color); margin: 6px 0 8px; max-width: 640px; }
+.codebox pre { margin: 0; padding: 9px 76px 9px 12px; font-size: var(--fs-2); line-height: 1.5; color: var(--text-primary); overflow-x: auto; white-space: pre; }
+.codebox .btn { position: absolute; top: 6px; right: 6px; }
+
+/* Tables inside cards */
+.s-table { width: 100%; border-collapse: collapse; }
+.s-table th { font-size: var(--fs-2); font-weight: 500; color: var(--text-muted); text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border-light); white-space: nowrap; }
+.s-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); vertical-align: middle; font-size: var(--fs-3); }
+.s-table th:first-child, .s-table td:first-child { padding-left: 0; }
+.s-table th:last-child, .s-table td:last-child { padding-right: 0; }
+.s-table tbody tr:last-child td { border-bottom: none; }
+.s-table .c-num { text-align: right; font-family: var(--font-mono); font-size: var(--fs-2); white-space: nowrap; }
+.s-table th.c-num { font-family: var(--font-ui); }
+.s-table .c-act { text-align: right; white-space: nowrap; }
+.s-table .c-act .btn + .btn { margin-left: 4px; }
+.s-table .name { font-weight: 600; }
+.s-table .name-mono { font-family: var(--font-mono); font-size: var(--fs-2); font-weight: 500; }
+.s-table .sub { display: block; font-size: var(--fs-1); color: var(--text-muted); font-weight: 400; margin-top: 2px; line-height: 1.35; }
+.s-table .sub-warn { color: var(--warning); }
+.s-table .zero { color: var(--text-muted); }
+.s-table .hot { color: var(--warning); font-weight: 600; }
+.s-table tr.row-open td { background: var(--bg-tertiary); }
+.s-table tr.row-form td { background: var(--bg-tertiary); padding: 10px 14px 14px; }
+.next { font-size: var(--fs-2); color: var(--text-secondary); }
+.next a { white-space: nowrap; }
+.next-ok { color: var(--success); }
+.dash { color: var(--text-muted); }
+
+/* Collectors toolbar */
+.filter-tabs .filter-tab { color: var(--text-secondary); }
+.filter-tab .count { margin-left: 6px; }
+.coll-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+.collector-section .badge::before { content: ''; width: 7px; height: 7px; background: currentColor; }
+.collector-section .badge-deployed { color: var(--success); }
+.collector-section .badge-category { color: var(--text-muted); }
+.collector-section .badge-warning { color: var(--warning); }
+.collector-section .form-input { width: 100%; }
+
+/* Forms in a row */
+.form-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.form-row .form-group { margin-bottom: 0; }
+.form-row .grow { flex: 1 1 260px; min-width: 0; }
+.form-row .grow .form-input { width: 100%; }
+input[type="file"] { font: inherit; font-size: var(--fs-2); color: var(--text-secondary); max-width: 100%; }
+input[type="file"]::file-selector-button { font: inherit; font-size: var(--fs-2); height: 28px; padding: 0 10px; margin-right: 10px; cursor: pointer;
+  background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-light); border-radius: 2px; }
+textarea.form-input { height: auto; padding: 8px; font-family: var(--font-mono); font-size: var(--fs-2); width: 100%; max-width: 640px; }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-2); color: var(--text-secondary); }
+.status-line { font-size: var(--fs-2); color: var(--text-muted); }
+.status-ok { color: var(--success); }
+.rows-tight p { margin: 0 0 6px; font-size: var(--fs-2); color: var(--text-secondary); }
+
+.es-table { table-layout: fixed; }
+.es-table col.e1 { width: 23%; } .es-table col.e2 { width: 22%; } .es-table col.e3 { width: 9%; } .es-table col.e4 { width: 14%; } .es-table col.e5 { width: 32%; }
+.es-table td.name-mono { overflow-wrap: anywhere; }
+.es-table th, .es-table th.c-num { white-space: normal; vertical-align: bottom; }
+.es-table th:last-child, .es-table td.next { padding-left: 24px; }
+.s-table td[data-label="Age"], .s-table td[data-label="Lasts"] { white-space: nowrap; }
+.s-table tr.row-form .form-row .grow { flex: 0 1 460px; }
+.s-table tr.row-form .form-input { max-width: none; }
+.about-v { overflow-wrap: normal; word-break: normal; }
+
+/* Environment rows */
+.env-val { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--text-secondary); }
+.env-lock { display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: var(--fs-1); }
+.s-table td .form-input { width: 100%; max-width: 260px; }
+
+/* About */
+.about-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border: 1px solid var(--border-color); }
+.about-grid > div { padding: 8px 12px; border-right: 1px solid var(--border-color); min-width: 0; }
+.about-grid > div:last-child { border-right: none; }
+.about-k { font-size: var(--fs-1); color: var(--text-muted); }
+.about-v { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--text-primary); overflow-wrap: anywhere; margin-top: 2px; }
+
+/* Notifications slot */
+.s-slot { border: 1px dashed var(--border-strong); background: none; padding: 18px; }
+.s-slot .s-title { color: var(--text-secondary); }
+
+/* Import */
+.imp-step { border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 14px; }
+.imp-step:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+.imp-files { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 14px; font-size: var(--fs-2); margin: 8px 0 4px; max-width: 760px; }
+.imp-files dt { color: var(--text-primary); font-weight: 600; }
+.imp-files dd { margin: 0; color: var(--text-secondary); }
+.imp-field { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: var(--fs-2); color: var(--text-secondary); margin: 2px 0; }
+.imp-field .k { color: var(--text-primary); min-width: 7.5em; }
+.imp-field .st { color: var(--text-muted); }
+.imp-field .st-bad { color: var(--warning); }
+.imp-field .form-input { height: 26px; width: 220px; }
+.imp-extra { font-size: var(--fs-1); color: var(--text-muted); margin-top: 3px; }
+.drafts { list-style: none; padding: 0; margin: 0; }
+.drafts li { display: flex; justify-content: space-between; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+.drafts li:last-child { border-bottom: none; }
+.drafts .meta { font-size: var(--fs-1); color: var(--text-muted); display: block; margin-top: 2px; }
+.drafts .grp .btn + .btn { margin-left: 4px; }
+.worker-ticks { display: flex; gap: 6px 18px; flex-wrap: wrap; align-items: center; }
+.skipped { font-size: var(--fs-2); color: var(--text-secondary); margin: 6px 0 0; padding-left: 18px; }
+
+/* Key */
+.key-reveal { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.key-reveal .form-input { width: 440px; max-width: 100%; font-family: var(--font-mono); font-size: var(--fs-2); }
+
+/* Static stand-ins for the shared dialog and toast (they are fixed overlays in the app). */
+.mock-modal { position: static; width: auto; max-width: 460px; margin: 12px 0; box-shadow: none; border-color: var(--border-strong); }
+.mock-modal .modal-body p { font-size: var(--fs-2); color: var(--text-secondary); margin: 0 0 10px; }
+.mock-modal .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.mock-confirm { max-width: 460px; }
+.mock-toast { position: static; transform: none; display: inline-flex; margin: 6px 0; max-width: 520px; font-size: var(--fs-2); }
+.mock-caption { font-size: var(--fs-1); color: var(--text-muted); font-family: var(--font-mono); margin: 10px 0 2px; }
+
+/* ----- Mockup chrome (state panels): not part of the design ----- */
+.states { margin-top: 40px; }
+.state-head { margin: 40px 0 6px; padding-top: 18px; border-top: 2px solid var(--border-strong); }
+.state-head h2 { font-size: var(--fs-4); font-weight: 600; margin: 0 0 4px; }
+.state-head p { color: var(--text-muted); font-size: var(--fs-2); margin: 0; max-width: 90ch; }
+.state-panel { border: 1px dashed var(--border-light); padding: 14px 16px 8px; margin: 16px 0; max-width: 1112px; }
+.state-label { display: inline-block; font-family: var(--font-mono); font-size: var(--fs-1); color: var(--accent-secondary);
+  border: 1px solid var(--accent-secondary); padding: 0 6px; margin-bottom: 12px; }
+.state-panel .s-card { margin-bottom: 8px; }
+.frame-wrap#frame-slot { max-width: none; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.frame-wrap#frame-slot .state-label { flex-basis: 100%; margin-bottom: 0; }
+.frame-fig { margin: 0; }
+.frame-fig figcaption { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); margin-bottom: 4px; }
+.frame-wrap iframe { width: 390px; height: 2400px; border: 1px solid var(--border-strong); background: var(--bg-primary); display: block; }
+.framed .states, .framed .mock-banner { display: none; }
+.mock-banner { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--accent-secondary); border: 1px solid var(--accent-secondary); padding: 3px 8px; display: inline-block; margin-bottom: 10px; }
+
+/* ----- Narrow screens ----- */
+@media (max-width: 1100px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .settings-index { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .idx-group { display: none; }
+  .settings-index a { border: 1px solid var(--border-light); padding: 4px 10px; font-size: var(--fs-2); }
+  .settings-index a[aria-current="true"] { border-color: var(--accent); }
+  .settings-index a.idx-slot { border-style: dashed; }
+}
+@media (max-width: 768px) {
+  .about-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .about-grid > div:nth-child(2) { border-right: none; }
+  .about-grid > div:nth-child(-n+2) { border-bottom: 1px solid var(--border-color); }
+}
+@media (max-width: 640px) {
+  .s-card { padding: 14px 12px 10px; }
+  .s-titles { flex-basis: 100%; }
+  /* Tables become one block per row. */
+  .s-table.stack, .s-table.stack tbody, .s-table.stack tr, .s-table.stack td { display: block; }
+  .s-table.stack thead { display: none; }
+  .s-table.stack tr { padding: 10px 0; border-bottom: 1px solid var(--border-color); }
+  .s-table.stack tbody tr:last-child { border-bottom: none; }
+  .s-table.stack td { border: none; padding: 2px 0; text-align: left; }
+  .s-table.stack td.c-num, .s-table.stack td.c-act { text-align: left; white-space: normal; }
+  .s-table.stack td[data-label]::before { content: attr(data-label) ": "; font-family: var(--font-ui); color: var(--text-muted); font-size: var(--fs-1); }
+  .s-table.stack td.c-act { padding-top: 6px; }
+  .s-table.stack td.c-num { display: inline-block; margin-right: 16px; }
+  .s-table.stack td[data-label]::before { font-weight: 400; }
+  .es-table { table-layout: auto; }
+  .s-table.stack.es-table td.next { padding-left: 0; }
+  .s-table.stack td[data-label="Age"], .s-table.stack td[data-label="Lasts"] { display: inline-block; margin-right: 16px; white-space: normal; }
+  .s-table.stack tr.row-form td { padding: 10px 12px; }
+  .s-table.stack td .form-input { max-width: none; }
+  .imp-files { grid-template-columns: minmax(0, 1fr); }
+  .imp-files dd { margin-bottom: 6px; }
+  .imp-field .form-input { width: 100%; }
+  .frame-wrap { display: none; }
+  .codebox pre { padding-right: 12px; padding-top: 38px; }
+}
+</style>
+</head>
+<body data-page="settings">
+<div class="main-content">
+  <header class="topbar">
+    <a href="#" class="topbar-brand" aria-label="CashPilot home">
+      <svg width="20" height="20" viewBox="0 0 256 256" aria-hidden="true"><defs><linearGradient id="cpSun" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFD54F"/><stop offset="40%" stop-color="#FF9800"/><stop offset="72%" stop-color="#E91E63"/><stop offset="100%" stop-color="#AB47BC"/></linearGradient></defs><circle cx="128" cy="132" r="110" fill="url(#cpSun)"/></svg>
+      <span>CashPilot</span>
+    </a>
+    <nav class="topnav" aria-label="Main">
+      <a href="#" class="sidebar-link">Dashboard</a>
+      <a href="#" class="sidebar-link">Fleet</a>
+      <a href="#" class="sidebar-link">Catalog</a>
+      <a href="#" class="sidebar-link">Payouts</a>
+      <a href="#" class="sidebar-link">Activity</a>
+      <a href="#" class="sidebar-link active" aria-current="page">Settings</a>
+    </nav>
+    <div class="topbar-right">
+      <a href="#" class="btn btn-primary btn-sm topbar-add" aria-label="Add service"><span aria-hidden="true">+</span><span class="topbar-add-label" aria-hidden="true"> Add service</span></a>
+      <div class="topbar-earnings"><span id="topbar-total">$52.07</span>
+        <select class="topbar-currency-select" aria-label="Currency"><option>USD</option></select></div>
+      <div class="topbar-notifications"><button class="topbar-icon-btn topbar-notify-btn" aria-label="Alerts">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></button></div>
+      <div class="topbar-avatar-wrap"><button class="topbar-avatar" aria-label="User menu">S</button></div>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <div class="mock-banner">Design 1 of 4: tidy in place. (a) The full Settings page, as it loads, with Import inside it.</div>
+    <div class="page-head"><h1 class="page-title">Settings</h1></div>
+
+<div class="settings-layout">
+<nav class="settings-index" aria-label="Settings sections">
+  <span class="idx-group">Earnings</span>
+  <a href="#set-collection" aria-current="true">Earnings collection</a>
+  <a href="#credential-health-card">Credential health <span class="idx-dot" role="img" aria-label="needs attention"></span></a>
+  <a href="#set-notifications" class="idx-slot">Notifications</a>
+  <span class="idx-group">Devices and backups</span>
+  <a href="#set-identities">Device ids</a>
+  <a href="#set-restore">Restore</a>
+  <a href="#set-import">Import from another tool</a>
+  <span class="idx-group">Security</span>
+  <a href="#set-key">Credential encryption key <span class="idx-dot" role="img" aria-label="needs attention"></span></a>
+  <a href="#set-earner-secrets">Earner credentials <span class="idx-dot" role="img" aria-label="needs attention"></span></a>
+  <span class="idx-group">System</span>
+  <a href="#set-env">Environment</a>
+  <a href="#set-about">About and updates</a>
+</nav>
+<div class="settings-body">
+
+<!-- ============ Earnings collection ============ -->
+<section class="s-card" id="set-collection" aria-labelledby="h-coll">
+  <header class="s-head">
+    <div class="s-titles">
+      <h2 class="s-title" id="h-coll">Earnings collection</h2>
+      <p class="s-sum">The logins CashPilot uses to read your balance at each service. You do not have to deploy a service to track it.</p>
+    </div>
+    <div class="s-meta"><span class="chip chip-ok">11 of 20 collecting</span></div>
+  </header>
+  <div class="s-body">
+    <div class="s-toolbar">
+      <div class="filter-tabs" role="group" aria-label="Show collectors">
+        <button class="filter-tab active" aria-pressed="true">All<span class="count">20</span></button>
+        <button class="filter-tab" aria-pressed="false">Collecting<span class="count">11</span></button>
+        <button class="filter-tab" aria-pressed="false">Not set up<span class="count">9</span></button>
+      </div>
+      <div class="grp">
+        <span class="status-line">Last collection 09:00 UTC</span>
+        <button class="btn btn-secondary btn-sm">Collect now</button>
+      </div>
+    </div>
+    <div class="collectors-grid">
+      <div class="collectors-col">
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">2Miners (ETC)</span><span class="badge badge-category">Not configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Anyone Protocol</span><span class="badge badge-category">Not configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Bitping</span><span class="badge badge-deployed">Configured</span></summary></details>
+        <details class="collector-section" open id="collector-bytelixir"><summary class="collector-header"><span class="collector-name">Bytelixir</span><span class="badge badge-deployed">Configured</span></summary>
+          <div class="collector-body">
+            <div class="form-hint collector-hint">Log in at <a href="#">dash.bytelixir.com</a> <b>ticking Remember Me</b>, press F12 → Application → expand <b>Cookies</b> → click <code>https://dash.bytelixir.com</code>, then copy three values: <b>bytelixir_session</b>, <b>remember_web_…</b> and <b>XSRF-TOKEN</b>. The session cookie alone expires about two hours after you copy it; the remember_web cookie lasts a year and is what keeps it working.</div>
+            <div class="form-group"><label class="form-label" for="cred-bx1">Session Cookie</label><input class="form-input" id="cred-bx1" type="password" placeholder="•••••••• (set — leave blank to keep)"></div>
+            <div class="form-group"><label class="form-label" for="cred-bx2">Remember Web <span class="optional">(optional)</span></label><input class="form-input" id="cred-bx2" type="password" placeholder="•••••••• (set — leave blank to keep)"></div>
+            <div class="form-group"><label class="form-label" for="cred-bx3">Xsrf Token <span class="optional">(optional)</span></label><input class="form-input" id="cred-bx3" type="password" placeholder="Not set"></div>
+            <div class="coll-foot">
+              <button class="btn btn-primary btn-sm">Save Bytelixir</button>
+              <button class="btn btn-danger btn-sm">Clear credentials</button>
+            </div>
+          </div>
+        </details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">EarnApp</span><span class="badge badge-category">Not configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Earn.fm</span><span class="badge badge-deployed">Configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Grass</span><span class="badge badge-category">Not configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">HeroMiners (KAS)</span><span class="badge badge-category">Not configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Honeygain</span><span class="badge badge-deployed">Configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">IPRoyal Pawns</span><span class="badge badge-deployed">Configured</span></summary></details>
+      </div>
+      <div class="collectors-col">
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">MystNodes</span><span class="badge badge-deployed">Configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Ocean</span><span class="badge badge-category">Not configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">PacketStream</span><span class="badge badge-deployed">Configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">ProxyRack</span><span class="badge badge-deployed">Configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Repocket</span><span class="badge badge-deployed">Configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Salad</span><span class="badge badge-category">Not configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Storj</span><span class="badge badge-deployed">Configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">SupportXMR</span><span class="badge badge-category">Not configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">Traffmonetizer</span><span class="badge badge-deployed">Configured</span></summary></details>
+        <details class="collector-section"><summary class="collector-header"><span class="collector-name">unMineable</span><span class="badge badge-category">Not configured</span></summary></details>
+      </div>
+    </div>
+  </div>
+  <details class="learn"><summary>Learn more<span class="sr-only"> about earnings collection</span></summary>
+    <div class="learn-body">
+      <p>Only services with a built-in collector are listed. Each one reads your balance at the provider with the login you give here.</p>
+      <p>Save sends only the fields of the service you are editing. A secret you leave blank keeps its stored value.</p>
+      <p>Collect now reads every service at once. The dashboard shows the result a moment later.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ============ Credential health ============ -->
+<section class="s-card" id="credential-health-card" aria-labelledby="h-health">
+  <header class="s-head">
+    <div class="s-titles">
+      <h2 class="s-title" id="h-health">Credential health</h2>
+      <p class="s-sum">How long each saved login should keep working. The values are never shown here.</p>
+    </div>
+    <div class="s-meta"><span class="chip chip-warn">1 expiring soon</span></div>
+  </header>
+  <div class="s-body">
+    <table class="s-table stack">
+      <thead><tr><th>Login</th><th>Age</th><th>Expected to last</th><th>Status</th><th class="c-act"><span class="sr-only">Action</span></th></tr></thead>
+      <tbody>
+        <tr><td><span class="name">Traffmonetizer</span> <span class="muted">token</span></td><td data-label="Age">9 days old</td><td data-label="Lasts">expires 3 Dec 2026</td><td><span class="chip chip-warn">Expiring soon</span></td><td class="c-act"><a class="btn btn-ghost btn-sm" href="#collector-traffmonetizer">Update</a></td></tr>
+        <tr><td><span class="name">Bytelixir</span> <span class="muted">session_cookie</span><span class="sub">Re-created on every run from the remember-me cookie you saved.</span></td><td data-label="Age">5 hours old</td><td data-label="Lasts">about 2 hours</td><td><span class="chip chip-muted">No known expiry</span></td><td class="c-act"></td></tr>
+        <tr><td><span class="name">PacketStream</span> <span class="muted">auth_token</span></td><td data-label="Age">41 days old</td><td data-label="Lasts"><span class="dash">—</span></td><td><span class="chip chip-muted">No known expiry</span></td><td class="c-act"></td></tr>
+        <tr><td><span class="name">Honeygain</span> <span class="muted">password</span></td><td data-label="Age">120 days old</td><td data-label="Lasts"><span class="dash">—</span></td><td><span class="chip chip-muted">No known expiry</span></td><td class="c-act"></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ Notifications slot ============ -->
+<section class="s-card s-slot" id="set-notifications" aria-labelledby="h-notif">
+  <h2 class="s-title" id="h-notif">Notifications (designed in the other PR)</h2>
+  <p class="s-sum">This slot holds the Notifications section. Its design is in the other PR.</p>
+</section>
+
+<!-- ============ Device ids ============ -->
+<section class="s-card" id="set-identities" aria-labelledby="h-ids">
+  <header class="s-head">
+    <div class="s-titles">
+      <h2 class="s-title" id="h-ids">Device ids</h2>
+      <p class="s-sum">The device id each service was deployed with, per box. A value stays hidden until you show or copy it.</p>
+    </div>
+    <div class="s-meta">
+      <button class="btn btn-secondary btn-sm">Add an id</button>
+      <button class="btn btn-ghost btn-sm">Download all</button>
+    </div>
+  </header>
+  <div class="s-body">
+    <table class="s-table stack">
+      <thead><tr><th>Service and field</th><th>Id</th><th>Box</th><th>State</th><th class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        <tr><td><span class="name">ProxyRack</span> <span class="muted">Device UUID</span><span class="sub">First seen 2 Aug 2026 10:14 UTC · last seen 28 Nov 2026 09:02 UTC</span></td>
+          <td><code class="identity-value">3f2a••••c91e</code></td><td data-label="Box">watchtower, copy 1</td><td>In use</td>
+          <td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-ghost btn-sm">Change</button></td></tr>
+        <tr><td><span class="name">ProxyBase</span> <span class="muted">Device ID</span><span class="sub">First seen 14 Sep 2026 18:30 UTC · last seen 28 Nov 2026 09:01 UTC</span></td>
+          <td><code class="identity-value">pb_7c••••a04f</code></td><td data-label="Box">geiserback, copy 1</td><td>In use</td>
+          <td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-ghost btn-sm">Change</button></td></tr>
+        <tr><td><span class="name">Mysterium</span> <span class="muted">Node identity</span><span class="sub">Reported by the node itself, not checked by CashPilot.</span></td>
+          <td><code class="identity-value">0x4be1••••77d2</code></td><td data-label="Box">watchtower, copy 1</td><td>In use</td>
+          <td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button></td></tr>
+        <tr><td><span class="name">ProxyRack</span> <span class="muted">Device UUID</span><span class="sub">First seen 3 Mar 2026 · last seen 1 Jul 2026</span></td>
+          <td><code class="identity-value">a91c••••0b3e</code></td><td data-label="Box">nas-old, copy 1</td><td class="muted">Removed</td>
+          <td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-danger btn-sm">Forget</button></td></tr>
+        <tr><td><span class="name">Mysterium</span> <span class="muted">Backup file SHA-256</span><span class="sub">A backup file this CashPilot made or restored. Restoring it again needs no typed confirmation.</span></td>
+          <td><code class="identity-value">e3b0••••b855</code></td><td data-label="Box">geiserback</td><td>Downloaded from here</td>
+          <td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-danger btn-sm">Forget</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <details class="learn"><summary>Learn more<span class="sr-only"> about device ids</span></summary>
+    <div class="learn-body">
+      <p>An id stays here after you remove its service. Use it to find the device at the provider, or give a new box the same id.</p>
+      <ul>
+        <li>Every Show and Copy is written to the audit log.</li>
+        <li>Passwords, keys and wallet seeds are never kept here.</li>
+        <li>Change gives a box a new id. Add an id keeps an id CashPilot did not deploy with.</li>
+        <li>Download all asks for your password, because the file holds every id in full.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<!-- ============ Restore ============ -->
+<section class="s-card" id="set-restore" aria-labelledby="h-restore">
+  <header class="s-head">
+    <div class="s-titles">
+      <h2 class="s-title" id="h-restore">Restore from a backup</h2>
+      <p class="s-sum">Put a Mysterium, ProxyBase or Anyone identity back from a <code>.cpbackup</code> file. It only makes a new container. It never writes over a running one.</p>
+    </div>
+  </header>
+  <div class="s-body">
+    <div class="form-row">
+      <div class="form-group"><label class="form-label" for="restore-file">Backup file</label><input type="file" id="restore-file" accept=".cpbackup,application/octet-stream"></div>
+      <button class="btn btn-secondary">Check file</button>
+    </div>
+  </div>
+  <details class="learn"><summary>Learn more<span class="sr-only"> about restore</span></summary>
+    <div class="learn-body">
+      <p>The file must be made with a passphrase. The box you pick must not run the service already.</p>
+      <p><strong>To replace a running identity:</strong> download its backup first. Then remove the service from that box on the dashboard, and say yes when it asks to delete its data. Then restore here.</p>
+      <p>Files sealed to a key, Storj and Sia use the <a href="#">command line steps</a>.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ============ Import (moved in from /import) ============ -->
+<section class="s-card" id="set-import" aria-labelledby="h-import">
+  <header class="s-head">
+    <div class="s-titles">
+      <h2 class="s-title" id="h-import">Import from another tool</h2>
+      <p class="s-sum">Bring your services over from money4band, CashFactory or InternetIncome. CashPilot shows what it found before it saves anything.</p>
+    </div>
+  </header>
+  <div class="s-body">
+    <div class="imp-step">
+      <h3 class="sub-h"><span class="n">1</span> Add your old config</h3>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="import-source">Tool</label>
+          <select id="import-source" class="form-input form-input-select"><option>Tell from the files</option><option>money4band</option><option>CashFactory</option><option>InternetIncome</option></select></div>
+        <div class="form-group"><label class="form-label" for="import-files">Files <span class="optional">(up to 4, 64 KiB in total)</span></label><input type="file" id="import-files" multiple></div>
+        <button class="btn btn-primary">Check what comes over</button>
+      </div>
+      <details class="mini-disc"><summary>Or paste one file</summary>
+        <textarea class="form-input" rows="5" aria-label="Or paste one file here"></textarea>
+      </details>
+      <details class="mini-disc"><summary>Which files to add</summary>
+        <dl class="imp-files">
+          <dt>money4band</dt><dd><code>config/user-config.json</code>, or its <code>.env</code>. <a href="#">Guide</a></dd>
+          <dt>CashFactory</dt><dd><code>.env</code>. <a href="#">Guide</a></dd>
+          <dt>InternetIncome</dt><dd><code>properties.conf</code>, plus <code>earnapp.txt</code> and <code>proxyrack.txt</code> if you have them, so your linked devices come over. <a href="#">Guide</a></dd>
+        </dl>
+      </details>
+    </div>
+    <div class="imp-step">
+      <h3 class="sub-h"><span class="n">2</span> Saved imports</h3>
+      <p class="block-empty" style="padding:4px 0">Nothing imported yet.</p>
+    </div>
+  </div>
+  <details class="learn"><summary>Learn more<span class="sr-only"> about import</span></summary>
+    <div class="learn-body">
+      <p>Nothing in the files is run or fetched. CashPilot does not keep the files.</p>
+      <p>Saved imports stay here, encrypted, so you can deploy them to more boxes later.</p>
+      <p>Stop the old tool on a box before you deploy there. Two copies behind one connection earn as one, and a device id must not run twice.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ============ Credential encryption key ============ -->
+<section class="s-card" id="set-key" aria-labelledby="h-key">
+  <header class="s-head">
+    <div class="s-titles">
+      <h2 class="s-title" id="h-key">Credential encryption key</h2>
+      <p class="s-sum">One key decrypts every credential CashPilot stores. Keep it outside the data folder.</p>
+    </div>
+    <div class="s-meta"><span class="chip chip-warn">In the data folder</span></div>
+  </header>
+  <div class="s-body">
+    <p class="callout callout-warn">The key is in the data folder (<code>/data/.fernet_key</code>). A copy of that folder can decrypt every stored credential.</p>
+    <div class="s-foot" style="margin-top:0"><button class="btn btn-primary btn-sm" aria-expanded="false" aria-controls="key-move">Move the key out of the data folder</button></div>
+  </div>
+  <details class="learn"><summary>Learn more<span class="sr-only"> about the encryption key</span></summary>
+    <div class="learn-body">
+      <p>On a default install the key sits next to the database it decrypts. Anyone with a copy of that folder can read your credentials.</p>
+      <p>Keep the key outside the folder, and a copy of the folder alone is no longer enough. <a href="#">Read the guide</a>.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ============ Earner credentials on each box ============ -->
+<section class="s-card" id="set-earner-secrets" aria-labelledby="h-es">
+  <header class="s-head">
+    <div class="s-titles">
+      <h2 class="s-title" id="h-es">Earner credentials on each box</h2>
+      <p class="s-sum">Where each box keeps the passwords of its earners. A file is safer than Docker's container settings.</p>
+    </div>
+    <div class="s-meta"><span class="chip chip-warn">0 of 5 boxes use a file</span></div>
+  </header>
+  <div class="s-body">
+    <table class="s-table stack es-table"><colgroup><col class="e1"><col class="e2"><col class="e3"><col class="e4"><col class="e5"></colgroup>
+      <thead><tr><th>Box</th><th>Passwords go in</th><th class="c-num">In a file</th><th class="c-num">In container settings</th><th>Next step</th></tr></thead>
+      <tbody>
+        <tr><td class="name-mono">geiserback</td><td><span class="chip chip-warn">Container settings</span></td><td class="c-num zero" data-label="In a file">0</td><td class="c-num hot" data-label="In container settings">8</td><td class="next"><a href="#es-howto">Turn on file mode</a>, then redeploy 8</td></tr>
+        <tr><td class="name-mono">watchtower</td><td><span class="chip chip-warn">Container settings</span></td><td class="c-num zero" data-label="In a file">0</td><td class="c-num hot" data-label="In container settings">8</td><td class="next"><a href="#es-howto">Turn on file mode</a>, then redeploy 8</td></tr>
+        <tr><td class="name-mono">geiserct</td><td><span class="chip chip-muted">Worker too old to say</span></td><td class="c-num zero" data-label="In a file">0</td><td class="c-num hot" data-label="In container settings">7</td><td class="next"><a href="#set-about">Update the worker</a> first</td></tr>
+        <tr><td class="name-mono">OPPO CPH1951 (5bdadbc5)</td><td><span class="chip chip-muted">Worker too old to say</span></td><td class="c-num" data-label="In a file"><span class="dash" title="Not reported">—</span></td><td class="c-num" data-label="In container settings"><span class="dash" title="Not reported">—</span></td><td class="next">Update the app. It does not report earners one by one.</td></tr>
+        <tr><td class="name-mono">motorola one fusion+ (1414f972)</td><td><span class="chip chip-muted">Worker too old to say</span></td><td class="c-num" data-label="In a file"><span class="dash" title="Not reported">—</span></td><td class="c-num" data-label="In container settings"><span class="dash" title="Not reported">—</span></td><td class="next">Update the app. It does not report earners one by one.</td></tr>
+      </tbody>
+    </table>
+    <details class="howto" id="es-howto"><summary>How to turn on file mode</summary>
+      <div class="howto-body">
+        <ol class="steps">
+          <li><strong>Add this line to the worker on the box</strong>In the worker's compose file, under <code>environment</code>:
+            <div class="codebox"><pre>services:
+  cashpilot-worker:
+    environment:
+      - CASHPILOT_EARNER_SECRETS=file</pre><button class="btn btn-ghost btn-sm">Copy</button></div></li>
+          <li><strong>Recreate the worker container</strong>So it reads the new line:
+            <div class="codebox"><pre>docker compose up -d cashpilot-worker</pre><button class="btn btn-ghost btn-sm">Copy</button></div></li>
+          <li><strong>Redeploy each earner on that box</strong>Open the earner on the <a href="#">dashboard</a> and press Redeploy. This table then counts it under "In a file".</li>
+        </ol>
+        <p class="undo"><strong>To undo:</strong> remove the line, then do steps 2 and 3 again. The next redeploy puts the passwords back in the container settings.</p>
+      </div>
+    </details>
+  </div>
+  <details class="learn"><summary>Learn more<span class="sr-only"> about earner credentials</span></summary>
+    <div class="learn-body">
+      <p><strong>Container settings</strong> are what Docker stores for each container: its environment and command line. <code>docker inspect</code>, a backup of Docker's folder and any tool with the Docker socket show them in plain text.</p>
+      <p><strong>File mode</strong> (<code>CASHPILOT_EARNER_SECRETS=file</code>) gives each earner its passwords in a file that only the earner reads. Root on that box can still read the file, so this is not a wall against root.</p>
+      <p>It covers Bitping, Earn.fm, Honeygain, IPRoyal Pawns, ProxyBase, ProxyRack, Repocket, Traffmonetizer, URnetwork and Sia hostd. Custom services and Sia's wallet seed are not covered. <a href="#">Read the guide</a>.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ============ Environment ============ -->
+<section class="s-card" id="set-env" aria-labelledby="h-env">
+  <header class="s-head">
+    <div class="s-titles">
+      <h2 class="s-title" id="h-env">Environment</h2>
+      <p class="s-sum">Settings CashPilot reads once, when it starts. To change one, set it in your compose file or Unraid template and restart.</p>
+    </div>
+    <div class="s-meta"><span class="chip chip-plain">6 variables</span></div>
+  </header>
+  <div class="s-body">
+    <table class="s-table stack">
+      <thead><tr><th>Setting</th><th>Value</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td><span class="name">Fleet API Key</span><span class="sub"><code>CASHPILOT_API_KEY</code> · Bearer token for worker-to-UI authentication</span></td><td><span class="env-val">••••••••</span></td><td><span class="env-lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-label="Locked" role="img"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> <span class="badge badge-deployed">From env</span></span></td></tr>
+        <tr><td><span class="name">Session Secret Key</span><span class="sub"><code>CASHPILOT_SECRET_KEY</code> · Secret for JWT session tokens</span></td><td><span class="env-val">••••••••</span></td><td><span class="env-lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-label="Locked" role="img"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> <span class="badge">Read-only</span></span></td></tr>
+        <tr><td><span class="name">Hostname Prefix</span><span class="sub"><code>CASHPILOT_HOSTNAME_PREFIX</code> · Containers named {prefix}-{service}</span></td><td><input class="form-input" aria-label="Hostname Prefix" placeholder="cashpilot"></td><td><span class="badge badge-category">Default</span></td></tr>
+        <tr><td><span class="name">Collect Interval (min)</span><span class="sub"><code>CASHPILOT_COLLECT_INTERVAL</code> · Minutes between automatic collections</span></td><td><input class="form-input" aria-label="Collect Interval (min)" placeholder="60"></td><td><span class="badge badge-category">Default</span></td></tr>
+        <tr><td><span class="name">Data Directory</span><span class="sub"><code>CASHPILOT_DATA_DIR</code> · Directory containing the SQLite database</span></td><td><span class="env-val">/data</span></td><td><span class="env-lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-label="Locked" role="img"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> <span class="badge">Read-only</span></span></td></tr>
+        <tr><td><span class="name">System Timezone</span><span class="sub"><code>TZ</code> · Container timezone in IANA format</span></td><td><span class="env-val">Europe/Madrid</span></td><td><span class="env-lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-label="Locked" role="img"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> <span class="badge badge-deployed">From env</span></span></td></tr>
+      </tbody>
+    </table>
+    <div class="s-foot s-foot-end">
+      <span class="status-line">A value saved here is stored but not used.</span>
+      <button class="btn btn-ghost btn-sm" title="Stores the value; it will not take effect until it is set in the environment and the container restarts">Save anyway</button>
+    </div>
+  </div>
+  <details class="learn"><summary>Learn more<span class="sr-only"> about environment settings</span></summary>
+    <div class="learn-body">
+      <p>Settings passed with Docker <code>-e</code> are locked here. You can store a value for the others, but nothing reads it back. The field stays so an old stored value does not disappear.</p>
+      <p>Some settings cannot change while CashPilot runs:</p>
+      <ul>
+        <li>The session key signs the logins already in use.</li>
+        <li>The data directory is where the open database lives.</li>
+        <li>The fleet key is what enrolled workers already hold.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<!-- ============ About and updates ============ -->
+<section class="s-card" id="set-about" aria-labelledby="h-about">
+  <header class="s-head">
+    <div class="s-titles">
+      <h2 class="s-title" id="h-about">About and updates</h2>
+      <p class="s-sum">The version each server runs, and a button that updates it for you.</p>
+    </div>
+    <div class="s-meta"><span class="chip chip-ok">Up to date</span></div>
+  </header>
+  <div class="s-body">
+    <div class="s-toolbar">
+      <div class="grp"><label class="form-label" for="update-worker-select" style="margin:0">Server</label>
+        <select id="update-worker-select" class="form-input form-input-select"><option>watchtower</option><option>geiserback</option><option>geiserct</option></select></div>
+    </div>
+    <div class="about-grid">
+      <div><div class="about-k">Running</div><div class="about-v">v3.1.0</div></div>
+      <div><div class="about-k">Latest release</div><div class="about-v">v3.1.0</div></div>
+      <div><div class="about-k">Worker image</div><div class="about-v">drumsergio/<wbr>cashpilot-worker:3.1</div></div>
+      <div><div class="about-k">Dashboard image</div><div class="about-v">drumsergio/<wbr>cashpilot:3.1</div></div>
+    </div>
+    <div class="s-foot">
+      <button class="btn btn-secondary btn-sm">Re-pull images</button>
+      <span class="status-line">You are on the newest known release. The button runs the pull anyway.</span>
+    </div>
+  </div>
+  <details class="learn"><summary>Learn more<span class="sr-only"> about updates</span></summary>
+    <div class="learn-body">
+      <p>CashPilot checks GitHub for the latest release. The button runs <code>docker compose pull &amp;&amp; docker compose up -d</code> for you, from a one-shot helper container.</p>
+      <p>It installs the newest patch of the image series your compose file pins. To move to a newer series, edit the image tags: read <a href="#">UPGRADING.md</a> first, then update the UI host first and every worker after it.</p>
+      <p>An install not managed by Compose gets the manual commands instead.</p>
+    </div>
+  </details>
+</section>
+
+</div><!-- settings-body -->
+</div><!-- settings-layout -->
+
+<!-- ================================================================
+     STATE PANELS (mockup only)
+     ================================================================ -->
+<div class="states">
+
+<div class="state-head"><h2>(b) Earner credentials: the owner's fleet, with "How to turn on file mode" open</h2>
+<p>Five boxes, mixed: two in container settings, one worker too old but with counts, two phones that do not report earners. The how-to is one disclosure with copy buttons; it never sits open by default.</p></div>
+<div class="state-panel"><span class="state-label">(b) mixed fleet, how-to open</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Earner credentials on each box</h2>
+    <p class="s-sum">Where each box keeps the passwords of its earners. A file is safer than Docker's container settings.</p></div>
+    <div class="s-meta"><span class="chip chip-warn">0 of 5 boxes use a file</span></div></header>
+  <div class="s-body">
+    <table class="s-table stack es-table"><colgroup><col class="e1"><col class="e2"><col class="e3"><col class="e4"><col class="e5"></colgroup>
+      <thead><tr><th>Box</th><th>Passwords go in</th><th class="c-num">In a file</th><th class="c-num">In container settings</th><th>Next step</th></tr></thead>
+      <tbody>
+        <tr><td class="name-mono">geiserback</td><td><span class="chip chip-warn">Container settings</span></td><td class="c-num zero" data-label="In a file">0</td><td class="c-num hot" data-label="In container settings">8</td><td class="next"><a href="#es-howto">Turn on file mode</a>, then redeploy 8</td></tr>
+        <tr><td class="name-mono">watchtower</td><td><span class="chip chip-warn">Container settings</span></td><td class="c-num zero" data-label="In a file">0</td><td class="c-num hot" data-label="In container settings">8</td><td class="next"><a href="#es-howto">Turn on file mode</a>, then redeploy 8</td></tr>
+        <tr><td class="name-mono">geiserct</td><td><span class="chip chip-muted">Worker too old to say</span></td><td class="c-num zero" data-label="In a file">0</td><td class="c-num hot" data-label="In container settings">7</td><td class="next"><a href="#set-about">Update the worker</a> first</td></tr>
+        <tr><td class="name-mono">OPPO CPH1951 (5bdadbc5)</td><td><span class="chip chip-muted">Worker too old to say</span></td><td class="c-num" data-label="In a file"><span class="dash">—</span></td><td class="c-num" data-label="In container settings"><span class="dash">—</span></td><td class="next">Update the app. It does not report earners one by one.</td></tr>
+        <tr><td class="name-mono">motorola one fusion+ (1414f972)</td><td><span class="chip chip-muted">Worker too old to say</span></td><td class="c-num" data-label="In a file"><span class="dash">—</span></td><td class="c-num" data-label="In container settings"><span class="dash">—</span></td><td class="next">Update the app. It does not report earners one by one.</td></tr>
+      </tbody>
+    </table>
+    <details class="howto" open><summary>How to turn on file mode</summary>
+      <div class="howto-body">
+        <ol class="steps">
+          <li><strong>Add this line to the worker on the box</strong>In the worker's compose file, under <code>environment</code>:
+            <div class="codebox"><pre>services:
+  cashpilot-worker:
+    environment:
+      - CASHPILOT_EARNER_SECRETS=file</pre><button class="btn btn-ghost btn-sm">Copied</button></div></li>
+          <li><strong>Recreate the worker container</strong>So it reads the new line:
+            <div class="codebox"><pre>docker compose up -d cashpilot-worker</pre><button class="btn btn-ghost btn-sm">Copy</button></div></li>
+          <li><strong>Redeploy each earner on that box</strong>Open the earner on the <a href="#">dashboard</a> and press Redeploy. This table then counts it under "In a file".</li>
+        </ol>
+        <p class="undo"><strong>To undo:</strong> remove the line, then do steps 2 and 3 again. The next redeploy puts the passwords back in the container settings.</p>
+        <p class="undo" style="border-top:none;padding-top:0">A worker marked "too old" needs a newer worker image before it can report.</p>
+      </div>
+    </details>
+  </div>
+</section>
+</div>
+
+<div class="state-head"><h2>(c) Earner credentials: halfway, then every box protected</h2>
+<p>The chip and the "Next step" column change with the data. A box in file mode that still has earners to redeploy gets a link to them; a done box says so in green, with words.</p></div>
+<div class="state-panel"><span class="state-label">(c1) halfway: geiserback switched, 3 earners still to redeploy</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Earner credentials on each box</h2>
+    <p class="s-sum">Where each box keeps the passwords of its earners. A file is safer than Docker's container settings.</p></div>
+    <div class="s-meta"><span class="chip chip-warn">1 of 5 boxes use a file</span></div></header>
+  <div class="s-body">
+    <table class="s-table stack es-table"><colgroup><col class="e1"><col class="e2"><col class="e3"><col class="e4"><col class="e5"></colgroup>
+      <thead><tr><th>Box</th><th>Passwords go in</th><th class="c-num">In a file</th><th class="c-num">In container settings</th><th>Next step</th></tr></thead>
+      <tbody>
+        <tr><td class="name-mono">geiserback</td><td><span class="chip chip-ok">A file</span></td><td class="c-num" data-label="In a file">5</td><td class="c-num hot" data-label="In container settings">3</td><td class="next"><a href="#">Redeploy 3 earners</a></td></tr>
+        <tr><td class="name-mono">watchtower</td><td><span class="chip chip-warn">Container settings</span></td><td class="c-num zero" data-label="In a file">0</td><td class="c-num hot" data-label="In container settings">8</td><td class="next"><a href="#es-howto">Turn on file mode</a>, then redeploy 8</td></tr>
+        <tr><td class="name-mono">geiserct</td><td><span class="chip chip-muted">Cannot use a file</span></td><td class="c-num zero" data-label="In a file">0</td><td class="c-num hot" data-label="In container settings">7</td><td class="next">This worker image has no start program. <a href="#set-about">Update it</a>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+</div>
+<div class="state-panel"><span class="state-label">(c2) every box protected</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Earner credentials on each box</h2>
+    <p class="s-sum">Where each box keeps the passwords of its earners. A file is safer than Docker's container settings.</p></div>
+    <div class="s-meta"><span class="chip chip-ok">All 5 boxes use a file</span></div></header>
+  <div class="s-body">
+    <table class="s-table stack es-table"><colgroup><col class="e1"><col class="e2"><col class="e3"><col class="e4"><col class="e5"></colgroup>
+      <thead><tr><th>Box</th><th>Passwords go in</th><th class="c-num">In a file</th><th class="c-num">In container settings</th><th>Next step</th></tr></thead>
+      <tbody>
+        <tr><td class="name-mono">geiserback</td><td><span class="chip chip-ok">A file</span></td><td class="c-num" data-label="In a file">8</td><td class="c-num zero" data-label="In container settings">0</td><td class="next next-ok">Nothing to do</td></tr>
+        <tr><td class="name-mono">geiserct</td><td><span class="chip chip-ok">A file</span></td><td class="c-num" data-label="In a file">7</td><td class="c-num zero" data-label="In container settings">0</td><td class="next next-ok">Nothing to do</td></tr>
+        <tr><td class="name-mono">watchtower</td><td><span class="chip chip-ok">A file</span></td><td class="c-num" data-label="In a file">8</td><td class="c-num zero" data-label="In container settings">0</td><td class="next next-ok">Nothing to do</td></tr>
+        <tr><td class="name-mono">OPPO CPH1951 (5bdadbc5)</td><td><span class="chip chip-ok">A file</span></td><td class="c-num" data-label="In a file"><span class="dash">—</span></td><td class="c-num" data-label="In container settings"><span class="dash">—</span></td><td class="next">It does not report earners one by one.</td></tr>
+        <tr><td class="name-mono">motorola one fusion+ (1414f972)</td><td><span class="chip chip-ok">A file</span></td><td class="c-num" data-label="In a file"><span class="dash">—</span></td><td class="c-num" data-label="In container settings"><span class="dash">—</span></td><td class="next">It does not report earners one by one.</td></tr>
+      </tbody>
+    </table>
+    <details class="howto"><summary>How to turn file mode off</summary></details>
+  </div>
+</section>
+<p class="mock-caption">Other states, same card: "Loading..." in the table body; "No workers yet." as the empty line; an error line in red with its own text, not the key section's.</p>
+</div>
+
+<div class="state-head"><h2>(d) Import from another tool, inside Settings: in progress, then finished</h2>
+<p>Step 2 appears under step 1 after "Check what comes over". After saving, step 3 lists the saved imports with the boxes to deploy to.</p></div>
+<div class="state-panel"><span class="state-label">(d1) in progress: files checked, what comes over</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Import from another tool</h2>
+    <p class="s-sum">Bring your services over from money4band, CashFactory or InternetIncome. CashPilot shows what it found before it saves anything.</p></div></header>
+  <div class="s-body">
+    <div class="imp-step">
+      <h3 class="sub-h"><span class="n">1</span> Add your old config</h3>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tool</label><select class="form-input form-input-select"><option>Tell from the files</option></select></div>
+        <div class="form-group"><label class="form-label">Files <span class="optional">(up to 4, 64 KiB in total)</span></label><span class="status-line"><code>user-config.json</code> · 3.1 KiB</span></div>
+        <button class="btn btn-secondary">Check again</button>
+      </div>
+    </div>
+    <div class="imp-step">
+      <h3 class="sub-h"><span class="n">2</span> What CashPilot found</h3>
+      <div class="rows-tight"><p>Read as <strong>money4band</strong>.</p><p>money4band keeps one Honeygain login for every box; CashPilot keeps it once.</p></div>
+      <table class="s-table stack">
+        <thead><tr><th style="width:36px"><span class="sr-only">Bring over</span></th><th>Service</th><th>Settings</th></tr></thead>
+        <tbody>
+          <tr><td><input type="checkbox" checked aria-label="Bring over Honeygain"></td><td><span class="name">Honeygain</span><span class="sub">Ready</span></td>
+            <td><div class="imp-field"><span class="k">Email</span><code>you@example.com</code><span class="st">imported</span></div><div class="imp-field"><span class="k">Password</span><span>set</span><span class="st">imported</span></div><div class="imp-extra">Earnings login already set; left as it is.</div></td></tr>
+          <tr><td><input type="checkbox" checked aria-label="Bring over Traffmonetizer"></td><td><span class="name">Traffmonetizer</span><span class="sub">Ready</span></td>
+            <td><div class="imp-field"><span class="k">Token</span><span>set</span><span class="st">imported</span></div><div class="imp-extra">Earnings tracking will use this login too.</div></td></tr>
+          <tr><td><input type="checkbox" checked aria-label="Bring over EarnApp"></td><td><span class="name">EarnApp</span><span class="sub">Ready</span></td>
+            <td><div class="imp-field"><span class="k">Device ID</span><code>sdk-node-3f9a…</code><span class="st">imported</span></div><div class="imp-extra">An earlier import is saved; saving replaces it.</div></td></tr>
+          <tr><td><input type="checkbox" aria-label="Bring over Repocket"></td><td><span class="name">Repocket</span><span class="sub sub-warn">Needs a value</span></td>
+            <td><div class="imp-field"><span class="k">Email</span><code>you@example.com</code><span class="st">imported</span></div><div class="imp-field"><span class="k">API Key</span><input class="form-input" type="password" placeholder="API Key"><span class="st-bad">missing</span></div></td></tr>
+          <tr><td><input type="checkbox" aria-label="Bring over PacketStream"></td><td><span class="name">PacketStream</span><span class="sub sub-warn">Check a value</span></td>
+            <td><div class="imp-field"><span class="k">CID</span><input class="form-input" placeholder="CID"><span class="st-bad">not in the format this service needs</span></div></td></tr>
+          <tr><td></td><td><span class="name">Mysterium</span><span class="sub">Cannot bring over</span></td>
+            <td><span class="status-line">The node identity lives in money4band's volume. Restore it from a backup instead.</span></td></tr>
+        </tbody>
+      </table>
+      <details class="mini-disc" open><summary>Not imported (2)</summary>
+        <ul class="skipped"><li><code>PEER2PROFIT_EMAIL</code>: CashPilot has no such service.</li><li><code>WATCHTOWER_INTERVAL</code>: not a service setting.</li></ul>
+      </details>
+      <div class="s-foot"><button class="btn btn-primary">Save the ticked services</button><span class="status-line">3 ticked</span></div>
+    </div>
+  </div>
+</section>
+</div>
+<div class="state-panel"><span class="state-label">(d2) finished: saved, ready to deploy</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Import from another tool</h2>
+    <p class="s-sum">Bring your services over from money4band, CashFactory or InternetIncome. CashPilot shows what it found before it saves anything.</p></div>
+    <div class="s-meta"><span class="chip chip-plain">3 saved imports</span></div></header>
+  <div class="s-body">
+    <p class="callout callout-ok">Saved 3 services.</p>
+    <div class="imp-step" style="border-top:none;padding-top:0;margin-top:0">
+      <h3 class="sub-h"><span class="n">3</span> Deploy what you imported</h3>
+      <p class="callout callout-warn"><strong>Stop the old tool on a box before you deploy there.</strong> Two copies behind one connection earn as one, and a device id must not run twice.</p>
+      <div class="worker-ticks"><span class="form-label" style="margin:0">Deploy to</span>
+        <label class="check"><input type="checkbox" checked> watchtower</label>
+        <label class="check"><input type="checkbox" checked> geiserback</label>
+        <label class="check"><input type="checkbox"> geiserct</label></div>
+      <ul class="drafts" style="margin-top:8px">
+        <li><div><span class="name" style="font-weight:600">Honeygain</span><span class="meta">from money4band, 28 Nov 2026 10:42 UTC; EMAIL, PASSWORD</span></div><div class="grp"><button class="btn btn-secondary btn-sm">Deploy</button><button class="btn btn-ghost btn-sm">Forget</button></div></li>
+        <li><div><span class="name" style="font-weight:600">Traffmonetizer</span><span class="meta">from money4band, 28 Nov 2026 10:42 UTC; TOKEN</span></div><div class="grp"><button class="btn btn-secondary btn-sm">Deploy</button><button class="btn btn-ghost btn-sm">Forget</button></div></li>
+        <li><div><span class="name" style="font-weight:600">EarnApp</span><span class="meta">from money4band, 28 Nov 2026 10:42 UTC; DEVICE_ID</span></div><div class="grp"><button class="btn btn-secondary btn-sm">Deploy</button><button class="btn btn-ghost btn-sm">Forget</button></div></li>
+      </ul>
+      <div class="s-foot"><button class="btn btn-primary">Deploy all</button></div>
+    </div>
+  </div>
+</section>
+<div class="toast success mock-toast">honeygain deployed to 2 workers</div>
+<p class="mock-caption">Forget asks first: "Forget the imported settings for honeygain? Running containers are not touched."</p>
+</div>
+
+<div class="state-head"><h2>(e) Credential encryption key: key revealed, then the copy deleted</h2>
+<p>There is no "regenerate" action in CashPilot today, so none is drawn. The confirmation in this section is "Delete the copy in the data folder", shown with its confirm and password steps.</p></div>
+<div class="state-panel"><span class="state-label">(e1) Move opened, key shown after the password</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Credential encryption key</h2>
+    <p class="s-sum">One key decrypts every credential CashPilot stores. Keep it outside the data folder.</p></div>
+    <div class="s-meta"><span class="chip chip-warn">In the data folder</span></div></header>
+  <div class="s-body">
+    <p class="callout callout-warn">The key is in the data folder (<code>/data/.fernet_key</code>). A copy of that folder can decrypt every stored credential.</p>
+    <div class="howto" style="margin-top:0"><div class="howto-body">
+      <ol class="steps">
+        <li><strong>Show the key and copy it</strong>CashPilot asks for your password first and writes the reveal to the audit log.
+          <div class="key-reveal"><input class="form-input" readonly value="DEMO-ONLY-0000000000000000000000000000000000=" aria-label="Credential encryption key"><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-ghost btn-sm">Hide</button></div>
+          <div class="toast success mock-toast">Key copied. Paste it into your secret store, then clear your clipboard.</div></li>
+        <li><strong>Save it in a file outside the data folder</strong>The UI runs as user 1000, so that user must be able to read the file. With Docker Compose, put it in <code>./secrets/cashpilot_encryption_key</code>:
+          <div class="codebox"><pre>mkdir -p secrets
+sudo chown 1000:1000 secrets/cashpilot_encryption_key
+sudo chmod 400 secrets/cashpilot_encryption_key</pre><button class="btn btn-ghost btn-sm">Copy</button></div>
+          Then add the secret to your compose file:
+          <div class="codebox"><pre>secrets:
+  cashpilot_encryption_key:
+    file: ./secrets/cashpilot_encryption_key
+
+services:
+  cashpilot-ui:
+    secrets:
+      - cashpilot_encryption_key
+    environment:
+      - CASHPILOT_ENCRYPTION_KEY_FILE=/run/secrets/cashpilot_encryption_key</pre><button class="btn btn-ghost btn-sm">Copy</button></div>
+          A secret manager works too. The <a href="#">guide</a> has steps for Infisical, Vault, 1Password and Bitwarden.</li>
+        <li><strong>Recreate the UI container</strong>So it reads the new setting:
+          <div class="codebox"><pre>docker compose up -d cashpilot-ui</pre><button class="btn btn-ghost btn-sm">Copy</button></div></li>
+        <li><strong>Come back to this page</strong>It checks that the key now comes from outside the data folder, then offers to delete the copy that is still there.</li>
+      </ol>
+    </div></div>
+  </div>
+</section>
+</div>
+<div class="state-panel"><span class="state-label">(e2) after the restart: a copy is left, Delete asks to confirm</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Credential encryption key</h2>
+    <p class="s-sum">One key decrypts every credential CashPilot stores. Keep it outside the data folder.</p></div>
+    <div class="s-meta"><span class="chip chip-warn">Copy still in the data folder</span></div></header>
+  <div class="s-body">
+    <p class="callout callout-ok">The key comes from <code>/run/secrets/cashpilot_encryption_key</code>, outside the data folder.</p>
+    <p class="callout callout-warn">A copy of the key is still in the data folder (<code>/data/.fernet_key</code>). Delete it, so a copy of the folder cannot decrypt your credentials.</p>
+    <div class="s-foot" style="margin-top:0"><button class="btn btn-primary btn-sm">Delete the copy in the data folder</button></div>
+    <div class="modal mock-modal mock-confirm" role="dialog" aria-label="Confirm">
+      <div class="modal-body"><p>Delete the key file from the data folder? After this, CashPilot can read your credentials only with the key you keep outside it. Make sure that copy is safe first.</p>
+        <div class="modal-actions"><button class="btn btn-ghost">Cancel</button><button class="btn btn-primary">OK</button></div></div>
+    </div>
+    <div class="modal mock-modal" role="dialog" aria-labelledby="su1">
+      <div class="modal-header"><h3 class="modal-title" id="su1">Confirm with your password</h3></div>
+      <div class="modal-body"><p>Enter your password to continue.</p>
+        <div class="form-group"><label class="form-label" for="su1p">Password</label><input class="form-input" type="password" id="su1p" value="xxxxxxxxxx" style="width:100%"></div>
+        <div class="modal-actions"><button class="btn btn-ghost">Cancel</button><button class="btn btn-primary">Confirm</button></div></div>
+    </div>
+  </div>
+</section>
+</div>
+<div class="state-panel"><span class="state-label">(e3) done</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Credential encryption key</h2>
+    <p class="s-sum">One key decrypts every credential CashPilot stores. Keep it outside the data folder.</p></div>
+    <div class="s-meta"><span class="chip chip-ok">Outside the data folder</span></div></header>
+  <div class="s-body">
+    <p class="callout callout-ok">Done: the data folder holds no copy of the key. Keep the key safe where it is now, because without it nothing can be decrypted.</p>
+  </div>
+</section>
+<div class="toast success mock-toast">The copy in the data folder is deleted.</div>
+</div>
+
+<div class="state-head"><h2>(f) Restore: a file chosen and checked, then the confirm step</h2>
+<p>The preview opens under the file picker. Warnings sit above the form that they apply to; the Restore button is last.</p></div>
+<div class="state-panel"><span class="state-label">(f1) a file this CashPilot made: pick a box and type the passphrase</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Restore from a backup</h2>
+    <p class="s-sum">Put a Mysterium, ProxyBase or Anyone identity back from a <code>.cpbackup</code> file. It only makes a new container. It never writes over a running one.</p></div></header>
+  <div class="s-body">
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Backup file</label><span class="status-line"><code>mysterium-geiserback-2026-11-02.cpbackup</code></span></div>
+      <button class="btn btn-secondary">Check file</button>
+    </div>
+    <div class="howto"><div class="howto-body">
+      <p style="margin:0 0 6px">Restoring <strong>Mysterium</strong> makes a new container <code>cashpilot-mysterium</code> with:</p>
+      <ul style="margin:0 0 8px;padding-left:18px;font-size:var(--fs-2)"><li>volume <code>cashpilot-mysterium-data</code> at <code>/var/lib/mysterium-node</code></li></ul>
+      <p class="form-hint" style="margin:0 0 10px">It never writes over anything: the box must not run Mysterium and these volumes must not exist. The backup is written and read back before the container first starts.</p>
+      <p class="callout callout-ok" style="margin-bottom:12px">This CashPilot knows this file: downloaded on geiserback, 2 Nov 2026 18:40 UTC.</p>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="rw">Box</label>
+          <select id="rw" class="form-input form-input-select"><option disabled>watchtower (runs Mysterium)</option><option>geiserback</option><option selected>geiserct (plain HTTP: the passphrase crosses your network unencrypted)</option></select></div>
+        <div class="form-group"><label class="form-label" for="rp">Passphrase of the backup</label><input class="form-input" id="rp" type="password" value="xxxxxxxxxxxx"></div>
+      </div>
+      <label class="check" style="margin-top:10px"><input type="checkbox"> Send the passphrase to a box on plain HTTP anyway: anyone on the network between can read it.</label>
+      <div class="s-foot"><button class="btn btn-primary">Restore</button></div>
+    </div></div>
+  </div>
+</section>
+</div>
+<div class="state-panel"><span class="state-label">(f2) a file CashPilot did not make: type the name, then the password</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Restore from a backup</h2>
+    <p class="s-sum">Put a Mysterium, ProxyBase or Anyone identity back from a <code>.cpbackup</code> file. It only makes a new container. It never writes over a running one.</p></div></header>
+  <div class="s-body">
+    <div class="howto" style="margin-top:0"><div class="howto-body">
+      <p style="margin:0 0 6px">Restoring <strong>ProxyBase</strong> makes a new container <code>cashpilot-proxybase</code> with: volume <code>cashpilot-proxybase-data</code> at <code>/data</code>.</p>
+      <p class="callout callout-warn">ProxyBase runs now on geiserback. If this file is a backup of that node, restoring it puts one identity on two boxes: remove it there first.</p>
+      <p class="callout callout-warn">This CashPilot did not make this file, so it cannot tell whose identity is inside. Restore only a file you made yourself.</p>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="rc">To go on, type <strong>ProxyBase</strong></label><input class="form-input" id="rc" value="ProxyBase"></div>
+        <div class="form-group"><label class="form-label">Box</label><select class="form-input form-input-select"><option>watchtower</option></select></div>
+        <div class="form-group"><label class="form-label">Passphrase of the backup</label><input class="form-input" type="password" value="xxxxxxxxxxxx"></div>
+      </div>
+      <div class="s-foot"><button class="btn btn-primary" disabled>Restoring…</button></div>
+    </div></div>
+    <div class="modal mock-modal" role="dialog" aria-labelledby="su2">
+      <div class="modal-header"><h3 class="modal-title" id="su2">Confirm with your password</h3></div>
+      <div class="modal-body"><p>Restoring ProxyBase on watchtower puts a node identity or wallet there. Enter your password to continue.</p>
+        <div class="form-group"><label class="form-label" for="su2p">Password</label><input class="form-input" type="password" id="su2p" style="width:100%"></div>
+        <div class="modal-actions"><button class="btn btn-ghost">Cancel</button><button class="btn btn-primary">Confirm</button></div></div>
+    </div>
+    <p class="callout callout-ok">ProxyBase restored on watchtower: 3 files checked, started.</p>
+  </div>
+</section>
+</div>
+
+<div class="state-head"><h2>(h) Credential health with a failing login, (i) Device ids with the forms open, (j) the page-wide error</h2>
+<p>Update now opens the matching collector on this page, so the button always does something.</p></div>
+<div class="state-panel"><span class="state-label">(h) a login that likely expired</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Credential health</h2>
+    <p class="s-sum">How long each saved login should keep working. The values are never shown here.</p></div>
+    <div class="s-meta"><span class="chip chip-fail">1 likely expired</span></div></header>
+  <div class="s-body">
+    <table class="s-table stack">
+      <thead><tr><th>Login</th><th>Age</th><th>Expected to last</th><th>Status</th><th class="c-act"><span class="sr-only">Action</span></th></tr></thead>
+      <tbody>
+        <tr><td><span class="name">Bytelixir</span> <span class="muted">session_cookie</span><span class="sub">A longer-lived credential exists for this service (Remember Web). Set it and you do not have to do this again.</span></td><td data-label="Age">5 hours old</td><td data-label="Lasts">about 2 hours</td><td><span class="chip chip-fail">Likely expired</span></td><td class="c-act"><a class="btn btn-ghost btn-sm" href="#collector-bytelixir">Update</a></td></tr>
+        <tr><td><span class="name">Honeygain</span> <span class="muted">password</span></td><td data-label="Age">2 days old</td><td data-label="Lasts"><span class="dash">—</span></td><td><span class="chip chip-ok">Fresh</span></td><td class="c-act"></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+</div>
+<div class="state-panel"><span class="state-label">(i) Change form on a row, and Add an id</span>
+<section class="s-card">
+  <header class="s-head"><div class="s-titles"><h2 class="s-title">Device ids</h2>
+    <p class="s-sum">The device id each service was deployed with, per box. A value stays hidden until you show or copy it.</p></div>
+    <div class="s-meta"><button class="btn btn-secondary btn-sm">Add an id</button><button class="btn btn-ghost btn-sm">Download all</button></div></header>
+  <div class="s-body">
+    <table class="s-table stack">
+      <thead><tr><th>Service and field</th><th>Id</th><th>Box</th><th>State</th><th class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        <tr class="row-open"><td><span class="name">ProxyRack</span> <span class="muted">Device UUID</span></td><td><code>3f2a91c0-77b1-4f1a-9e02-5d1bc3a0c91e</code></td><td data-label="Box">watchtower, copy 1</td><td>In use</td>
+          <td class="c-act"><button class="btn btn-ghost btn-sm">Hide</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-ghost btn-sm" aria-expanded="true">Change</button></td></tr>
+        <tr class="row-form"><td colspan="5">
+          <div class="form-row">
+            <div class="form-group grow"><label class="form-label" for="chg">New Device UUID</label><input class="form-input" id="chg"></div>
+            <button class="btn btn-primary btn-sm">Change</button><button class="btn btn-ghost btn-sm">Cancel</button>
+          </div>
+          <div class="imp-extra" style="margin-top:6px"><button class="btn-link">Use one this service had before</button> · <code>a91c••••0b3e</code> last on nas-old <button class="btn btn-ghost btn-sm">Use</button></div>
+          <details class="mini-disc"><summary>What Change does</summary><div class="learn-body">CashPilot makes the ProxyRack container on watchtower again with the new id, and changes nothing else. To the provider it is a new device. Its extra copies and proxied copies on this box take ids made from the new one.</div></details>
+        </td></tr>
+      </tbody>
+    </table>
+    <div class="howto"><div class="howto-body">
+      <h3 class="sub-h">Add an id</h3>
+      <p class="form-hint" style="margin:0 0 10px">An id CashPilot did not deploy with. It is kept here and offered when you deploy this service again.</p>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Service</label><select class="form-input"><option>ProxyRack</option></select></div>
+        <div class="form-group"><label class="form-label">Box</label><select class="form-input"><option>geiserct</option></select></div>
+        <div class="form-group"><label class="form-label">Copy</label><input class="form-input form-input-num" type="number" value="1"></div>
+        <div class="form-group"><label class="form-label">Field</label><input class="form-input" placeholder="Pick one, or type a name"></div>
+        <div class="form-group grow"><label class="form-label">Id</label><input class="form-input"></div>
+      </div>
+      <div class="s-foot"><button class="btn btn-primary btn-sm">Save</button><button class="btn btn-ghost btn-sm">Cancel</button></div>
+    </div></div>
+  </div>
+</section>
+</div>
+<div class="state-panel"><span class="state-label">(j) page-wide load error, shown once at the top of Settings</span>
+<p class="callout callout-fail">Could not load settings. Your session may have expired — reload the page, and sign in again if you are asked to.</p>
+</div>
+
+<div class="state-head frame-wrap"><h2>(g) The page at 390 px</h2>
+<p>The index becomes a row of buttons. Every table becomes one block per row, with its labels. Three windows onto the same page at 390 px: the top, Earner credentials and Import. The full page at 390 px is shot-390.png.</p></div>
+<div class="state-panel frame-wrap" id="frame-slot"><span class="state-label">(g) 390 px</span></div>
+
+</div><!-- states -->
+  </main>
+  <footer class="page-foot">
+    <span class="sidebar-footer-version">CashPilot v3.1.0</span>
+    <a href="#">Source</a><a href="#">Report a problem</a><a href="#">Sponsor</a>
+  </footer>
+</div>
+<script>
+(function () {
+  var framed = document.documentElement.classList.contains('framed');
+  if (framed) {
+    window.addEventListener('load', function () {
+      parent.postMessage({ cpFrameHeight: document.documentElement.scrollHeight }, '*');
+    });
+    return;
+  }
+  var slot = document.getElementById('frame-slot');
+  if (slot && window.innerWidth >= 700) {
+    // srcdoc keeps the frame in-process, so a full-page screenshot paints it.
+    var html = '<!doctype html>' + document.documentElement.outerHTML.replace('<html lang="en" data-theme="classic"', '<html lang="en" data-theme="classic" class="framed"');
+    [['top', 'Top of the page'], ['set-earner-secrets', 'Earner credentials'], ['set-import', 'Import']].forEach(function (v) {
+      var box = document.createElement('figure'); box.className = 'frame-fig';
+      var cap = document.createElement('figcaption'); cap.textContent = v[1]; box.appendChild(cap);
+      var f = document.createElement('iframe'); f.title = 'Settings at 390 px: ' + v[1];
+      f.addEventListener('load', function () {
+        var d = f.contentDocument; if (!d) return;
+        var el = v[0] === 'top' ? null : d.getElementById(v[0]);
+        if (el) f.contentWindow.scrollTo(0, el.getBoundingClientRect().top + f.contentWindow.scrollY - 104);
+      });
+      f.srcdoc = html;
+      box.appendChild(f); slot.appendChild(box);
+    });
+  }
+  // "Move the key" shows the steps; the mockup only flips aria-expanded.
+  document.querySelectorAll('[aria-controls="key-move"]').forEach(function (b) {
+    b.addEventListener('click', function () { b.setAttribute('aria-expanded', b.getAttribute('aria-expanded') !== 'true'); });
+  });
+})();
+</script>
+</body>
+</html>

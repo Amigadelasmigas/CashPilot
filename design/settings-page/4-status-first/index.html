@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Settings - CashPilot (design 4: Status first)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<style>
+/* ============================================================
+   Design 4, "Status first". Only the new parts live here; every
+   colour, font and size comes from the tokens in style.css.
+   ============================================================ */
+
+/* Mockup chrome: the labelled state panels under the main view. */
+.mk-label { max-width: 1320px; margin: 0 auto; padding: 22px 24px 6px; font-family: var(--font-mono); font-size: var(--fs-1); color: var(--accent-secondary); letter-spacing: .04em; }
+.mk-label b { color: var(--text-primary); font-weight: 500; }
+.mk-states { border-top: 2px dashed var(--border-strong); margin-top: 24px; padding-bottom: 60px; }
+.mk-state { max-width: 1320px; margin: 0 auto; padding: 0 24px 8px; }
+.mk-state-body { max-width: 1080px; }
+.mk-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.mk-sub { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); margin: 0 0 8px; }
+.mk-phone { width: 392px; max-width: none; border: 1px solid var(--border-strong); display: block; }
+.mk-phone-wrap { overflow-x: auto; }
+.mk-phone-note { display: none; color: var(--text-muted); font-size: var(--fs-2); }
+@media (max-width: 600px) { .mk-phone-wrap { display: none; } .mk-phone-note { display: block; } }
+html.embed .mk-only { display: none !important; }
+@media (max-width: 900px) { .mk-two { grid-template-columns: minmax(0, 1fr); } }
+
+/* Focus: visible everywhere, cyan as in Classic night. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 2px solid var(--accent-secondary); outline-offset: 2px; }
+
+/* ---- Index: groups, status dots, current section ---- */
+.sf-index { position: sticky; top: calc(var(--topbar-height) + 18px); display: flex; flex-direction: column; gap: 2px; }
+.sf-index-group { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin: 14px 0 4px 11px; }
+.sf-index-group:first-child { margin-top: 0; }
+.sf-index a { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); text-decoration: none; font-size: var(--fs-2); padding: 4px 0 4px 10px; border-left: 1px solid var(--border-light); }
+.sf-index a:hover { color: var(--text-primary); border-left-color: var(--text-primary); }
+.sf-index a[aria-current="true"] { color: var(--text-primary); border-left: 2px solid var(--accent); padding-left: 9px; font-weight: 600; }
+.sf-index .sf-dot { margin-left: auto; }
+.sf-index .sf-count { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-1); color: var(--bg-primary); background: var(--warning); padding: 0 6px; border-radius: 2px; }
+.sf-index a.is-slot { color: var(--text-muted); font-style: italic; }
+.sf-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-muted); }
+.sf-dot.is-ok { background: var(--success); } .sf-dot.is-warn { background: var(--warning); } .sf-dot.is-fail { background: var(--error); }
+
+/* ---- Group headings between section cards ---- */
+.sf-group { font-family: var(--font-mono); font-size: var(--fs-1); font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; margin: 30px 0 10px; }
+
+/* ---- "Needs your attention" ---- */
+.sf-attn { background: var(--bg-secondary); border: 1px solid var(--border-light); border-left: 3px solid var(--warning); padding: 14px 16px 6px; scroll-margin-top: 60px; }
+.sf-attn-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.sf-attn-title { font-family: var(--font-mono); font-size: var(--fs-4); font-weight: 500; }
+.sf-attn-list { list-style: none; }
+.sf-attn-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border-color); }
+.sf-attn-item:first-child { border-top: none; }
+.sf-attn-item .sf-dot { margin-top: 2px; }
+.sf-attn-text { font-weight: 600; }
+.sf-attn-sub { font-size: var(--fs-2); color: var(--text-muted); margin-top: 1px; font-weight: 400; }
+.sf-attn-fine { display: flex; flex-wrap: wrap; gap: 4px 18px; padding: 10px 0 8px; border-top: 1px solid var(--border-color); font-size: var(--fs-2); color: var(--text-muted); }
+.sf-attn-fine span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 7px; vertical-align: 1px; }
+.sf-attn.is-clear { border-left-color: var(--success); }
+
+/* ---- Section card ---- */
+.sf-sec { background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 14px 16px; margin-bottom: 12px; scroll-margin-top: 60px; }
+.sf-sec-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.sf-sec-title { font-family: var(--font-mono); font-size: var(--fs-4); font-weight: 500; line-height: 1.3; }
+.sf-sec-tools { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sf-lede { font-size: var(--fs-2); color: var(--text-secondary); margin: 4px 0 0; max-width: 78ch; }
+.sf-linkbtn { background: none; border: none; padding: 0; font: inherit; font-size: var(--fs-2); color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.sf-linkbtn:hover { color: var(--accent-hover); }
+.sf-linkbtn[aria-expanded="true"]::after { content: " \25B4"; }
+.sf-linkbtn[aria-expanded="false"]::after { content: " \25BE"; }
+a.sf-a { color: var(--accent); text-underline-offset: 3px; }
+.sf-more { margin: 10px 0 2px; padding: 10px 12px; background: var(--bg-tertiary); border-left: 2px solid var(--border-strong); font-size: var(--fs-2); color: var(--text-secondary); max-width: 82ch; }
+.sf-more ul { margin: 0; padding-left: 18px; }
+.sf-more li + li { margin-top: 4px; }
+.sf-more code, .sf-row code, .sf-lede code { font-family: var(--font-mono); font-size: 0.92em; color: var(--text-primary); }
+
+/* ---- Rows: label left, value and action right ---- */
+.sf-rows { margin-top: 10px; border-top: 1px solid var(--border-color); }
+.sf-row { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr) minmax(0, 4fr); grid-template-areas: "main val act"; gap: 4px 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-color); min-height: 48px; }
+.sf-row:last-child { border-bottom: none; }
+.sf-row-main { grid-area: main; min-width: 0; }
+.sf-row-val { grid-area: val; min-width: 0; color: var(--text-secondary); font-size: var(--fs-2); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.sf-row-act { grid-area: act; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.sf-row-label { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sf-row-sub { font-size: var(--fs-1); color: var(--text-muted); margin-top: 1px; }
+.sf-desc { flex-basis: 100%; font-size: var(--fs-1); }
+.sf-mono { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--text-primary); overflow-wrap: anywhere; }
+
+/* ---- Status chips (text, never colour alone) ---- */
+.sf-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-1); font-weight: 600; line-height: 1; padding: 4px 8px; border: 1px solid var(--border-light); border-radius: 2px; color: var(--text-secondary); white-space: nowrap; }
+.sf-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+.sf-chip.is-ok { color: var(--success); border-color: rgba(70,179,127,.45); }  .sf-chip.is-ok::before { background: var(--success); }
+.sf-chip.is-warn { color: var(--warning); border-color: rgba(224,165,60,.45); } .sf-chip.is-warn::before { background: var(--warning); }
+.sf-chip.is-fail { color: var(--error); border-color: rgba(240,106,95,.45); } .sf-chip.is-fail::before { background: var(--error); }
+.sf-chip.is-lock::before { display: none; }
+.sf-chip.is-plain::before { display: none; }
+
+/* "?" button that opens a short explanation under its row */
+.sf-info { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border-strong); background: none; color: var(--text-secondary); font: 600 12px/1 var(--font-mono); cursor: pointer; flex: none; }
+.sf-info:hover, .sf-info[aria-expanded="true"] { color: var(--bg-primary); background: var(--text-secondary); }
+.sf-pop { grid-column: 1 / -1; font-size: var(--fs-2); color: var(--text-secondary); background: var(--bg-tertiary); padding: 8px 10px; border-left: 2px solid var(--border-strong); max-width: 82ch; }
+
+/* ---- Collectors as rows in two columns ---- */
+.sf-coll { margin-top: 10px; border-top: 1px solid var(--border-color); }
+.sf-coll-cols { columns: 2; column-gap: 24px; }
+.sf-coll-cols details { break-inside: avoid; }
+.sf-coll details { border-bottom: 1px solid var(--border-color); }
+.sf-coll summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 9px 2px; cursor: pointer; min-height: 42px; }
+.sf-coll summary::-webkit-details-marker { display: none; }
+.sf-coll summary::after { content: ""; width: 6px; height: 6px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: rotate(-45deg); margin: 0 4px 0 2px; }
+.sf-coll details[open] summary::after { transform: rotate(45deg); }
+.sf-coll summary:hover { background: var(--bg-hover); }
+.sf-coll .sf-name { font-weight: 600; flex: 1; }
+.sf-coll .sf-chip { margin-left: auto; }
+.sf-coll-body { padding: 4px 2px 14px; }
+.sf-coll-body .form-group { margin-bottom: 10px; }
+.sf-coll-body .form-input { width: 100%; }
+.sf-coll-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sf-coll-actions .btn-danger { margin-left: auto; }
+.sf-coll-rest { border-bottom: none !important; }
+.sf-coll-rest > summary { color: var(--text-secondary); }
+.sf-coll-rest-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+.sf-coll-rest-grid details:nth-last-child(-n+1) { border-bottom: none; }
+
+/* ---- Earner credentials: meter + per-box chips ---- */
+.sf-meter-wrap { margin-top: 14px; }
+.sf-meter-top { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 6px; }
+.sf-meter-figure { font-family: var(--font-mono); font-size: var(--fs-figure); font-weight: 500; line-height: 1; }
+.sf-meter-figure small { font-size: var(--fs-3); color: var(--text-muted); font-weight: 400; margin-left: 6px; font-family: var(--font-ui); }
+.sf-meter { display: flex; height: 10px; background: var(--bg-input); border: 1px solid var(--border-light); border-radius: 2px; overflow: hidden; }
+.sf-meter span { display: block; height: 100%; }
+.sf-meter .m-file { background: var(--success); }
+.sf-meter .m-env { background: var(--warning); }
+.sf-legend { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; font-size: var(--fs-1); color: var(--text-muted); }
+.sf-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.sf-legend .l-file { background: var(--success); } .sf-legend .l-env { background: var(--warning); }
+.sf-legend .l-none { border: 1px dashed var(--text-muted); }
+.sf-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 8px; margin-top: 14px; }
+.sf-box { text-align: left; font: inherit; color: inherit; background: var(--bg-tertiary); border: 1px solid var(--border-light); border-top: 3px solid var(--text-muted); border-radius: 2px; padding: 9px 10px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.sf-box:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.sf-box[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.sf-box.is-ok { border-top-color: var(--success); } .sf-box.is-warn { border-top-color: var(--warning); } .sf-box.is-muted { border-top-color: var(--border-strong); }
+.sf-box-name { font-weight: 600; overflow-wrap: anywhere; line-height: 1.25; }
+.sf-box-kind { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); }
+.sf-box-mode { font-size: var(--fs-1); color: var(--text-secondary); }
+.sf-box-count { font-family: var(--font-mono); font-size: var(--fs-2); }
+.sf-box-mini { height: 4px; background: var(--bg-input); border-radius: 2px; overflow: hidden; display: flex; }
+.sf-box-mini span { background: var(--success); } .sf-box-mini .m-env { background: var(--warning); }
+.sf-box-next { font-size: var(--fs-1); font-weight: 600; color: var(--accent); margin-top: auto; }
+.sf-box.is-ok .sf-box-next { color: var(--success); }
+.sf-box.is-muted .sf-box-next { color: var(--text-secondary); }
+
+.sf-steps { margin-top: 14px; border: 1px solid var(--border-light); background: var(--bg-primary); padding: 12px 14px; }
+.sf-steps-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.sf-steps-head h3 { font-size: var(--fs-3); font-weight: 600; }
+.sf-steps ol { list-style: none; counter-reset: s; }
+.sf-steps li { counter-increment: s; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 0 10px; padding: 8px 0; border-top: 1px solid var(--border-color); }
+.sf-steps li:first-child { border-top: none; }
+.sf-steps li::before { content: counter(s); width: 22px; height: 22px; border: 1px solid var(--border-strong); border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 500 var(--fs-1)/1 var(--font-mono); color: var(--text-secondary); margin-top: 1px; }
+.sf-steps li.is-done::before { content: "\2713"; background: var(--success); color: var(--bg-primary); border-color: var(--success); }
+.sf-step-t { font-weight: 600; }
+.sf-step-s { font-size: var(--fs-2); color: var(--text-muted); margin-top: 2px; }
+.sf-code { display: flex; align-items: stretch; margin-top: 6px; border: 1px solid var(--border-light); background: var(--bg-input); max-width: 100%; }
+.sf-code pre { flex: 1; min-width: 0; margin: 0; padding: 6px 10px; font-family: var(--font-mono); font-size: var(--fs-2); color: var(--text-primary); overflow-x: auto; white-space: pre; background: none; border: none; }
+.sf-code .btn { height: auto; border-radius: 0; border-width: 0 0 0 1px; }
+.sf-undo { margin-top: 8px; font-size: var(--fs-2); color: var(--text-secondary); }
+
+/* ---- Device ids as expandable rows ---- */
+.sf-ids details { border-bottom: 1px solid var(--border-color); }
+.sf-ids details:last-child { border-bottom: none; }
+.sf-ids summary { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) minmax(0, 0.7fr) auto 14px; gap: 4px 14px; align-items: center; padding: 9px 2px; cursor: pointer; min-height: 46px; }
+.sf-ids summary::-webkit-details-marker { display: none; }
+.sf-ids summary::after { content: ""; width: 6px; height: 6px; border-right: 2px solid var(--text-muted); border-bottom: 2px solid var(--text-muted); transform: rotate(-45deg); justify-self: center; }
+.sf-ids details[open] summary::after { transform: rotate(45deg); }
+.sf-ids summary:hover { background: var(--bg-hover); }
+.sf-id-body { padding: 2px 2px 12px; display: grid; gap: 6px; }
+.sf-id-body .sf-row-sub { font-size: var(--fs-2); }
+.sf-id-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.sf-id-actions .btn-danger { margin-left: auto; }
+
+/* ---- Import stepper ---- */
+.sf-stepper { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 12px 0 4px; list-style: none; font-size: var(--fs-2); }
+.sf-stepper li { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
+.sf-stepper li b { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; font: 500 var(--fs-1)/1 var(--font-mono); }
+.sf-stepper li.is-now { color: var(--text-primary); font-weight: 600; }
+.sf-stepper li.is-now b { border-color: var(--accent); color: var(--accent); }
+.sf-stepper li.is-done b { background: var(--success); border-color: var(--success); color: var(--bg-primary); }
+.sf-panel { margin-top: 12px; border: 1px solid var(--border-light); background: var(--bg-primary); padding: 12px 14px; }
+.sf-panel h3 { font-size: var(--fs-3); font-weight: 600; margin-bottom: 8px; }
+.sf-form-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 12px 16px; align-items: start; }
+.sf-form-grid textarea.form-input { height: auto; min-height: 84px; padding: 6px 8px; font-family: var(--font-mono); font-size: var(--fs-2); width: 100%; }
+.sf-table { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
+.sf-table th { text-align: left; font-weight: 500; color: var(--text-muted); padding: 6px 8px; border-bottom: 1px solid var(--border-light); }
+.sf-table td { padding: 8px; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+.sf-table .sf-f { display: block; color: var(--text-secondary); }
+.sf-table .sf-f b { color: var(--text-primary); font-weight: 500; font-family: var(--font-mono); }
+.sf-table .form-input { height: 26px; margin-top: 4px; width: 100%; max-width: 260px; }
+.sf-workers { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 4px 0 10px; font-size: var(--fs-2); }
+.sf-workers label { display: inline-flex; gap: 6px; align-items: center; }
+.sf-toast { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(70,179,127,.45); background: var(--success-soft); color: var(--text-primary); padding: 6px 10px; font-size: var(--fs-2); }
+.sf-toast.is-warn { border-color: rgba(224,165,60,.45); background: var(--warning-soft); }
+
+/* ---- Notifications slot (the other lane designs it) ---- */
+.sf-slot { border: 1px dashed var(--border-strong); padding: 22px 16px; text-align: center; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-2); margin-bottom: 12px; scroll-margin-top: 60px; background: repeating-linear-gradient(135deg, transparent 0 10px, rgba(255,255,255,.015) 10px 20px); }
+
+/* ---- Dialog mock (native confirm and password prompt, drawn in place) ---- */
+.sf-dialog { border: 1px solid var(--border-strong); background: var(--bg-secondary); padding: 14px 16px; max-width: 440px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+.sf-dialog h4 { font-size: var(--fs-3); font-weight: 600; margin-bottom: 6px; }
+.sf-dialog p { font-size: var(--fs-2); color: var(--text-secondary); margin-bottom: 10px; }
+.sf-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+/* ---- Widths ---- */
+@media (max-width: 1100px) {
+  .sf-index { position: sticky; top: 0; z-index: 5; flex-direction: row; flex-wrap: wrap; gap: 4px; background: var(--bg-primary); padding: 6px 0 10px; margin-bottom: 6px; border-bottom: 1px solid var(--border-color); }
+  .sf-index-group { display: none; }
+  .sf-index a { border: 1px solid var(--border-light); padding: 3px 8px; font-size: var(--fs-1); }
+  .sf-index a[aria-current="true"] { border: 1px solid var(--accent); padding: 3px 8px; }
+  .sf-index .sf-dot, .sf-index .sf-count { margin-left: 0; }
+}
+@media (max-width: 768px) {
+  .sf-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main act" "val val"; }
+  .sf-row-act { align-self: start; }
+  .sf-coll-rest-grid { grid-template-columns: minmax(0, 1fr); }
+  .sf-coll-cols { columns: 1; }
+  .sf-ids summary { grid-template-columns: minmax(0, 1fr) auto 14px; }
+  .sf-ids summary .sf-id-val, .sf-ids summary .sf-id-box { grid-column: 1; }
+  .sf-ids summary .sf-chip { grid-row: 1; grid-column: 2; }
+  .sf-ids summary::after { grid-row: 1; grid-column: 3; }
+  .sf-form-grid { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .sf-form-grid .form-label { margin-top: 6px; }
+  .sf-sec { padding: 12px; }
+  .sf-attn { padding: 12px 12px 4px; }
+  .sf-attn-item { grid-template-columns: auto minmax(0, 1fr); }
+  .sf-attn-item .btn { grid-column: 2; justify-self: start; }
+  .sf-boxes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sf-table thead { display: none; }
+  .sf-table tr { display: grid; grid-template-columns: 26px minmax(0, 1fr); border-bottom: 1px solid var(--border-color); padding: 6px 0; }
+  .sf-table td { border: none; padding: 2px 4px; }
+  .sf-table td:nth-child(3) { grid-column: 2; }
+  .sf-index { position: static; }
+}
+</style>
+<script>if (location.search.indexOf('embed') !== -1) document.documentElement.className = 'embed';</script>
+</head>
+<body data-page="settings">
+
+<div class="mk-label mk-only">(a) <b>The full Settings page.</b> Every section, Import inside it, and the Notifications slot. Realistic data from the owner's fleet.</div>
+
+<div class="main-content">
+  <header class="topbar">
+    <a href="#" class="topbar-brand" aria-label="Home">
+      <svg width="20" height="20" viewBox="0 0 256 256" aria-hidden="true"><defs><linearGradient id="cpSun" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFD54F"/><stop offset="40%" stop-color="#FF9800"/><stop offset="72%" stop-color="#E91E63"/><stop offset="100%" stop-color="#AB47BC"/></linearGradient></defs><circle cx="128" cy="132" r="110" fill="url(#cpSun)"/></svg>
+      <span>CashPilot</span>
+    </a>
+    <nav class="topnav" aria-label="Main">
+      <a href="#" class="sidebar-link">Dashboard</a>
+      <a href="#" class="sidebar-link">Fleet</a>
+      <a href="#" class="sidebar-link">Catalog</a>
+      <a href="#" class="sidebar-link">Payouts</a>
+      <a href="#" class="sidebar-link">Activity</a>
+      <a href="#" class="sidebar-link active" aria-current="page">Settings</a>
+    </nav>
+    <div class="topbar-right">
+      <a href="#" class="btn btn-primary btn-sm topbar-add" aria-label="Add service"><span aria-hidden="true">+</span><span class="topbar-add-label" aria-hidden="true"> Add service</span></a>
+      <div class="topbar-earnings"><span id="topbar-total">$52.07</span>
+        <select class="topbar-currency-select" aria-label="Currency"><option>USD</option></select></div>
+      <div class="topbar-notifications"><button class="topbar-icon-btn topbar-notify-btn" aria-label="Alerts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></button></div>
+      <div class="topbar-avatar-wrap"><button class="topbar-avatar" aria-label="User menu">S</button></div>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <div class="page-head"><h1 class="page-title">Settings</h1></div>
+
+    <div class="settings-layout">
+      <nav class="sf-index" aria-label="Settings sections">
+        <a href="#set-attention" aria-current="true">Needs your attention <span class="sf-count" aria-label="4 items">4</span></a>
+        <div class="sf-index-group" aria-hidden="true">Earnings</div>
+        <a href="#set-collection">Earnings collection</a>
+        <a href="#credential-health-card">Credential health <span class="sf-dot is-warn" role="img" aria-label="Needs attention"></span></a>
+        <div class="sf-index-group" aria-hidden="true">Security</div>
+        <a href="#set-earner-secrets">Earner credentials <span class="sf-dot is-warn" role="img" aria-label="Needs attention"></span></a>
+        <a href="#set-key">Encryption key <span class="sf-dot is-warn" role="img" aria-label="Needs attention"></span></a>
+        <a href="#set-identities">Device ids</a>
+        <div class="sf-index-group" aria-hidden="true">Move and restore</div>
+        <a href="#set-restore">Restore</a>
+        <a href="#set-import">Import from another tool</a>
+        <div class="sf-index-group" aria-hidden="true">Alerts</div>
+        <a href="#set-notifications" class="is-slot">Notifications</a>
+        <div class="sf-index-group" aria-hidden="true">System</div>
+        <a href="#set-env">Environment</a>
+        <a href="#set-about">About and updates <span class="sf-dot is-ok" role="img" aria-label="Up to date"></span></a>
+      </nav>
+
+      <div class="settings-body">
+
+        <!-- ===== Needs your attention ===== -->
+        <section class="sf-attn" id="set-attention" aria-labelledby="attn-t">
+          <div class="sf-attn-head">
+            <h2 class="sf-attn-title" id="attn-t">Needs your attention</h2>
+            <span class="sf-chip is-warn">4 items</span>
+          </div>
+          <ul class="sf-attn-list">
+            <li class="sf-attn-item">
+              <span class="sf-dot is-warn" aria-hidden="true"></span>
+              <div class="sf-attn-text">23 earners keep their passwords in container settings.
+                <div class="sf-attn-sub">On geiserback, geiserct and watchtower. Anyone who can read Docker there can see them.</div></div>
+              <a class="btn btn-ghost btn-sm" href="#set-earner-secrets">Show me</a>
+            </li>
+            <li class="sf-attn-item">
+              <span class="sf-dot is-warn" aria-hidden="true"></span>
+              <div class="sf-attn-text">The encryption key is next to your database.
+                <div class="sf-attn-sub">A copy of the data folder can decrypt every stored credential.</div></div>
+              <a class="btn btn-ghost btn-sm" href="#set-key">Show me</a>
+            </li>
+            <li class="sf-attn-item">
+              <span class="sf-dot is-warn" aria-hidden="true"></span>
+              <div class="sf-attn-text">The Traffmonetizer login expires on 30 Nov.
+                <div class="sf-attn-sub">After that date, CashPilot cannot read its balance.</div></div>
+              <a class="btn btn-ghost btn-sm" href="#credential-health-card">Show me</a>
+            </li>
+            <li class="sf-attn-item">
+              <span class="sf-dot" aria-hidden="true"></span>
+              <div class="sf-attn-text">Workers on 3 boxes are too old to report.
+                <div class="sf-attn-sub">geiserct and the two phones. Update them to see their earners here.</div></div>
+              <a class="btn btn-ghost btn-sm" href="#set-earner-secrets">Show me</a>
+            </li>
+          </ul>
+          <div class="sf-attn-fine" aria-label="Looks fine">
+            <span>Up to date: v3.1.0</span>
+            <span>11 of 20 services collected</span>
+            <span>5 device ids kept</span>
+          </div>
+        </section>
+
+        <!-- ===== EARNINGS ===== -->
+        <h2 class="sf-group">Earnings</h2>
+
+        <section class="sf-sec" id="set-collection" aria-labelledby="coll-t">
+          <div class="sf-sec-head">
+            <h3 class="sf-sec-title" id="coll-t">Earnings collection</h3>
+            <span class="sf-chip is-ok">11 of 20 set up</span>
+            <div class="sf-sec-tools">
+              <span class="muted" id="collector-save-status" style="font-size:var(--fs-2)"></span>
+              <button type="button" class="btn btn-secondary btn-sm">Collect now</button>
+            </div>
+          </div>
+          <p class="sf-lede">Add the login of each service. CashPilot then reads its balance. <button type="button" class="sf-linkbtn" aria-expanded="false" data-toggle="coll-more">Learn more</button></p>
+          <div class="sf-more" id="coll-more" hidden>Only services with a built-in collector show here. You do not need to deploy a container through CashPilot: the login alone is enough.</div>
+
+          <div class="sf-coll">
+            <div class="sf-coll-cols">
+            <details id="collector-bitping"><summary><span class="sf-name">Bitping</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            <details id="collector-bytelixir" open>
+              <summary><span class="sf-name">Bytelixir</span><span class="sf-chip is-ok">Configured</span></summary>
+              <div class="sf-coll-body">
+                <p class="form-hint" style="margin:0 0 10px">Copy three cookies from dash.bytelixir.com. <button type="button" class="sf-linkbtn" aria-expanded="false" data-toggle="byte-hint">How</button></p>
+                <div class="sf-more" id="byte-hint" hidden>Log in at dash.bytelixir.com and tick <b>Remember Me</b>. Press F12, open Application, then Cookies, then <code>https://dash.bytelixir.com</code>. Copy <b>bytelixir_session</b>, <b>remember_web_…</b> and <b>XSRF-TOKEN</b>. The session cookie alone stops working after about two hours. The remember_web cookie lasts a year.</div>
+                <div class="form-group"><label class="form-label" for="cred-bl-s">Session Cookie</label><input class="form-input" id="cred-bl-s" type="password" placeholder="•••••••• (set — leave blank to keep)"></div>
+                <div class="form-group"><label class="form-label" for="cred-bl-r">Remember Web <span class="optional">(optional)</span></label><input class="form-input" id="cred-bl-r" type="password" placeholder="•••••••• (set — leave blank to keep)"></div>
+                <div class="form-group"><label class="form-label" for="cred-bl-x">Xsrf Token <span class="optional">(optional)</span></label><input class="form-input" id="cred-bl-x" type="password" placeholder="Not set"></div>
+                <div class="sf-coll-actions">
+                  <button type="button" class="btn btn-primary btn-sm">Save Bytelixir</button>
+                  <button type="button" class="btn btn-danger btn-sm">Clear credentials</button>
+                </div>
+              </div>
+            </details>
+            <details id="collector-earnfm"><summary><span class="sf-name">Earn.fm</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            <details id="collector-honeygain"><summary><span class="sf-name">Honeygain</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            <details id="collector-iproyal"><summary><span class="sf-name">IPRoyal Pawns</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            <details id="collector-mysterium"><summary><span class="sf-name">Mysterium</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            <details id="collector-packetstream"><summary><span class="sf-name">PacketStream</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            <details id="collector-proxyrack"><summary><span class="sf-name">ProxyRack</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            <details id="collector-repocket"><summary><span class="sf-name">Repocket</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            <details id="collector-storj"><summary><span class="sf-name">Storj</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            <details id="collector-traffmonetizer"><summary><span class="sf-name">Traffmonetizer</span><span class="sf-chip is-ok">Configured</span></summary></details>
+            </div>
+            <details class="sf-coll-rest">
+              <summary><span class="sf-name">9 more services you can add</span><span class="sf-chip">Not configured</span></summary>
+              <div class="sf-coll-rest-grid">
+                <details><summary><span class="sf-name">2Miners (ETC)</span><span class="sf-chip">Not configured</span></summary></details>
+                <details><summary><span class="sf-name">Anyone Protocol</span><span class="sf-chip">Not configured</span></summary></details>
+                <details><summary><span class="sf-name">EarnApp</span><span class="sf-chip">Not configured</span></summary></details>
+                <details><summary><span class="sf-name">Grass</span><span class="sf-chip">Not configured</span></summary></details>
+                <details><summary><span class="sf-name">HeroMiners (KAS)</span><span class="sf-chip">Not configured</span></summary></details>
+                <details><summary><span class="sf-name">Ocean</span><span class="sf-chip">Not configured</span></summary></details>
+                <details><summary><span class="sf-name">Salad</span><span class="sf-chip">Not configured</span></summary></details>
+                <details><summary><span class="sf-name">SupportXMR</span><span class="sf-chip">Not configured</span></summary></details>
+                <details><summary><span class="sf-name">unMineable</span><span class="sf-chip">Not configured</span></summary></details>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <section class="sf-sec" id="credential-health-card" aria-labelledby="health-t">
+          <div class="sf-sec-head">
+            <h3 class="sf-sec-title" id="health-t">Credential health</h3>
+            <span class="sf-chip is-warn">1 expiring soon</span>
+          </div>
+          <p class="sf-lede">How old each saved login is, and when it may stop working. Values never show here.</p>
+          <div class="sf-rows">
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Traffmonetizer <span class="optional">token</span></div></div>
+              <div class="sf-row-val">9 days old · expires 30 Nov 2026</div>
+              <div class="sf-row-act"><span class="sf-chip is-warn">Expiring soon</span><a class="btn btn-primary btn-sm" href="#collector-traffmonetizer">Update</a></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Bytelixir <span class="optional">session_cookie</span> <button type="button" class="sf-info" aria-expanded="false" aria-label="Why" data-toggle="h-bl">?</button></div></div>
+              <div class="sf-row-val">5 hours old · expected to last about 2 hours</div>
+              <div class="sf-row-act"><span class="sf-chip">No known expiry</span></div>
+              <p class="sf-pop" id="h-bl" hidden>The remember-me cookie is saved, so this session is made again on every run.</p>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">PacketStream <span class="optional">auth_token</span></div></div>
+              <div class="sf-row-val">41 days old</div>
+              <div class="sf-row-act"><span class="sf-chip">No known expiry</span></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Honeygain <span class="optional">password</span></div></div>
+              <div class="sf-row-val">128 days old</div>
+              <div class="sf-row-act"><span class="sf-chip">No known expiry</span></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== SECURITY ===== -->
+        <h2 class="sf-group">Security</h2>
+
+        <section class="sf-sec" id="set-earner-secrets" aria-labelledby="es-t">
+          <div class="sf-sec-head">
+            <h3 class="sf-sec-title" id="es-t">Earner credentials on each box</h3>
+            <span class="sf-chip is-warn">Not protected</span>
+            <div class="sf-sec-tools"><button type="button" class="btn btn-primary btn-sm" aria-expanded="false" data-toggle="es-steps-a">How to protect them</button></div>
+          </div>
+          <p class="sf-lede">Keep earner passwords out of Docker's container settings. You turn this on for each box. <button type="button" class="sf-linkbtn" aria-expanded="false" data-toggle="es-more-a">Learn more</button></p>
+          <div class="sf-more" id="es-more-a" hidden>
+            <ul>
+              <li>Docker keeps each container's settings in plain text. <code>docker inspect</code>, a backup of Docker's folder and any tool with the Docker socket can read every earner password there.</li>
+              <li>With <code>CASHPILOT_EARNER_SECRETS=file</code> on a worker, each earner reads its password from a file. Only that earner can read the file.</li>
+              <li>Root on the box can still read the file. This does not protect against root.</li>
+              <li>Some earners are not covered. The <a class="sf-a" href="https://geiserx.github.io/CashPilot/earner-secrets/">guide</a> lists them.</li>
+            </ul>
+          </div>
+
+          <div class="sf-meter-wrap">
+            <div class="sf-meter-top">
+              <div class="sf-meter-figure">0 <small>of 23 earners protected</small></div>
+              <span class="muted" style="font-size:var(--fs-2)">2 phones do not report their earners</span>
+            </div>
+            <div class="sf-meter" role="img" aria-label="0 earners in a file, 23 in container settings"><span class="m-env" style="width:100%"></span></div>
+            <div class="sf-legend"><span><i class="l-file"></i>In a file: 0</span><span><i class="l-env"></i>In container settings: 23</span><span><i class="l-none"></i>Not reported: 2 boxes</span></div>
+          </div>
+
+          <div class="sf-boxes" role="group" aria-label="Boxes">
+            <button type="button" class="sf-box is-warn" aria-pressed="false" data-toggle="es-steps-a">
+              <span class="sf-box-name">watchtower</span><span class="sf-box-kind">Server</span>
+              <span class="sf-box-mode">Off: passwords in container settings</span>
+              <span class="sf-box-count">0 of 8 protected</span><span class="sf-box-mini"><span class="m-env" style="width:100%"></span></span>
+              <span class="sf-box-next">Turn on</span>
+            </button>
+            <button type="button" class="sf-box is-warn" aria-pressed="false" data-toggle="es-steps-a">
+              <span class="sf-box-name">geiserback</span><span class="sf-box-kind">Server</span>
+              <span class="sf-box-mode">Off: passwords in container settings</span>
+              <span class="sf-box-count">0 of 8 protected</span><span class="sf-box-mini"><span class="m-env" style="width:100%"></span></span>
+              <span class="sf-box-next">Turn on</span>
+            </button>
+            <button type="button" class="sf-box is-warn" aria-pressed="false" data-toggle="es-steps-a">
+              <span class="sf-box-name">geiserct</span><span class="sf-box-kind">Server</span>
+              <span class="sf-box-mode">Worker too old to say</span>
+              <span class="sf-box-count">0 of 7 protected</span><span class="sf-box-mini"><span class="m-env" style="width:100%"></span></span>
+              <span class="sf-box-next">Update the worker</span>
+            </button>
+            <button type="button" class="sf-box is-muted" aria-pressed="false" data-toggle="es-steps-a">
+              <span class="sf-box-name">OPPO CPH1951 (5bdadbc5)</span><span class="sf-box-kind">Phone</span>
+              <span class="sf-box-mode">Worker too old to say</span>
+              <span class="sf-box-count muted">Earners not reported</span>
+              <span class="sf-box-next">Update the worker</span>
+            </button>
+            <button type="button" class="sf-box is-muted" aria-pressed="false" data-toggle="es-steps-a">
+              <span class="sf-box-name">motorola one fusion+ (1414f972)</span><span class="sf-box-kind">Phone</span>
+              <span class="sf-box-mode">Worker too old to say</span>
+              <span class="sf-box-count muted">Earners not reported</span>
+              <span class="sf-box-next">Update the worker</span>
+            </button>
+          </div>
+          <div class="sf-steps" id="es-steps-a" hidden>
+            <div class="sf-steps-head"><h3>Protect the earners on a box</h3><span class="muted" style="font-size:var(--fs-2)">Do this on each box.</span></div>
+            <ol>
+              <li><div><div class="sf-step-t">Add this line to the worker's environment.</div>
+                <div class="sf-code"><pre>CASHPILOT_EARNER_SECRETS=file</pre><button type="button" class="btn btn-ghost btn-sm">Copy</button></div></div></li>
+              <li><div><div class="sf-step-t">Recreate the worker container.</div>
+                <div class="sf-code"><pre>docker compose up -d cashpilot-worker</pre><button type="button" class="btn btn-ghost btn-sm">Copy</button></div></div></li>
+              <li><div><div class="sf-step-t">Redeploy each earner on that box.</div><div class="sf-step-s">Use Redeploy on the dashboard. This page then shows the box as protected.</div></div></li>
+            </ol>
+            <p class="sf-undo"><b>Undo:</b> remove the line, recreate the worker and redeploy. The passwords go back into container settings.</p>
+          </div>
+        </section>
+
+        <section class="sf-sec" id="set-key" aria-labelledby="key-t">
+          <div class="sf-sec-head">
+            <h3 class="sf-sec-title" id="key-t">Credential encryption key</h3>
+            <span class="sf-chip is-warn">In the data folder</span>
+          </div>
+          <p class="sf-lede">One key decrypts every credential CashPilot stores. Keep it outside the data folder. <button type="button" class="sf-linkbtn" aria-expanded="false" data-toggle="key-more">Learn more</button></p>
+          <div class="sf-more" id="key-more" hidden>On a default install, the key is in the data folder, next to the database it decrypts. Anyone with a copy of that folder can then read your credentials. When the key is outside the folder, a copy of the folder alone is not enough.</div>
+          <div class="sf-rows">
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Where the key is</div><div class="sf-row-sub">A copy of the data folder can decrypt every stored credential.</div></div>
+              <div class="sf-row-val"><span class="sf-mono">/data/.fernet_key</span></div>
+              <div class="sf-row-act"><button type="button" class="btn btn-primary btn-sm">Move the key out</button></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sf-sec" id="set-identities" aria-labelledby="ids-t">
+          <div class="sf-sec-head">
+            <h3 class="sf-sec-title" id="ids-t">Device ids</h3>
+            <span class="sf-chip is-plain">5 kept · 3 in use</span>
+            <div class="sf-sec-tools">
+              <button type="button" class="btn btn-secondary btn-sm">Add an id</button>
+              <button type="button" class="btn btn-ghost btn-sm">Download all</button>
+            </div>
+          </div>
+          <p class="sf-lede">The device id each service runs with, per box. They stay after you remove a service. <button type="button" class="sf-linkbtn" aria-expanded="false" data-toggle="ids-more">Learn more</button></p>
+          <div class="sf-more" id="ids-more" hidden>
+            <ul>
+              <li>Use an id to find the device at the provider, or to give a new box the same id.</li>
+              <li>Each value stays hidden until you show or copy it. The audit log records every show.</li>
+              <li>Passwords, keys and wallet seeds are never kept here.</li>
+              <li>You can change the id a box runs, and add an id CashPilot did not deploy with.</li>
+              <li>Download all asks for your password first.</li>
+            </ul>
+          </div>
+          <div class="sf-ids sf-rows">
+            <details open>
+              <summary><span><b>ProxyRack</b> <span class="optional">Device UUID</span></span><code class="sf-mono sf-id-val">••••••••-••••-4f1a</code><span class="sf-id-box muted">watchtower · copy 1</span><span class="sf-chip is-ok">In use</span></summary>
+              <div class="sf-id-body">
+                <div class="sf-row-sub">First seen 2026-09-02 10:14 UTC · last seen 2026-11-28 08:40 UTC</div>
+                <div class="sf-id-actions">
+                  <button type="button" class="btn btn-secondary btn-sm">Show</button>
+                  <button type="button" class="btn btn-ghost btn-sm">Copy</button>
+                  <button type="button" class="btn btn-ghost btn-sm">Change</button>
+                  <button type="button" class="btn btn-danger btn-sm">Forget</button>
+                </div>
+              </div>
+            </details>
+            <details><summary><span><b>ProxyBase</b> <span class="optional">Device ID</span></span><code class="sf-mono sf-id-val">••••••••3c9e</code><span class="sf-id-box muted">geiserback · copy 1</span><span class="sf-chip is-ok">In use</span></summary></details>
+            <details><summary><span><b>Mysterium</b> <span class="optional">Node identity</span></span><code class="sf-mono sf-id-val">0x••••••a41f</code><span class="sf-id-box muted">geiserct · copy 1</span><span class="sf-chip is-ok">In use</span></summary></details>
+            <details><summary><span><b>ProxyRack</b> <span class="optional">Device UUID</span></span><code class="sf-mono sf-id-val">••••••••-••••-91be</code><span class="sf-id-box muted">nas-old · copy 1</span><span class="sf-chip">Removed</span></summary></details>
+            <details><summary><span><b>Mysterium</b> <span class="optional">Backup SHA-256</span></span><code class="sf-mono sf-id-val">••••••••5d20</code><span class="sf-id-box muted">geiserct · copy 1</span><span class="sf-chip">Downloaded from here</span></summary></details>
+          </div>
+        </section>
+
+        <!-- ===== MOVE AND RESTORE ===== -->
+        <h2 class="sf-group">Move and restore</h2>
+
+        <section class="sf-sec" id="set-restore" aria-labelledby="rs-t">
+          <div class="sf-sec-head"><h3 class="sf-sec-title" id="rs-t">Restore from a backup</h3></div>
+          <p class="sf-lede">Put back a Mysterium, ProxyBase or Anyone identity from a <code>.cpbackup</code> file. <button type="button" class="sf-linkbtn" aria-expanded="false" data-toggle="rs-more">Learn more</button></p>
+          <div class="sf-more" id="rs-more" hidden>
+            <ul>
+              <li>The file must be one made with a passphrase.</li>
+              <li>A restore only creates a new container, on a box that does not run the service. It never writes over a running one.</li>
+              <li>To replace a running identity: download its backup first. Then remove the service from that box on the dashboard, and say yes when it asks to delete its data. Then restore here.</li>
+              <li>Files sealed to a key, Storj and Sia use the <a class="sf-a" href="https://geiserx.github.io/CashPilot/backup/#restore-a-backup-from-the-command-line">command line steps</a>.</li>
+            </ul>
+          </div>
+          <div class="sf-rows">
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label"><label for="restore-file">Backup file</label></div><div class="sf-row-sub">CashPilot checks the file before anything changes.</div></div>
+              <div class="sf-row-val"><input type="file" id="restore-file" accept=".cpbackup,application/octet-stream" style="font-size:var(--fs-2);max-width:100%"></div>
+              <div class="sf-row-act"><button type="button" class="btn btn-secondary btn-sm">Check file</button></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sf-sec" id="set-import" aria-labelledby="im-t">
+          <div class="sf-sec-head"><h3 class="sf-sec-title" id="im-t">Import from another tool</h3></div>
+          <p class="sf-lede">Bring your services over from money4band, CashFactory or InternetIncome. <button type="button" class="sf-linkbtn" aria-expanded="false" data-toggle="im-more">Learn more</button></p>
+          <div class="sf-more" id="im-more" hidden>
+            <ul>
+              <li>Add the config files from that tool. CashPilot shows what it can bring over before it saves anything.</li>
+              <li>CashPilot does not run or fetch anything in the files, and it does not keep the files.</li>
+              <li>Guides for each tool: <a class="sf-a" href="#">money4band</a>, <a class="sf-a" href="#">CashFactory</a>, <a class="sf-a" href="#">InternetIncome</a>.</li>
+            </ul>
+          </div>
+          <div class="sf-rows">
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Start an import</div><div class="sf-row-sub">Up to 4 files, 64 KiB in total.</div></div>
+              <div class="sf-row-val">Nothing is saved until you choose.</div>
+              <div class="sf-row-act"><button type="button" class="btn btn-secondary btn-sm">Add files</button></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Saved imports</div><div class="sf-row-sub">Kept encrypted, to deploy to more boxes later.</div></div>
+              <div class="sf-row-val muted">Nothing imported yet.</div>
+              <div class="sf-row-act"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== ALERTS ===== -->
+        <h2 class="sf-group">Alerts</h2>
+        <div class="sf-slot" id="set-notifications" role="note">Notifications (designed in the other PR)</div>
+
+        <!-- ===== SYSTEM ===== -->
+        <h2 class="sf-group">System</h2>
+
+        <section class="sf-sec" id="set-env" aria-labelledby="env-t">
+          <div class="sf-sec-head">
+            <h3 class="sf-sec-title" id="env-t">Environment</h3>
+            <span class="sf-chip is-plain">Read when CashPilot starts</span>
+          </div>
+          <p class="sf-lede">To change one, set it in your compose file or Unraid template, then restart. <button type="button" class="sf-linkbtn" aria-expanded="false" data-toggle="env-more">Learn more</button></p>
+          <div class="sf-more" id="env-more" hidden>
+            <ul>
+              <li>Variables set with Docker <code>-e</code> show locked.</li>
+              <li>You can store a value for the others here, but <b>a stored value does not take effect</b>. CashPilot keeps the field so a value stored before stays visible.</li>
+              <li>Some can never change while CashPilot runs: the session key signs logins in use, the data directory holds the open database, and enrolled workers already hold the fleet key.</li>
+            </ul>
+          </div>
+          <div class="sf-rows">
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Fleet API Key</div><div class="sf-row-sub sf-mono" style="font-size:var(--fs-1);color:var(--text-muted)">CASHPILOT_API_KEY</div></div>
+              <div class="sf-row-val"><span class="sf-mono">•••••••• set</span><span class="muted sf-desc">Bearer token for worker-to-UI authentication</span></div>
+              <div class="sf-row-act"><span class="sf-chip is-lock">&#128274; From env</span></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Session Secret Key</div><div class="sf-row-sub sf-mono" style="font-size:var(--fs-1);color:var(--text-muted)">CASHPILOT_SECRET_KEY</div></div>
+              <div class="sf-row-val"><span class="sf-mono">•••••••• set</span><span class="muted sf-desc">Secret for JWT session tokens</span></div>
+              <div class="sf-row-act"><span class="sf-chip is-lock">&#128274; Read-only</span></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label"><label for="env-prefix">Hostname Prefix</label></div><div class="sf-row-sub sf-mono" style="font-size:var(--fs-1);color:var(--text-muted)">CASHPILOT_HOSTNAME_PREFIX</div></div>
+              <div class="sf-row-val"><input class="form-input form-input-select" id="env-prefix" value="cashpilot" style="max-width:200px"><span class="muted sf-desc">Containers named {prefix}-{service}</span></div>
+              <div class="sf-row-act"><span class="sf-chip is-plain">Default</span></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label"><label for="env-int">Collect Interval (min)</label></div><div class="sf-row-sub sf-mono" style="font-size:var(--fs-1);color:var(--text-muted)">CASHPILOT_COLLECT_INTERVAL</div></div>
+              <div class="sf-row-val"><input class="form-input form-input-num" id="env-int" value="60"><span class="muted sf-desc">Minutes between collections</span></div>
+              <div class="sf-row-act"><span class="sf-chip is-plain">Default</span></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Data Directory</div><div class="sf-row-sub sf-mono" style="font-size:var(--fs-1);color:var(--text-muted)">CASHPILOT_DATA_DIR</div></div>
+              <div class="sf-row-val"><span class="sf-mono">/data</span><span class="muted sf-desc">Holds the SQLite database</span></div>
+              <div class="sf-row-act"><span class="sf-chip is-lock">&#128274; Read-only</span></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">System Timezone</div><div class="sf-row-sub sf-mono" style="font-size:var(--fs-1);color:var(--text-muted)">TZ</div></div>
+              <div class="sf-row-val"><span class="sf-mono">Europe/Madrid</span><span class="muted sf-desc">IANA format</span></div>
+              <div class="sf-row-act"><span class="sf-chip is-lock">&#128274; From env</span></div>
+            </div>
+          </div>
+          <div class="kv-actions kv-actions-end" style="margin-top:10px">
+            <span class="muted" style="font-size:var(--fs-1)">Stores the value only. It does not take effect.</span>
+            <button type="button" class="btn btn-ghost btn-sm" title="Stores the value; it will not take effect until it is set in the environment and the container restarts">Save anyway</button>
+          </div>
+        </section>
+
+        <section class="sf-sec" id="set-about" aria-labelledby="ab-t">
+          <div class="sf-sec-head">
+            <h3 class="sf-sec-title" id="ab-t">About and updates</h3>
+            <span class="sf-chip is-ok">Up to date</span>
+          </div>
+          <p class="sf-lede">CashPilot checks GitHub for the newest release, and can update itself. <button type="button" class="sf-linkbtn" aria-expanded="false" data-toggle="ab-more">Learn more</button></p>
+          <div class="sf-more" id="ab-more" hidden>
+            <ul>
+              <li>The update button runs <code>docker compose pull &amp;&amp; docker compose up -d</code> for you, from a one-shot helper container.</li>
+              <li>It installs the newest patch of the image series your compose file pins.</li>
+              <li>To move to a newer series, edit the image tags. Read <a class="sf-a" href="https://github.com/GeiserX/CashPilot/blob/main/UPGRADING.md">UPGRADING.md</a> first. Update the UI host first, then every worker.</li>
+              <li>An install not managed by Compose gets the manual commands instead.</li>
+            </ul>
+          </div>
+          <div class="sf-rows">
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label"><label for="update-worker-select">Server</label></div></div>
+              <div class="sf-row-val"><select id="update-worker-select" class="form-input form-input-select"><option>watchtower</option><option>geiserback</option><option>geiserct</option></select></div>
+              <div class="sf-row-act"></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Running</div></div>
+              <div class="sf-row-val"><span class="sf-mono">v3.1.0</span></div>
+              <div class="sf-row-act"><span class="sf-chip is-ok">Latest release v3.1.0</span></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Images</div><div class="sf-row-sub">Worker and dashboard</div></div>
+              <div class="sf-row-val"><span class="sf-mono">drumsergio/cashpilot-worker:3.1</span><span class="sf-mono">drumsergio/cashpilot:3.1</span></div>
+              <div class="sf-row-act"></div>
+            </div>
+            <div class="sf-row">
+              <div class="sf-row-main"><div class="sf-row-label">Update</div><div class="sf-row-sub">You run the newest release. The button runs the pull anyway.</div></div>
+              <div class="sf-row-val"><span class="form-hint" id="update-run-status"></span></div>
+              <div class="sf-row-act"><button type="button" class="btn btn-secondary btn-sm">Re-pull images</button></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- =================================================================
+     STATE PANELS (mockup only)
+     ================================================================= -->
+<div class="mk-states mk-only">
+
+  <!-- (b) -->
+  <div class="mk-label">(b) <b>Earner credentials, realistic mixed fleet.</b> watchtower picked: its steps open, with undo. Too-old workers send you to updates.</div>
+  <div class="mk-state"><div class="mk-state-body">
+    <section class="sf-sec" aria-label="Earner credentials, mixed">
+      <div class="sf-sec-head">
+        <h3 class="sf-sec-title">Earner credentials on each box</h3>
+        <span class="sf-chip is-warn">Not protected</span>
+        <div class="sf-sec-tools"><button type="button" class="btn btn-primary btn-sm" aria-expanded="true">How to protect them</button></div>
+      </div>
+      <p class="sf-lede">Keep earner passwords out of Docker's container settings. You turn this on for each box. <button type="button" class="sf-linkbtn" aria-expanded="true">Learn more</button></p>
+      <div class="sf-more">
+        <ul>
+          <li>Docker keeps each container's settings in plain text. <code>docker inspect</code>, a backup of Docker's folder and any tool with the Docker socket can read every earner password there.</li>
+          <li>With <code>CASHPILOT_EARNER_SECRETS=file</code> on a worker, each earner reads its password from a file. Only that earner can read the file.</li>
+          <li>Root on the box can still read the file. This does not protect against root.</li>
+          <li>Some earners are not covered. The <a class="sf-a" href="https://geiserx.github.io/CashPilot/earner-secrets/">guide</a> lists them.</li>
+        </ul>
+      </div>
+      <div class="sf-meter-wrap">
+        <div class="sf-meter-top">
+          <div class="sf-meter-figure">0 <small>of 23 earners protected</small></div>
+          <span class="muted" style="font-size:var(--fs-2)">2 phones do not report their earners</span>
+        </div>
+        <div class="sf-meter" role="img" aria-label="0 in a file, 23 in container settings"><span class="m-env" style="width:100%"></span></div>
+        <div class="sf-legend"><span><i class="l-file"></i>In a file: 0</span><span><i class="l-env"></i>In container settings: 23</span><span><i class="l-none"></i>Not reported: 2 boxes</span></div>
+      </div>
+      <div class="sf-boxes" role="group" aria-label="Boxes">
+        <button type="button" class="sf-box is-warn" aria-pressed="true"><span class="sf-box-name">watchtower</span><span class="sf-box-kind">Server</span><span class="sf-box-mode">Off: passwords in container settings</span><span class="sf-box-count">0 of 8 protected</span><span class="sf-box-mini"><span class="m-env" style="width:100%"></span></span><span class="sf-box-next">Turn on</span></button>
+        <button type="button" class="sf-box is-warn" aria-pressed="false"><span class="sf-box-name">geiserback</span><span class="sf-box-kind">Server</span><span class="sf-box-mode">Off: passwords in container settings</span><span class="sf-box-count">0 of 8 protected</span><span class="sf-box-mini"><span class="m-env" style="width:100%"></span></span><span class="sf-box-next">Turn on</span></button>
+        <button type="button" class="sf-box is-warn" aria-pressed="false"><span class="sf-box-name">geiserct</span><span class="sf-box-kind">Server</span><span class="sf-box-mode">Worker too old to say</span><span class="sf-box-count">0 of 7 protected</span><span class="sf-box-mini"><span class="m-env" style="width:100%"></span></span><span class="sf-box-next">Update the worker</span></button>
+        <button type="button" class="sf-box is-muted" aria-pressed="false"><span class="sf-box-name">OPPO CPH1951 (5bdadbc5)</span><span class="sf-box-kind">Phone</span><span class="sf-box-mode">Worker too old to say</span><span class="sf-box-count muted">Earners not reported</span><span class="sf-box-next">Update the worker</span></button>
+        <button type="button" class="sf-box is-muted" aria-pressed="false"><span class="sf-box-name">motorola one fusion+ (1414f972)</span><span class="sf-box-kind">Phone</span><span class="sf-box-mode">Worker too old to say</span><span class="sf-box-count muted">Earners not reported</span><span class="sf-box-next">Update the worker</span></button>
+      </div>
+      <div class="sf-steps">
+        <div class="sf-steps-head"><h3>Protect the earners on watchtower</h3><span class="muted" style="font-size:var(--fs-2)">8 earners to redeploy after step 2.</span></div>
+        <ol>
+          <li><div><div class="sf-step-t">Add this line to the worker's environment.</div>
+            <div class="sf-code"><pre>CASHPILOT_EARNER_SECRETS=file</pre><button type="button" class="btn btn-ghost btn-sm">Copy</button></div>
+            <details style="margin-top:6px"><summary class="sf-linkbtn" style="display:inline;list-style:none">Show it in a compose file</summary>
+              <div class="sf-code"><pre>services:
+  cashpilot-worker:
+    environment:
+      - CASHPILOT_EARNER_SECRETS=file</pre><button type="button" class="btn btn-ghost btn-sm">Copy</button></div></details></div></li>
+          <li><div><div class="sf-step-t">Recreate the worker container.</div>
+            <div class="sf-code"><pre>docker compose up -d cashpilot-worker</pre><button type="button" class="btn btn-ghost btn-sm">Copy</button></div></div></li>
+          <li><div><div class="sf-step-t">Redeploy each earner on watchtower.</div><div class="sf-step-s">Use Redeploy on the dashboard. The count above goes up as you go.</div>
+            <div style="margin-top:6px"><a class="btn btn-secondary btn-sm" href="#">Open watchtower on the dashboard</a></div></div></li>
+        </ol>
+        <p class="sf-undo"><b>Undo:</b> remove the line, recreate the worker and redeploy. The passwords go back into container settings.</p>
+      </div>
+      <div class="sf-steps" style="border-style:dashed">
+        <div class="sf-steps-head"><h3>If you pick geiserct or a phone</h3></div>
+        <p class="sf-step-s" style="margin:0">This worker is too old to say how it keeps passwords. Update the worker first, then come back. <a class="sf-a" href="#set-about">Go to About and updates</a></p>
+      </div>
+    </section>
+    <p class="mk-sub">Other modes, as chips: "On: 3 still to redeploy" (file, some left) · "This image cannot use a file" (unavailable) · "Does not list its earners" (counts unknown, mode known).</p>
+    <div class="sf-boxes" style="max-width:640px">
+      <div class="sf-box is-warn"><span class="sf-box-name">example-a</span><span class="sf-box-kind">Server</span><span class="sf-box-mode">On: 3 still in container settings</span><span class="sf-box-count">5 of 8 protected</span><span class="sf-box-mini"><span style="width:62.5%"></span><span class="m-env" style="width:37.5%"></span></span><span class="sf-box-next">Redeploy 3</span></div>
+      <div class="sf-box is-muted"><span class="sf-box-name">example-b</span><span class="sf-box-kind">Server</span><span class="sf-box-mode">This worker image cannot keep passwords in a file</span><span class="sf-box-count muted">0 of 4 protected</span><span class="sf-box-next">Use the standard worker image</span></div>
+      <div class="sf-box is-ok"><span class="sf-box-name">example-c</span><span class="sf-box-kind">Desktop</span><span class="sf-box-mode">On</span><span class="sf-box-count muted">Does not list its earners</span><span class="sf-box-next">Nothing to do</span></div>
+    </div>
+  </div></div>
+
+  <!-- (c) -->
+  <div class="mk-label">(c) <b>Earner credentials when every box is protected.</b> The section shrinks to a full meter and green chips. Undo stays one click away.</div>
+  <div class="mk-state"><div class="mk-state-body">
+    <section class="sf-sec" aria-label="Earner credentials, all protected">
+      <div class="sf-sec-head">
+        <h3 class="sf-sec-title">Earner credentials on each box</h3>
+        <span class="sf-chip is-ok">All protected</span>
+        <div class="sf-sec-tools"><button type="button" class="btn btn-ghost btn-sm" aria-expanded="false">How to undo</button></div>
+      </div>
+      <p class="sf-lede">Earner passwords are in files, not in Docker's container settings. <button type="button" class="sf-linkbtn" aria-expanded="false">Learn more</button></p>
+      <div class="sf-meter-wrap">
+        <div class="sf-meter-top"><div class="sf-meter-figure" style="color:var(--success)">23 <small>of 23 earners protected</small></div><span class="muted" style="font-size:var(--fs-2)">2 phones do not report their earners</span></div>
+        <div class="sf-meter" role="img" aria-label="23 in a file, 0 in container settings"><span class="m-file" style="width:100%"></span></div>
+      </div>
+      <div class="sf-boxes">
+        <div class="sf-box is-ok"><span class="sf-box-name">watchtower</span><span class="sf-box-kind">Server</span><span class="sf-box-mode">On</span><span class="sf-box-count">8 of 8 protected</span><span class="sf-box-mini"><span style="width:100%"></span></span></div>
+        <div class="sf-box is-ok"><span class="sf-box-name">geiserback</span><span class="sf-box-kind">Server</span><span class="sf-box-mode">On</span><span class="sf-box-count">8 of 8 protected</span><span class="sf-box-mini"><span style="width:100%"></span></span></div>
+        <div class="sf-box is-ok"><span class="sf-box-name">geiserct</span><span class="sf-box-kind">Server</span><span class="sf-box-mode">On</span><span class="sf-box-count">7 of 7 protected</span><span class="sf-box-mini"><span style="width:100%"></span></span></div>
+        <div class="sf-box is-ok"><span class="sf-box-name">OPPO CPH1951 (5bdadbc5)</span><span class="sf-box-kind">Phone</span><span class="sf-box-mode">On</span><span class="sf-box-count muted">Does not list its earners</span></div>
+        <div class="sf-box is-ok"><span class="sf-box-name">motorola one fusion+ (1414f972)</span><span class="sf-box-kind">Phone</span><span class="sf-box-mode">On</span><span class="sf-box-count muted">Does not list its earners</span></div>
+      </div>
+    </section>
+    <p class="mk-sub">And the attention strip, when nothing needs you:</p>
+    <section class="sf-attn is-clear" aria-label="Nothing needs you">
+      <div class="sf-attn-head"><h2 class="sf-attn-title">Nothing needs your attention</h2><span class="sf-chip is-ok">All clear</span></div>
+      <div class="sf-attn-fine" style="border-top:none"><span>Up to date: v3.1.0</span><span>23 of 23 earners protected</span><span>Key outside the data folder</span><span>11 of 20 services collected</span></div>
+    </section>
+  </div></div>
+
+  <!-- (d) -->
+  <div class="mk-label">(d) <b>Import from another tool, inside Settings.</b> Left: in progress (files checked, CashPilot shows what it found). Right: finished (saved, ready to deploy).</div>
+  <div class="mk-state"><div class="mk-state-body" style="max-width:none">
+    <div class="mk-two">
+      <section class="sf-sec" aria-label="Import in progress">
+        <div class="sf-sec-head"><h3 class="sf-sec-title">Import from another tool</h3><span class="sf-chip is-warn">Not saved yet</span></div>
+        <ol class="sf-stepper"><li class="is-done"><b>&#10003;</b>Your files</li><li class="is-now"><b>2</b>What CashPilot found</li><li><b>3</b>Deploy</li></ol>
+        <div class="sf-panel">
+          <h3>1. Your files</h3>
+          <div class="sf-form-grid">
+            <label class="form-label" for="im-src">Tool</label>
+            <select id="im-src" class="form-input form-input-select"><option>Tell from the files</option><option>money4band</option><option>CashFactory</option><option>InternetIncome</option></select>
+            <label class="form-label" for="im-files">Files</label>
+            <div><input type="file" id="im-files" multiple style="font-size:var(--fs-2)"> <span class="sf-mono" style="font-size:var(--fs-1)">user-config.json</span>
+              <div class="form-hint">money4band: <code>config/user-config.json</code> or its <code>.env</code>. CashFactory: <code>.env</code>. InternetIncome: <code>properties.conf</code>, plus <code>earnapp.txt</code> and <code>proxyrack.txt</code>. Up to 4 files, 64 KiB in total.</div></div>
+            <label class="form-label" for="im-paste">Or paste one file here</label>
+            <textarea id="im-paste" class="form-input" rows="3" placeholder=""></textarea>
+          </div>
+          <div class="settings-actions"><button type="button" class="btn btn-secondary btn-sm">Check what comes over</button><span class="muted" style="font-size:var(--fs-2)">Checked.</span></div>
+        </div>
+        <div class="sf-panel">
+          <h3>2. What CashPilot found</h3>
+          <p class="form-hint" style="margin:0 0 8px">Read as <b>money4band</b>.</p>
+          <table class="sf-table">
+            <thead><tr><th></th><th>Service</th><th>Settings</th></tr></thead>
+            <tbody>
+              <tr><td><input type="checkbox" checked aria-label="Honeygain"></td><td><b>Honeygain</b> <span class="sf-chip is-ok">Ready</span></td><td><span class="sf-f">email <b>me@example.com</b> imported</span><span class="sf-f">password set</span><span class="sf-f muted">earnings tracking will use this login too</span></td></tr>
+              <tr><td><input type="checkbox" checked aria-label="PacketStream"></td><td><b>PacketStream</b> <span class="sf-chip is-ok">Ready</span></td><td><span class="sf-f">cid <b>a1B2</b> imported</span><span class="sf-f muted">already deployed by CashPilot</span></td></tr>
+              <tr><td><input type="checkbox" aria-label="Repocket"></td><td><b>Repocket</b> <span class="sf-chip is-warn">Needs a value</span></td><td><span class="sf-f">email imported</span><span class="sf-f">api_key missing</span><input class="form-input" type="password" placeholder="Api Key (optional)"></td></tr>
+              <tr><td></td><td><b>EarnApp</b> <span class="sf-chip">Cannot bring over</span></td><td><span class="sf-f muted">Device id is linked to the old tool.</span></td></tr>
+            </tbody>
+          </table>
+          <p class="form-hint" style="margin-top:8px"><b>Not imported:</b> <code>DEVICE_NAME</code>: not a service setting.</p>
+          <div class="settings-actions"><button type="button" class="btn btn-primary btn-sm">Save the ticked services</button><span class="muted" style="font-size:var(--fs-2)">2 ticked</span></div>
+        </div>
+      </section>
+
+      <section class="sf-sec" aria-label="Import finished">
+        <div class="sf-sec-head"><h3 class="sf-sec-title">Import from another tool</h3><span class="sf-chip is-ok">2 saved</span><div class="sf-sec-tools"><button type="button" class="btn btn-ghost btn-sm">Import more</button></div></div>
+        <ol class="sf-stepper"><li class="is-done"><b>&#10003;</b>Your files</li><li class="is-done"><b>&#10003;</b>What CashPilot found</li><li class="is-now"><b>3</b>Deploy</li></ol>
+        <p style="margin:10px 0"><span class="sf-toast">Imported 2 services</span></p>
+        <div class="sf-panel">
+          <h3>3. Deploy what you imported</h3>
+          <p class="sf-toast is-warn" style="display:flex;margin-bottom:10px">Stop the old tool on a box before you deploy there. Two copies on one connection earn as one, and a device id must not run twice.</p>
+          <div class="form-label">Deploy to</div>
+          <div class="sf-workers"><label><input type="checkbox" checked> watchtower</label><label><input type="checkbox"> geiserback</label><label><input type="checkbox"> geiserct</label></div>
+          <div class="sf-rows">
+            <div class="sf-row"><div class="sf-row-main"><div class="sf-row-label">Honeygain</div><div class="sf-row-sub">from money4band, 2026-11-28 10:02 UTC; email, password</div></div><div class="sf-row-val"></div><div class="sf-row-act"><button type="button" class="btn btn-secondary btn-sm">Deploy</button><button type="button" class="btn btn-danger btn-sm">Forget</button></div></div>
+            <div class="sf-row"><div class="sf-row-main"><div class="sf-row-label">PacketStream</div><div class="sf-row-sub">from money4band, 2026-11-28 10:02 UTC; cid</div></div><div class="sf-row-val"></div><div class="sf-row-act"><button type="button" class="btn btn-secondary btn-sm">Deploy</button><button type="button" class="btn btn-danger btn-sm">Forget</button></div></div>
+          </div>
+          <div class="settings-actions"><button type="button" class="btn btn-primary btn-sm">Deploy all</button></div>
+        </div>
+        <p class="mk-sub" style="margin-top:12px">Main view after this: the "Saved imports" row says "2 waiting to deploy" with a Deploy button. <code>/import</code> redirects to <code>/settings#set-import</code>.</p>
+      </section>
+    </div>
+  </div></div>
+
+  <!-- (e) -->
+  <div class="mk-label">(e) <b>Credential encryption key: key revealed, then the delete-the-copy confirmation and the done state.</b> Today there is no "regenerate" action; see NOTES.md.</div>
+  <div class="mk-state"><div class="mk-state-body" style="max-width:none">
+    <div class="mk-two">
+      <section class="sf-sec" aria-label="Key revealed">
+        <div class="sf-sec-head"><h3 class="sf-sec-title">Credential encryption key</h3><span class="sf-chip is-warn">In the data folder</span></div>
+        <div class="sf-rows">
+          <div class="sf-row"><div class="sf-row-main"><div class="sf-row-label">Where the key is</div></div><div class="sf-row-val"><span class="sf-mono">/data/.fernet_key</span></div><div class="sf-row-act"><button type="button" class="btn btn-ghost btn-sm" aria-expanded="true">Hide the steps</button></div></div>
+        </div>
+        <div class="sf-steps">
+          <ol>
+            <li class="is-done"><div><div class="sf-step-t">Show the key and copy it.</div><div class="sf-step-s">CashPilot asks for your password first. The audit log records the show.</div>
+              <div class="sf-code"><pre>Zm9vYmFyLWRlbW8ta2V5LW5vdC1yZWFsLTAwMDAwMDA=</pre><button type="button" class="btn btn-ghost btn-sm">Copy</button><button type="button" class="btn btn-ghost btn-sm">Hide</button></div>
+              <p style="margin-top:6px"><span class="sf-toast">Key copied. Paste it into your secret store, then clear your clipboard.</span></p></div></li>
+            <li><div><div class="sf-step-t">Save it in a file outside the data folder.</div><div class="sf-step-s">The UI runs as user 1000, so that user must be able to read it.</div>
+              <div class="sf-code"><pre>mkdir -p secrets
+sudo chown 1000:1000 secrets/cashpilot_encryption_key
+sudo chmod 400 secrets/cashpilot_encryption_key</pre><button type="button" class="btn btn-ghost btn-sm">Copy</button></div>
+              <details style="margin-top:6px"><summary class="sf-linkbtn" style="display:inline;list-style:none">Add it to your compose file</summary>
+                <div class="sf-code"><pre>secrets:
+  cashpilot_encryption_key:
+    file: ./secrets/cashpilot_encryption_key
+services:
+  cashpilot-ui:
+    secrets:
+      - cashpilot_encryption_key
+    environment:
+      - CASHPILOT_ENCRYPTION_KEY_FILE=/run/secrets/cashpilot_encryption_key</pre><button type="button" class="btn btn-ghost btn-sm">Copy</button></div></details>
+              <div class="sf-step-s">A secret manager works too. The <a class="sf-a" href="https://geiserx.github.io/CashPilot/encryption-key/">guide</a> has steps for Infisical, Vault, 1Password and Bitwarden.</div></div></li>
+            <li><div><div class="sf-step-t">Recreate the UI container.</div>
+              <div class="sf-code"><pre>docker compose up -d cashpilot-ui</pre><button type="button" class="btn btn-ghost btn-sm">Copy</button></div></div></li>
+            <li><div><div class="sf-step-t">Come back to this page.</div><div class="sf-step-s">It checks where the key comes from, then offers to delete the copy in the data folder.</div></div></li>
+          </ol>
+        </div>
+      </section>
+
+      <div>
+        <section class="sf-sec" aria-label="Key moved, copy left">
+          <div class="sf-sec-head"><h3 class="sf-sec-title">Credential encryption key</h3><span class="sf-chip is-warn">Copy still in the data folder</span></div>
+          <div class="sf-rows">
+            <div class="sf-row"><div class="sf-row-main"><div class="sf-row-label">Where the key is</div><div class="sf-row-sub">Outside the data folder.</div></div><div class="sf-row-val"><span class="sf-mono">/run/secrets/cashpilot_encryption_key</span></div><div class="sf-row-act"><span class="sf-chip is-ok">Outside</span></div></div>
+            <div class="sf-row"><div class="sf-row-main"><div class="sf-row-label">Copy in the data folder</div><div class="sf-row-sub">Delete it, so a copy of the folder cannot decrypt your credentials.</div></div><div class="sf-row-val"><span class="sf-mono">/data/.fernet_key</span></div><div class="sf-row-act"><button type="button" class="btn btn-primary btn-sm">Delete the copy</button></div></div>
+          </div>
+        </section>
+        <div class="sf-dialog" role="dialog" aria-label="Confirm" style="margin:0 0 12px auto">
+          <h4>Delete the key file from the data folder?</h4>
+          <p>After this, CashPilot can read your credentials only with the key you keep outside it. Make sure that copy is safe first.</p>
+          <div class="sf-dialog-actions"><button type="button" class="btn btn-ghost btn-sm">Cancel</button><button type="button" class="btn btn-primary btn-sm">Delete</button></div>
+        </div>
+        <section class="sf-sec" aria-label="Key done">
+          <div class="sf-sec-head"><h3 class="sf-sec-title">Credential encryption key</h3><span class="sf-chip is-ok">Protected</span></div>
+          <div class="sf-rows">
+            <div class="sf-row"><div class="sf-row-main"><div class="sf-row-label">Where the key is</div><div class="sf-row-sub">The data folder holds no copy. Keep this key safe: nothing decrypts without it.</div></div><div class="sf-row-val"><span class="sf-mono">/run/secrets/cashpilot_encryption_key</span></div><div class="sf-row-act"></div></div>
+          </div>
+          <p style="margin-top:8px"><span class="sf-toast">The copy in the data folder is deleted.</span></p>
+        </section>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- (f) -->
+  <div class="mk-label">(f) <b>Restore with a file chosen, then the confirm step.</b> Left: a known file, box picked. Right: an unknown file needs the typed name, then the password prompt.</div>
+  <div class="mk-state"><div class="mk-state-body" style="max-width:none">
+    <div class="mk-two">
+      <section class="sf-sec" aria-label="Restore preview">
+        <div class="sf-sec-head"><h3 class="sf-sec-title">Restore from a backup</h3><span class="sf-chip is-ok">File checked</span></div>
+        <div class="sf-rows">
+          <div class="sf-row"><div class="sf-row-main"><div class="sf-row-label">Backup file</div></div><div class="sf-row-val"><span class="sf-mono">mysterium-geiserct-2026-11-02.cpbackup</span></div><div class="sf-row-act"><button type="button" class="btn btn-ghost btn-sm">Choose another</button></div></div>
+        </div>
+        <div class="sf-panel">
+          <p>Restoring <b>Mysterium</b> creates a new container <code class="sf-mono">cashpilot-mysterium</code> with:</p>
+          <ul style="margin:4px 0 8px 18px;font-size:var(--fs-2)"><li>volume <code class="sf-mono">cashpilot-mysterium-data</code> at <code class="sf-mono">/var/lib/mysterium-node</code></li></ul>
+          <p class="form-hint">It never writes over anything. The box must not run Mysterium, and these volumes must not exist.</p>
+          <p class="form-hint" style="margin-top:6px"><b>This CashPilot knows this file:</b> Downloaded on geiserct, 2026-11-02 14:10 UTC.</p>
+          <p class="text-warn" style="font-size:var(--fs-2);margin-top:6px">Mysterium runs now on geiserct. If this is a backup of that node, remove it there first.</p>
+          <div class="sf-form-grid" style="margin-top:10px">
+            <label class="form-label" for="rs-box">Box</label>
+            <select id="rs-box" class="form-input form-input-select"><option>watchtower</option><option>geiserback (plain HTTP: the passphrase crosses your network unencrypted)</option><option disabled>geiserct (runs Mysterium)</option></select>
+            <label class="form-label" for="rs-pp">Passphrase of the backup</label>
+            <input id="rs-pp" class="form-input" type="password" value="xxxxxxxxxxxx" style="max-width:280px">
+          </div>
+          <div class="settings-actions"><button type="button" class="btn btn-primary btn-sm">Restore</button></div>
+        </div>
+        <p style="margin-top:10px"><span class="sf-toast">Mysterium restored on watchtower: 3 files checked, started.</span></p>
+      </section>
+
+      <div>
+        <section class="sf-sec" aria-label="Restore unknown file">
+          <div class="sf-sec-head"><h3 class="sf-sec-title">Restore from a backup</h3><span class="sf-chip is-warn">Unknown file</span></div>
+          <div class="sf-panel">
+            <p class="text-warn" style="font-size:var(--fs-2)">This CashPilot did not make this file, so it cannot tell whose identity is inside. Restore only a file you made yourself. To go on, type <b>ProxyBase</b>:</p>
+            <input class="form-input" value="ProxyBase" aria-label="Type the service name" style="max-width:220px;margin-top:6px">
+            <div class="sf-form-grid" style="margin-top:10px">
+              <label class="form-label" for="rs-box2">Box</label><select id="rs-box2" class="form-input form-input-select"><option>watchtower</option></select>
+              <label class="form-label" for="rs-pp2">Passphrase of the backup</label><input id="rs-pp2" class="form-input" type="password" value="xxxxxxxxxx" style="max-width:280px">
+            </div>
+            <label class="checkbox-label" style="display:flex;gap:6px;margin-top:8px;font-size:var(--fs-2)"><input type="checkbox"> Send the passphrase to a box on plain HTTP anyway: anyone on the network between can read it.</label>
+            <div class="settings-actions"><button type="button" class="btn btn-primary btn-sm">Restore</button></div>
+          </div>
+        </section>
+        <div class="sf-dialog" role="dialog" aria-label="Confirm with your password">
+          <h4>Confirm with your password</h4>
+          <p>Restoring ProxyBase on watchtower puts a node identity or wallet there. Enter your password to continue.</p>
+          <label class="form-label" for="su-pw">Password</label><input id="su-pw" class="form-input" type="password" style="width:100%">
+          <div class="sf-dialog-actions"><button type="button" class="btn btn-ghost btn-sm">Cancel</button><button type="button" class="btn btn-primary btn-sm">Confirm</button></div>
+        </div>
+        <p style="margin-top:10px"><span class="sf-toast is-warn">The file chosen now is not the one checked. Press Check file again before you restore.</span></p>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- (g) -->
+  <div class="mk-label">(g) <b>The page at 390 px.</b> The main view of this same file, rendered at 390 px (embed mode, panels hidden). The index becomes wrapped chips; rows stack label over value.</div>
+  <div class="mk-state">
+    <div class="mk-phone-wrap"><img class="mk-phone" src="phone-390.png" alt="The main Settings view rendered at 390 px wide"></div>
+    <p class="mk-phone-note">On a narrow screen this whole screenshot is the 390 px view, so the frame is hidden.</p>
+  </div>
+
+  <!-- (h) -->
+  <div class="mk-label">(h) <b>Edge states.</b> Page-wide load error, loading, empty and error lines keep their own text.</div>
+  <div class="mk-state"><div class="mk-state-body">
+    <div class="sf-toast is-warn" style="display:flex;border-color:rgba(240,106,95,.5);background:var(--error-soft);margin-bottom:12px"><span class="text-fail">Could not load settings. Your session may have expired — reload the page, and sign in again if you are asked to.</span></div>
+    <div class="mk-two">
+      <section class="sf-sec" aria-label="Earner credentials loading"><div class="sf-sec-head"><h3 class="sf-sec-title">Earner credentials on each box</h3></div><p class="loading-line" style="margin-top:8px">Loading...</p></section>
+      <section class="sf-sec" aria-label="Earner credentials none"><div class="sf-sec-head"><h3 class="sf-sec-title">Earner credentials on each box</h3></div><p class="muted" style="margin-top:8px">No workers yet.</p></section>
+      <section class="sf-sec" aria-label="Device ids empty"><div class="sf-sec-head"><h3 class="sf-sec-title">Device ids</h3><div class="sf-sec-tools"><button type="button" class="btn btn-secondary btn-sm">Add an id</button></div></div><p class="muted" style="margin-top:8px">No device ids yet. They appear here once you deploy a service that has one, or add one below.</p></section>
+      <section class="sf-sec" aria-label="About no worker"><div class="sf-sec-head"><h3 class="sf-sec-title">About and updates</h3><span class="sf-chip">Unknown</span></div><p class="block-empty" style="margin-top:8px">No Docker worker is online, so the install cannot be inspected or updated right now.</p></section>
+    </div>
+  </div></div>
+</div>
+
+<script>
+// Show/hide only. Any element with data-toggle opens or closes the element
+// it names, and keeps aria-expanded (or aria-pressed on a box chip) in step.
+document.addEventListener('click', function (e) {
+  var t = e.target.closest('[data-toggle]');
+  if (!t) return;
+  var el = document.getElementById(t.getAttribute('data-toggle'));
+  if (!el) return;
+  el.hidden = !el.hidden;
+  if (t.hasAttribute('aria-pressed')) {
+    t.parentNode.querySelectorAll('[aria-pressed]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+    t.setAttribute('aria-pressed', String(!el.hidden));
+  } else {
+    t.setAttribute('aria-expanded', String(!el.hidden));
+  }
+});
+</script>
+</body>
+</html>

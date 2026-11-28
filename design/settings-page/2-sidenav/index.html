@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Settings - CashPilot (design 2: sticky side navigation)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<script>
+  // Show/hide only. "?embed" is how the phone frames in panel (g) load this
+  // same page without the state panels under it.
+  // A phone frame below is this same page, copied into a same-origin srcdoc
+  // frame (a file:// src frame is cross-origin and a full-page shot skips it).
+  var snEmbed = location.search.indexOf('embed') !== -1 || window !== window.top;
+  if (snEmbed) document.documentElement.classList.add('sn-embed');
+  document.addEventListener('DOMContentLoaded', function () {
+    if (snEmbed) return;
+    var html = '<!DOCTYPE html>' + document.documentElement.outerHTML;
+    document.querySelectorAll('iframe[data-phone]').forEach(function (f) {
+      var anchor = f.getAttribute('data-anchor');
+      if (anchor) f.addEventListener('load', function () {
+        var t = f.contentDocument.getElementById(anchor);
+        if (t) f.contentWindow.scrollTo(0, t.getBoundingClientRect().top - 110);
+      });
+      f.srcdoc = html;
+    });
+  });
+</script>
+<style>
+/* ===== New parts for design 2 only. Everything else is style.css. ===== */
+.sn-embed .sn-design-strip, .sn-embed .sn-panels { display: none !important; }
+
+.sn-design-strip {
+  font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted);
+  padding: 6px 20px; border-bottom: 1px dashed var(--border-strong); background: var(--bg-secondary);
+}
+.sn-design-strip b { color: var(--accent); font-weight: 500; }
+
+/* Layout: sticky nav + one content column. */
+.sn-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 40px; align-items: start; }
+.sn-col { min-width: 0; max-width: 980px; container-type: inline-size; container-name: col; }
+
+/* Side navigation */
+.sn-nav { position: sticky; top: calc(var(--topbar-height) + 16px); max-height: calc(100vh - var(--topbar-height) - 32px); overflow-y: auto; padding-bottom: 8px; }
+.sn-group { margin: 0 0 16px; }
+.sn-group-label {
+  font-family: var(--font-mono); font-size: var(--fs-1); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-muted); margin: 0 0 4px; padding-left: 12px;
+}
+.sn-nav a { display: block; padding: 5px 10px; border-left: 2px solid var(--border-color); text-decoration: none; color: var(--text-secondary); }
+.sn-nav a:hover { color: var(--text-primary); background: var(--bg-hover); border-left-color: var(--border-strong); }
+.sn-nav a[aria-current="true"] { color: var(--text-primary); background: var(--accent-soft); border-left-color: var(--accent); }
+.sn-nav .sn-l { display: block; font-size: var(--fs-2); line-height: 1.3; }
+.sn-nav .sn-s { display: flex; align-items: center; gap: 6px; margin-top: 1px; font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); }
+.sn-nav a.sn-slot-link .sn-l { font-style: italic; }
+
+@media (max-width: 1100px) { .sn-layout { grid-template-columns: 196px minmax(0, 1fr); gap: 28px; } .sn-nav a { padding: 5px 8px; } .sn-group-label { padding-left: 10px; } }
+
+/* Phone: the nav becomes one select under the top bar. */
+.sn-jump { display: none; }
+@media (max-width: 860px) {
+  .sn-layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .sn-nav { display: none; }
+  .sn-jump {
+    display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 80;
+    margin: 0 -12px 14px; padding: 8px 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);
+  }
+  .sn-jump label { font-size: var(--fs-2); color: var(--text-muted); white-space: nowrap; }
+  .sn-jump select { flex: 1; min-width: 0; }
+}
+
+/* Status mark: always a shape plus a word, never colour alone. */
+.sn-mark { display: inline-block; width: 8px; height: 8px; flex: none; border: 1px solid var(--text-muted); }
+.sn-mark.ok { background: var(--success); border-color: var(--success); }
+.sn-mark.warn { background: var(--warning); border-color: var(--warning); }
+.sn-mark.fail { background: var(--error); border-color: var(--error); }
+.sn-mark.idle { background: none; }
+
+/* Attention list at the top */
+.sn-attn { border: 1px solid var(--border-light); background: var(--bg-secondary); padding: 10px 14px; margin: 0 0 28px; }
+.sn-attn h2 { font-family: var(--font-mono); font-size: var(--fs-2); font-weight: 500; margin: 0 0 6px; color: var(--text-secondary); }
+.sn-attn ul { list-style: none; margin: 0; padding: 0; }
+.sn-attn li { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; border-top: 1px solid var(--border-color); font-size: var(--fs-2); }
+.sn-attn li:first-child { border-top: none; }
+.sn-attn li .sn-mark { position: relative; top: -1px; }
+.sn-attn li span.t { flex: 1; min-width: 0; }
+.sn-attn li a { white-space: nowrap; }
+
+/* Section frame: same five parts in every section. */
+.sn-sec { border-top: 1px solid var(--border-light); padding-top: 12px; margin: 0 0 44px; scroll-margin-top: 64px; }
+.sn-eyebrow { font-family: var(--font-mono); font-size: var(--fs-1); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 4px; }
+.sn-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; }
+.sn-title { font-family: var(--font-mono); font-size: var(--fs-4); font-weight: 500; margin: 0; line-height: 1.25; }
+.sn-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 5px 0 0; font-size: var(--fs-2); color: var(--text-secondary); }
+.sn-status b { color: var(--text-primary); font-weight: 600; }
+.sn-status .sep { color: var(--border-strong); }
+.sn-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sn-actions:empty, .sn-actions span:empty { display: none; }
+.sn-lede { margin: 10px 0 0; max-width: 72ch; font-size: var(--fs-2); color: var(--text-secondary); line-height: 1.5; }
+.sn-body { margin-top: 14px; }
+
+/* "Learn more" and other disclosures */
+.sn-more { margin-top: 6px; }
+.sn-more > summary {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none;
+  font-size: var(--fs-2); color: var(--text-secondary); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px;
+}
+.sn-more > summary::-webkit-details-marker { display: none; }
+.sn-more > summary::before { content: ''; width: 5px; height: 5px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; }
+.sn-more[open] > summary::before { transform: rotate(45deg); }
+.sn-more > summary:hover { color: var(--text-primary); }
+.sn-more > .sn-more-body { margin-top: 8px; padding: 10px 14px; background: var(--bg-secondary); border: 1px solid var(--border-color); font-size: var(--fs-2); color: var(--text-secondary); max-width: 78ch; line-height: 1.5; }
+.sn-more-body p { margin: 0 0 8px; }
+.sn-more-body p:last-child, .sn-more-body ul:last-child { margin-bottom: 0; }
+.sn-more-body ul { margin: 0 0 8px; padding-left: 18px; }
+.sn-more-body li { margin: 2px 0; }
+
+.sn-sub { font-family: var(--font-mono); font-size: var(--fs-2); font-weight: 500; color: var(--text-secondary); margin: 18px 0 8px; }
+.sn-sub:first-child { margin-top: 0; }
+.sn-hint { font-size: var(--fs-2); color: var(--text-muted); margin: 6px 0 0; }
+.sn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sn-field { display: grid; gap: 3px; margin: 0 0 12px; }
+.sn-field .form-label { margin: 0; }
+.sn-form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 14px; }
+
+/* Tables: the app's .breakdown-table, stacked into blocks when the column is narrow. */
+.sn-table td { vertical-align: top; padding-top: 8px; padding-bottom: 8px; }
+.sn-table .c-num { text-align: right; }
+.sn-wide1 th:first-child { width: 46%; }
+.sn-table th.c-num { text-align: right; }
+.sn-table .c-act { text-align: right; white-space: nowrap; }
+.sn-table .c-act .btn + .btn { margin-left: 4px; }
+.sn-name { font-weight: 600; }
+.sn-name .optional { font-weight: 400; }
+.sn-subline { display: block; font-size: var(--fs-1); color: var(--text-muted); margin-top: 2px; font-weight: 400; }
+.sn-state { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); white-space: nowrap; }
+.sn-mask { display: block; margin-top: 2px; white-space: nowrap; overflow-wrap: normal !important; font-size: var(--fs-2); color: var(--text-secondary); }
+.sn-na { color: var(--text-muted); font-family: var(--font-ui); font-size: var(--fs-2); font-weight: 400; }
+@container col (max-width: 600px) {
+  .sn-table, .sn-table tbody { display: block; }
+  .sn-table thead { display: none; }
+  .sn-table tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 12px; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
+  .sn-table td { display: block; padding: 0 !important; border: none; text-align: left !important; white-space: normal; }
+  .sn-table td.c-first, .sn-table td.c-wide, .sn-table td.c-act { grid-column: 1 / -1; }
+  .sn-table td[data-label]::before { content: attr(data-label); display: block; font-family: var(--font-ui); font-size: var(--fs-1); color: var(--text-muted); font-weight: 400; }
+  .sn-table .c-act { display: flex !important; flex-wrap: wrap; gap: 6px; }
+  .sn-table .c-act .btn + .btn { margin-left: 0; }
+  .sn-boxes td:nth-child(2) { justify-self: end; text-align: right !important; }
+  .sn-boxes td:nth-child(2) .sn-subline { text-align: right; }
+  .sn-boxes td:nth-child(2)::before { display: none !important; }
+  .sn-boxes td.c-num { display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; white-space: normal; }
+  .sn-boxes td.c-num::before { display: inline !important; }
+}
+@container col (max-width: 720px) {
+  .sn-stack-early, .sn-stack-early tbody { display: block; }
+  .sn-stack-early thead { display: none; }
+  .sn-stack-early tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 12px; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
+  .sn-stack-early td { display: block; padding: 0 !important; border: none; text-align: left !important; white-space: normal; }
+  .sn-stack-early td.c-first, .sn-stack-early td.c-wide, .sn-stack-early td.c-act { grid-column: 1 / -1; }
+  .sn-stack-early td[data-label]::before { content: attr(data-label); display: block; font-family: var(--font-ui); font-size: var(--fs-1); color: var(--text-muted); font-weight: 400; }
+  .sn-stack-early .c-act { display: flex !important; flex-wrap: wrap; gap: 6px; }
+  .sn-stack-early .c-act .btn + .btn { margin-left: 0; }
+  .sn-boxes td:nth-child(2) { justify-self: end; text-align: right !important; }
+  .sn-boxes td:nth-child(2) .sn-subline { text-align: right; }
+  .sn-boxes td:nth-child(2)::before { display: none !important; }
+  .sn-boxes td.c-num { display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; white-space: normal; }
+  .sn-boxes td.c-num::before { display: inline !important; }
+}
+
+.sn-col code, .sn-panel-in code { overflow-wrap: anywhere; }
+.sn-col pre code, .sn-panel-in pre code, .sn-table td[data-label="Value"] code { overflow-wrap: normal; white-space: nowrap; }
+
+/* Code with a copy button */
+.sn-code { position: relative; margin: 6px 0 10px; }
+.sn-code pre { margin: 0; padding: 9px 76px 9px 12px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); font-size: var(--fs-2); line-height: 1.5; overflow-x: auto; white-space: pre; }
+.sn-code .btn { position: absolute; top: 6px; right: 6px; }
+
+/* Numbered steps */
+.sn-steps { list-style: none; counter-reset: st; margin: 0; padding: 0; }
+.sn-steps > li { counter-increment: st; position: relative; padding: 0 0 14px 34px; }
+.sn-steps > li::before {
+  content: counter(st); position: absolute; left: 0; top: 0; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-light); font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-secondary);
+}
+.sn-steps > li.done::before { content: '✓'; color: var(--success); border-color: var(--success); }
+.sn-steps > li > p { margin: 0 0 4px; }
+.sn-steps .t { font-weight: 600; color: var(--text-primary); }
+
+/* Callouts */
+.sn-callout { border-left: 3px solid var(--border-strong); background: var(--bg-secondary); padding: 8px 12px; margin: 10px 0; font-size: var(--fs-2); color: var(--text-secondary); max-width: 78ch; }
+.sn-callout.warn { border-left-color: var(--warning); }
+.sn-callout.fail { border-left-color: var(--error); }
+.sn-callout.ok { border-left-color: var(--success); }
+.sn-callout b { color: var(--text-primary); }
+.sn-callout p { margin: 0 0 6px; }
+.sn-callout p:last-child { margin: 0; }
+
+/* Key/value facts */
+.sn-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 18px; margin: 0; font-size: var(--fs-2); }
+.sn-facts dt { color: var(--text-muted); }
+.sn-facts dd { margin: 0; color: var(--text-primary); }
+.sn-facts dd code { word-break: break-all; }
+
+/* Collectors: two columns of the app's <details> rows */
+.sn-coll { columns: 2; column-gap: 8px; }
+@container col (max-width: 600px) { .sn-coll { columns: 1; } }
+.sn-coll .collector-section { margin: 0 0 4px; break-inside: avoid; }
+.sn-coll .collector-header { min-height: 34px; }
+.sn-coll .collector-body .kv-actions { margin-top: 4px; justify-content: space-between; }
+.sn-notset > summary { font-size: var(--fs-2); }
+
+/* Import: three-step track */
+.sn-track { display: flex; gap: 0; list-style: none; margin: 0 0 14px; padding: 0; counter-reset: tr; border: 1px solid var(--border-color); }
+.sn-track li { counter-increment: tr; flex: 1; display: flex; align-items: center; gap: 8px; padding: 7px 10px; font-size: var(--fs-2); color: var(--text-muted); border-right: 1px solid var(--border-color); min-width: 0; }
+.sn-track li:last-child { border-right: none; }
+.sn-track li::before { content: counter(tr); width: 20px; height: 20px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-light); font-family: var(--font-mono); font-size: var(--fs-1); }
+.sn-track li.now { color: var(--text-primary); background: var(--accent-soft); }
+.sn-track li.now::before { border-color: var(--accent); color: var(--accent); }
+.sn-track li.done { color: var(--text-secondary); }
+.sn-track li.done::before { content: '✓'; color: var(--success); border-color: var(--success); }
+@container col (max-width: 520px) { .sn-track li span { display: none; } .sn-track li.now { flex: 3; } .sn-track li.now span { display: inline; } .sn-attn li { flex-wrap: wrap; } .sn-attn li a { margin-left: 18px; } .sn-attn li span.t { flex-basis: calc(100% - 30px); } }
+.sn-drop { border: 1px dashed var(--border-strong); padding: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: var(--bg-input); }
+.sn-drop .muted { font-size: var(--fs-2); }
+.sn-file { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: var(--fs-2); }
+.sn-drafts { list-style: none; margin: 0; padding: 0; }
+.sn-drafts li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+.sn-drafts .meta { font-size: var(--fs-1); color: var(--text-muted); display: block; }
+.sn-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); margin-right: 14px; }
+.sn-check input { accent-color: var(--accent); width: 15px; height: 15px; }
+.sn-fieldstate { display: block; font-size: var(--fs-1); color: var(--text-muted); }
+.sn-fieldstate code { font-size: var(--fs-1); }
+.sn-fieldstate.warn { color: var(--warning); }
+
+/* Inline confirm (replaces a native confirm() where the step needs words) */
+.sn-confirm { border: 1px solid var(--border-strong); background: var(--bg-secondary); padding: 12px 14px; margin: 10px 0; max-width: 78ch; }
+.sn-confirm p { margin: 0 0 10px; font-size: var(--fs-2); color: var(--text-secondary); }
+.sn-confirm p b { color: var(--text-primary); }
+
+/* Notifications slot */
+.sn-slot { border: 1px dashed var(--border-strong); padding: 26px 16px; text-align: center; color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-2); }
+
+/* Static toast example */
+.sn-toast { position: static; transform: none; display: inline-flex; margin: 6px 0; max-width: 100%; }
+
+/* ===== State panels under the page ===== */
+.sn-panels { max-width: var(--page-max); margin: 0 auto; padding: 8px 24px 40px; }
+.sn-panels > h2 { font-family: var(--font-mono); font-size: var(--fs-4); font-weight: 500; margin: 24px 0 4px; }
+.sn-panels > p { color: var(--text-muted); font-size: var(--fs-2); margin: 0 0 18px; }
+.sn-panel { border: 1px dashed var(--border-strong); margin: 0 0 28px; }
+.sn-panel-label { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--accent); padding: 6px 12px; border-bottom: 1px dashed var(--border-strong); background: var(--bg-secondary); }
+.sn-panel-label span { color: var(--text-muted); }
+.sn-panel-in { padding: 16px 18px 4px; max-width: 1020px; container-type: inline-size; container-name: col; }
+.sn-panel-in .sn-sec { margin-bottom: 20px; }
+.sn-phones { display: flex; flex-wrap: wrap; gap: 24px; padding: 16px 18px; }
+.sn-phone { display: grid; gap: 6px; }
+.sn-phone span { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); }
+.sn-phone iframe { width: 390px; height: 1500px; border: 1px solid var(--border-strong); background: var(--bg-primary); }
+.sn-mini { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px 20px; }
+.sn-mini > div { border-top: 1px solid var(--border-color); padding-top: 6px; }
+.sn-mini h4 { margin: 0 0 4px; font-size: var(--fs-1); font-family: var(--font-mono); font-weight: 500; color: var(--text-muted); }
+@media (max-width: 768px) { .sn-panels { padding: 8px 12px 30px; } .sn-panel-in { padding: 12px 12px 4px; } .sn-phones { padding: 12px; } .sn-phone iframe { width: 100%; max-width: 390px; } .sn-phone { width: 100%; } }
+</style>
+</head>
+<body data-page="settings">
+
+<div class="sn-design-strip"><b>Design 2 · Sticky side navigation.</b> (a) The full Settings page with Import inside it. The state panels (b) to (h) follow under the footer.</div>
+
+<div class="main-content">
+  <header class="topbar">
+    <a href="#" class="topbar-brand" aria-label="Home">
+      <svg width="20" height="20" viewBox="0 0 256 256" aria-hidden="true"><defs><linearGradient id="cpSun" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFD54F"/><stop offset="40%" stop-color="#FF9800"/><stop offset="72%" stop-color="#E91E63"/><stop offset="100%" stop-color="#AB47BC"/></linearGradient></defs><circle cx="128" cy="128" r="110" fill="url(#cpSun)"/></svg>
+      <span>CashPilot</span>
+    </a>
+    <nav class="topnav" aria-label="Main">
+      <a href="#" class="sidebar-link">Dashboard</a>
+      <a href="#" class="sidebar-link">Fleet</a>
+      <a href="#" class="sidebar-link">Catalog</a>
+      <a href="#" class="sidebar-link">Payouts</a>
+      <a href="#" class="sidebar-link">Activity</a>
+      <a href="#" class="sidebar-link active" aria-current="page">Settings</a>
+    </nav>
+    <div class="topbar-right">
+      <a href="#" class="btn btn-primary btn-sm topbar-add" aria-label="Add service"><span aria-hidden="true">+</span><span class="topbar-add-label" aria-hidden="true"> Add service</span></a>
+      <div class="topbar-earnings"><span id="topbar-total">$52.07</span>
+        <select class="topbar-currency-select" aria-label="Currency"><option>USD</option></select></div>
+      <div class="topbar-notifications"><button class="topbar-icon-btn topbar-notify-btn" aria-label="Alerts">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></button></div>
+      <div class="topbar-avatar-wrap"><button class="topbar-avatar" aria-label="User menu">S</button></div>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <div class="page-head"><h1 class="page-title">Settings</h1></div>
+
+    <!-- Phones: the side nav becomes this one select. -->
+    <div class="sn-jump">
+      <label for="sn-jump-select">Go to</label>
+      <select id="sn-jump-select" class="form-input" onchange="if (this.value) location.hash = this.value">
+        <optgroup label="General">
+          <option value="set-collection">Earnings collection · 11 of 20 set up</option>
+          <option value="credential-health-card">Credential health · 1 expiring soon</option>
+        </optgroup>
+        <optgroup label="Data and import">
+          <option value="set-import">Import from another tool</option>
+          <option value="set-identities">Device ids · 5 ids</option>
+          <option value="set-restore">Restore from a backup</option>
+        </optgroup>
+        <optgroup label="Security">
+          <option value="set-key">Credential encryption key · in the data folder</option>
+          <option value="set-earner-secrets">Earner credentials · 0 of 5 protected</option>
+        </optgroup>
+        <optgroup label="Notifications">
+          <option value="set-notifications">Notifications (designed in the other PR)</option>
+        </optgroup>
+        <optgroup label="About">
+          <option value="set-about">About and updates · v3.1.0</option>
+          <option value="set-env">Environment · 6 variables</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="sn-layout">
+      <nav class="sn-nav" aria-label="Settings sections">
+        <div class="sn-group">
+          <p class="sn-group-label">General</p>
+          <a href="#set-collection" aria-current="true"><span class="sn-l">Earnings collection</span><span class="sn-s"><span class="sn-mark ok" aria-hidden="true"></span>11 of 20 set up</span></a>
+          <a href="#credential-health-card" id="credential-health-link"><span class="sn-l">Credential health</span><span class="sn-s"><span class="sn-mark warn" aria-hidden="true"></span>1 expiring soon</span></a>
+        </div>
+        <div class="sn-group">
+          <p class="sn-group-label">Data and import</p>
+          <a href="#set-import"><span class="sn-l">Import from another tool</span><span class="sn-s"><span class="sn-mark idle" aria-hidden="true"></span>Nothing imported</span></a>
+          <a href="#set-identities"><span class="sn-l">Device ids</span><span class="sn-s"><span class="sn-mark idle" aria-hidden="true"></span>5 ids, 3 in use</span></a>
+          <a href="#set-restore"><span class="sn-l">Restore from a backup</span><span class="sn-s"><span class="sn-mark idle" aria-hidden="true"></span>.cpbackup files</span></a>
+        </div>
+        <div class="sn-group">
+          <p class="sn-group-label">Security</p>
+          <a href="#set-key"><span class="sn-l">Credential encryption key</span><span class="sn-s"><span class="sn-mark warn" aria-hidden="true"></span>In the data folder</span></a>
+          <a href="#set-earner-secrets"><span class="sn-l">Earner credentials on each box</span><span class="sn-s"><span class="sn-mark warn" aria-hidden="true"></span>0 of 5 protected</span></a>
+        </div>
+        <div class="sn-group">
+          <p class="sn-group-label">Notifications</p>
+          <a href="#set-notifications" class="sn-slot-link"><span class="sn-l">Notifications (designed in the other PR)</span></a>
+        </div>
+        <div class="sn-group">
+          <p class="sn-group-label">About</p>
+          <a href="#set-about"><span class="sn-l">About and updates</span><span class="sn-s"><span class="sn-mark ok" aria-hidden="true"></span>v3.1.0, up to date</span></a>
+          <a href="#set-env"><span class="sn-l">Environment</span><span class="sn-s"><span class="sn-mark idle" aria-hidden="true"></span>6 variables</span></a>
+        </div>
+      </nav>
+
+      <div class="sn-col">
+
+        <!-- What needs the owner, built from the same calls the sections make. -->
+        <section class="sn-attn" aria-labelledby="sn-attn-h">
+          <h2 id="sn-attn-h">3 things need you</h2>
+          <ul>
+            <li><span class="sn-mark warn" aria-hidden="true"></span><span class="t">23 earners on 3 boxes keep their passwords in Docker settings.</span><a href="#set-earner-secrets">Earner credentials</a></li>
+            <li><span class="sn-mark warn" aria-hidden="true"></span><span class="t">The encryption key is in the data folder, next to the database.</span><a href="#set-key">Encryption key</a></li>
+            <li><span class="sn-mark warn" aria-hidden="true"></span><span class="t">The Traffmonetizer token expires on 2 Dec 2026.</span><a href="#credential-health-card">Credential health</a></li>
+          </ul>
+        </section>
+
+        <!-- ============ GENERAL ============ -->
+        <section class="sn-sec" id="set-collection" aria-labelledby="h-coll">
+          <p class="sn-eyebrow">General</p>
+          <div class="sn-head">
+            <div>
+              <h2 class="sn-title" id="h-coll">Earnings collection</h2>
+              <p class="sn-status"><span class="sn-mark ok" aria-hidden="true"></span><b>11 of 20</b> services are collected<span class="sep">·</span>9 not set up</p>
+            </div>
+            <div class="sn-actions">
+              <button class="btn btn-secondary" type="button">Collect now</button>
+              <span class="muted" id="collector-save-status"></span>
+            </div>
+          </div>
+          <p class="sn-lede">Add the login of a service, and CashPilot reads its balance every 60 minutes. You do not have to deploy the service with CashPilot.</p>
+          <details class="sn-more"><summary>Learn more</summary><div class="sn-more-body">
+            <p>Only services with a built-in collector show here. A collector is the code that signs in to the service and reads your balance.</p>
+            <p>Each service saves on its own. A secret that is already saved shows as dots: leave the field empty to keep it.</p>
+          </div></details>
+          <div class="sn-body">
+            <h3 class="sn-sub">Set up (11)</h3>
+            <div class="sn-coll">
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">Bitping</span><span class="badge badge-deployed">Configured</span></summary></details>
+              <details class="collector-section" open id="collector-bytelixir"><summary class="collector-header"><span class="collector-name">Bytelixir</span><span class="badge badge-deployed">Configured</span></summary>
+                <div class="collector-body">
+                  <div class="form-hint collector-hint">The session cookie lasts about 2 hours. Add the remember-me cookie too, and CashPilot makes a new session on each run.</div>
+                  <div class="form-group"><label class="form-label" for="cred-bytelixir_session_cookie">Session Cookie</label><input class="form-input" id="cred-bytelixir_session_cookie" type="password" placeholder="•••••••• (set — leave blank to keep)"></div>
+                  <div class="form-group"><label class="form-label" for="cred-bytelixir_remember_web">Remember Web <span class="optional">(optional)</span></label><input class="form-input" id="cred-bytelixir_remember_web" type="password" placeholder="•••••••• (set — leave blank to keep)"></div>
+                  <div class="form-group"><label class="form-label" for="cred-bytelixir_xsrf_token">Xsrf Token <span class="optional">(optional)</span></label><input class="form-input" id="cred-bytelixir_xsrf_token" type="password" placeholder="Not set"></div>
+                  <div class="kv-actions"><button class="btn btn-danger btn-sm" type="button">Clear credentials</button><button class="btn btn-primary btn-sm" type="button">Save Bytelixir</button></div>
+                </div>
+              </details>
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">Earn.fm</span><span class="badge badge-deployed">Configured</span></summary></details>
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">Honeygain</span><span class="badge badge-deployed">Configured</span></summary></details>
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">IPRoyal Pawns</span><span class="badge badge-deployed">Configured</span></summary></details>
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">Mysterium</span><span class="badge badge-deployed">Configured</span></summary></details>
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">PacketStream</span><span class="badge badge-deployed">Configured</span></summary></details>
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">ProxyRack</span><span class="badge badge-deployed">Configured</span></summary></details>
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">Repocket</span><span class="badge badge-deployed">Configured</span></summary></details>
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">Storj</span><span class="badge badge-deployed">Configured</span></summary></details>
+              <details class="collector-section"><summary class="collector-header"><span class="collector-name">Traffmonetizer</span><span class="badge badge-deployed">Configured</span></summary></details>
+            </div>
+            <details class="sn-more sn-notset" style="margin-top:12px"><summary>Not set up (9): 2Miners (ETC), Anyone Protocol, EarnApp, Grass, HeroMiners (KAS), Ocean, Salad, SupportXMR, unMineable</summary>
+              <div class="sn-coll" style="margin-top:8px">
+                <details class="collector-section"><summary class="collector-header"><span class="collector-name">2Miners (ETC)</span><span class="badge badge-category">Not configured</span></summary></details>
+                <details class="collector-section"><summary class="collector-header"><span class="collector-name">Anyone Protocol</span><span class="badge badge-category">Not configured</span></summary></details>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <section class="sn-sec" id="credential-health-card" aria-labelledby="h-health">
+          <p class="sn-eyebrow">General</p>
+          <div class="sn-head">
+            <div>
+              <h2 class="sn-title" id="h-health">Credential health</h2>
+              <p class="sn-status"><span class="sn-mark warn" aria-hidden="true"></span><b>1 expiring soon</b><span class="sep">·</span>3 with no known expiry</p>
+            </div>
+          </div>
+          <p class="sn-lede">How old each saved login is, and when it can stop working. The values themselves never show here.</p>
+          <div class="sn-body">
+            <table class="breakdown-table sn-table sn-wide1">
+              <thead><tr><th>Login</th><th>Age</th><th>Expected to last</th><th>Status</th><th class="c-act"><span class="sr-only">Action</span></th></tr></thead>
+              <tbody>
+                <tr><td class="c-first"><span class="sn-name">Traffmonetizer <span class="optional">token</span></span></td><td data-label="Age" style="white-space:nowrap">9 days old</td><td data-label="Expected to last">expires 2 Dec 2026</td><td data-label="Status"><span class="sn-state text-warn"><span class="sn-mark warn" aria-hidden="true"></span>Expiring soon</span></td><td class="c-act"><button class="btn btn-ghost btn-sm" type="button">Update</button></td></tr>
+                <tr><td class="c-first"><span class="sn-name">Bytelixir <span class="optional">session_cookie</span></span><span class="sn-subline">Made again on every run from the remember-me cookie.</span></td><td data-label="Age" style="white-space:nowrap">3 hours old</td><td data-label="Expected to last">about 2 hours</td><td data-label="Status"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>No known expiry</span></td><td class="c-act"></td></tr>
+                <tr><td class="c-first"><span class="sn-name">PacketStream <span class="optional">auth_token</span></span></td><td data-label="Age" style="white-space:nowrap">41 days old</td><td data-label="Expected to last"><span class="sn-na">not known</span></td><td data-label="Status"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>No known expiry</span></td><td class="c-act"></td></tr>
+                <tr><td class="c-first"><span class="sn-name">Honeygain <span class="optional">password</span></span></td><td data-label="Age" style="white-space:nowrap">63 days old</td><td data-label="Expected to last"><span class="sn-na">not known</span></td><td data-label="Status"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>No known expiry</span></td><td class="c-act"></td></tr>
+              </tbody>
+            </table>
+            <p class="sn-hint">Update opens that service in Earnings collection, with its fields ready.</p>
+          </div>
+        </section>
+
+        <!-- ============ DATA AND IMPORT ============ -->
+        <section class="sn-sec" id="set-import" aria-labelledby="h-import">
+          <p class="sn-eyebrow">Data and import</p>
+          <div class="sn-head">
+            <div>
+              <h2 class="sn-title" id="h-import">Import from another tool</h2>
+              <p class="sn-status"><span class="sn-mark idle" aria-hidden="true"></span>Nothing imported yet</p>
+            </div>
+          </div>
+          <p class="sn-lede">Bring your services over from money4band, CashFactory or InternetIncome. CashPilot shows what it found before it saves anything. It runs nothing from the files and does not keep them.</p>
+          <details class="sn-more"><summary>Which files to add</summary><div class="sn-more-body">
+            <ul>
+              <li><b>money4band:</b> <code>config/user-config.json</code>, or its <code>.env</code>. <a href="#">Guide</a></li>
+              <li><b>CashFactory:</b> <code>.env</code>. <a href="#">Guide</a></li>
+              <li><b>InternetIncome:</b> <code>properties.conf</code>. Add <code>earnapp.txt</code> and <code>proxyrack.txt</code> too, so your linked devices come over. <a href="#">Guide</a></li>
+            </ul>
+            <p>Up to 4 files, 64 KiB in total.</p>
+          </div></details>
+          <div class="sn-body">
+            <ol class="sn-track" aria-label="Import steps">
+              <li class="now" aria-current="step"><span>Add the files</span></li>
+              <li><span>Check what comes over</span></li>
+              <li><span>Deploy</span></li>
+            </ol>
+            <div class="sn-form-grid">
+              <div class="sn-field"><label class="form-label" for="import-source">Tool</label>
+                <select id="import-source" class="form-input"><option>Tell from the files</option><option>money4band</option><option>CashFactory</option><option>InternetIncome</option></select></div>
+            </div>
+            <div class="sn-drop">
+              <label class="btn btn-secondary btn-sm" for="import-files">Choose files</label>
+              <input id="import-files" type="file" multiple class="sr-only">
+              <span class="muted">or drop them here. Up to 4 files, 64 KiB in total.</span>
+            </div>
+            <details class="sn-more" style="margin-top:8px"><summary>Or paste one file</summary>
+              <div style="margin-top:8px"><label class="form-label" for="import-paste">Or paste one file here</label><textarea id="import-paste" class="form-input" rows="5" style="height:auto;padding:6px 8px"></textarea></div>
+            </details>
+            <div class="sn-row" style="margin-top:12px"><button class="btn btn-primary" type="button">Check what comes over</button><span id="import-status" class="muted"></span></div>
+          </div>
+        </section>
+
+        <section class="sn-sec" id="set-identities" aria-labelledby="h-ids">
+          <p class="sn-eyebrow">Data and import</p>
+          <div class="sn-head">
+            <div>
+              <h2 class="sn-title" id="h-ids">Device ids</h2>
+              <p class="sn-status"><span class="sn-mark idle" aria-hidden="true"></span><b>5 ids</b><span class="sep">·</span>3 in use on 3 boxes<span class="sep">·</span>1 removed</p>
+            </div>
+            <div class="sn-actions">
+              <button class="btn btn-secondary btn-sm" type="button">Add an id</button>
+              <button class="btn btn-ghost btn-sm" type="button" title="Asks for your password">Download all</button>
+            </div>
+          </div>
+          <p class="sn-lede">The device ids CashPilot deployed each service with, per box. Use one to find the device at the provider, or to give a new box the same id.</p>
+          <details class="sn-more"><summary>Learn more</summary><div class="sn-more-body">
+            <ul>
+              <li>An id stays here after you remove its service.</li>
+              <li>Each value is hidden until you show or copy it. Every show goes into the audit log.</li>
+              <li>Passwords, keys and wallet seeds are never kept here.</li>
+              <li>You can change the id a box runs, and add an id CashPilot did not deploy with.</li>
+              <li>Download all asks for your password. The file holds every id in full.</li>
+            </ul>
+          </div></details>
+          <div class="sn-body">
+            <table class="breakdown-table sn-table sn-wide1 sn-stack-early">
+              <thead><tr><th>Id</th><th>Box</th><th>State</th><th class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                <tr><td class="c-first"><span class="sn-name">ProxyRack <span class="optional">Device UUID</span></span><code class="sn-mask">••••••••-4b1e</code><span class="sn-subline">First seen 12 Sep 2026 09:14 UTC · last seen 28 Nov 2026 10:02 UTC</span></td><td data-label="Box">watchtower<span class="sn-subline">copy 1</span></td><td data-label="State"><span class="sn-state"><span class="sn-mark ok" aria-hidden="true"></span>In use</span></td><td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-ghost btn-sm">Change</button></td></tr>
+                <tr><td class="c-first"><span class="sn-name">ProxyBase <span class="optional">Device ID</span></span><code class="sn-mask">••••••••c07d</code><span class="sn-subline">First seen 3 Oct 2026 18:40 UTC · last seen 28 Nov 2026 10:01 UTC</span></td><td data-label="Box">geiserback<span class="sn-subline">copy 1</span></td><td data-label="State"><span class="sn-state"><span class="sn-mark ok" aria-hidden="true"></span>In use</span></td><td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-ghost btn-sm">Change</button></td></tr>
+                <tr><td class="c-first"><span class="sn-name">Mysterium <span class="optional">Node identity</span></span><code class="sn-mask">0x••••••a91c</code><span class="sn-subline">Reported by the node itself, not checked by CashPilot.</span></td><td data-label="Box">geiserct<span class="sn-subline">copy 1</span></td><td data-label="State"><span class="sn-state"><span class="sn-mark ok" aria-hidden="true"></span>In use</span></td><td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button></td></tr>
+                <tr><td class="c-first"><span class="sn-name">Mysterium <span class="optional">Backup SHA-256</span></span><code class="sn-mask">••••••••e3f0</code><span class="sn-subline">A backup file this CashPilot made or restored. Restoring it again needs no typed confirmation.</span></td><td data-label="Box">geiserct<span class="sn-subline">copy 1</span></td><td data-label="State"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>Downloaded from here</span></td><td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button></td></tr>
+                <tr><td class="c-first"><span class="sn-name">ProxyRack <span class="optional">Device UUID</span></span><code class="sn-mask">••••••••91aa</code><span class="sn-subline">First seen 2 Jun 2026 · last seen 30 Aug 2026 22:15 UTC</span></td><td data-label="Box">nas-old<span class="sn-subline">copy 1</span></td><td data-label="State"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>Removed</span></td><td class="c-act"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-danger btn-sm">Forget</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="sn-sec" id="set-restore" aria-labelledby="h-restore">
+          <p class="sn-eyebrow">Data and import</p>
+          <div class="sn-head">
+            <div>
+              <h2 class="sn-title" id="h-restore">Restore from a backup</h2>
+              <p class="sn-status"><span class="sn-mark idle" aria-hidden="true"></span>For Mysterium, ProxyBase and Anyone</p>
+            </div>
+          </div>
+          <p class="sn-lede">Put a node identity or wallet back from a <code>.cpbackup</code> file. A restore only makes a new container on a box that does not run the service. It never writes over a running one.</p>
+          <details class="sn-more"><summary>To replace a running identity, or for other files</summary><div class="sn-more-body">
+            <p><b>To replace a running identity:</b></p>
+            <ol><li>Download its backup first.</li><li>On the dashboard, remove the service from that box. Say yes when it asks to delete its data.</li><li>Then restore here.</li></ol>
+            <p>Files sealed to a key, and Storj and Sia, use the <a href="#">command line steps</a>.</p>
+          </div></details>
+          <div class="sn-body">
+            <label class="form-label" for="restore-file">Backup file</label>
+            <div class="sn-drop">
+              <label class="btn btn-secondary btn-sm" for="restore-file">Choose a file</label>
+              <input id="restore-file" type="file" accept=".cpbackup,application/octet-stream" class="sr-only">
+              <span class="muted">No file chosen. A .cpbackup file made with a passphrase.</span>
+              <button class="btn btn-ghost btn-sm" type="button" disabled style="margin-left:auto">Check file</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ SECURITY ============ -->
+        <section class="sn-sec" id="set-key" aria-labelledby="h-key">
+          <p class="sn-eyebrow">Security</p>
+          <div class="sn-head">
+            <div>
+              <h2 class="sn-title" id="h-key">Credential encryption key</h2>
+              <p class="sn-status"><span class="sn-mark warn" aria-hidden="true"></span><b>In the data folder</b><span class="sep">·</span>a copy of that folder can read every credential</p>
+            </div>
+            <div class="sn-actions"><button class="btn btn-primary btn-sm" type="button" aria-expanded="false" aria-controls="key-move">Move the key out of the data folder</button></div>
+          </div>
+          <p class="sn-lede">One key decrypts every credential CashPilot stores. Keep it outside the data folder. Then a copy of the folder alone cannot read your credentials.</p>
+          <div class="sn-body">
+            <dl class="sn-facts">
+              <dt>The key is in</dt><dd><code>/data/.fernet_key</code> (the data folder)</dd>
+              <dt>Next to</dt><dd>the database it decrypts</dd>
+            </dl>
+          </div>
+        </section>
+
+        <section class="sn-sec" id="set-earner-secrets" aria-labelledby="h-es">
+          <p class="sn-eyebrow">Security</p>
+          <div class="sn-head">
+            <div>
+              <h2 class="sn-title" id="h-es">Earner credentials on each box</h2>
+              <p class="sn-status"><span class="sn-mark warn" aria-hidden="true"></span><b>0 of 5 boxes protected</b><span class="sep">·</span>23 earners keep their passwords in Docker settings</p>
+            </div>
+            <div class="sn-actions"><a class="btn btn-secondary btn-sm" href="#es-steps" onclick="document.getElementById('es-steps').open = true">How to turn it on</a></div>
+          </div>
+          <p class="sn-lede">Docker shows an earner's password in plain text to anyone who can read its settings. In file mode, the password goes in a file that only the earner reads.</p>
+          <details class="sn-more"><summary>Learn more</summary><div class="sn-more-body">
+            <p><b>Docker settings</b> are the environment and command line Docker keeps for each container. <code>docker inspect</code>, a backup of Docker's folder and any tool with the Docker socket can read them.</p>
+            <p><b>File mode</b> is the worker setting <code>CASHPILOT_EARNER_SECRETS=file</code>. Root on the box can still read the file, so it does not stop root.</p>
+            <p>It covers Bitping, Earn.fm, Honeygain, IPRoyal Pawns, ProxyBase, ProxyRack, Repocket, Traffmonetizer, URnetwork and Sia hostd. It does not cover custom services or Sia's wallet seed. <a href="#">Read the guide</a></p>
+          </div></details>
+          <div class="sn-body">
+            <table class="breakdown-table sn-table sn-boxes">
+              <thead><tr><th>Box</th><th>Mode</th><th class="c-num">In a file</th><th class="c-num">In Docker settings</th><th>What to do</th></tr></thead>
+              <tbody>
+                <tr><td><span class="sn-name">watchtower</span></td><td data-label="Mode"><span class="sn-state text-warn"><span class="sn-mark warn" aria-hidden="true"></span>Docker settings</span></td><td class="c-num" data-label="In a file">0</td><td class="c-num" data-label="In Docker settings">8</td><td class="c-wide"><a href="#es-steps" onclick="document.getElementById('es-steps').open = true">Turn on file mode</a></td></tr>
+                <tr><td><span class="sn-name">geiserback</span></td><td data-label="Mode"><span class="sn-state text-warn"><span class="sn-mark warn" aria-hidden="true"></span>Docker settings</span></td><td class="c-num" data-label="In a file">0</td><td class="c-num" data-label="In Docker settings">8</td><td class="c-wide"><a href="#es-steps" onclick="document.getElementById('es-steps').open = true">Turn on file mode</a></td></tr>
+                <tr><td><span class="sn-name">geiserct</span></td><td data-label="Mode"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>Not known</span><span class="sn-subline">Worker too old to say</span></td><td class="c-num" data-label="In a file">0</td><td class="c-num" data-label="In Docker settings">7</td><td class="c-wide"><a href="#set-about">Update the worker</a> first</td></tr>
+                <tr><td><span class="sn-name">OPPO CPH1951 (5bdadbc5)</span></td><td data-label="Mode"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>Not known</span><span class="sn-subline">Worker too old to say</span></td><td class="c-num" data-label="In a file"><span class="sn-na" title="It does not report its earners one by one">not reported</span></td><td class="c-num" data-label="In Docker settings"><span class="sn-na" title="It does not report its earners one by one">not reported</span></td><td class="c-wide">Update the worker app</td></tr>
+                <tr><td><span class="sn-name">motorola one fusion+ (1414f972)</span></td><td data-label="Mode"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>Not known</span><span class="sn-subline">Worker too old to say</span></td><td class="c-num" data-label="In a file"><span class="sn-na" title="It does not report its earners one by one">not reported</span></td><td class="c-num" data-label="In Docker settings"><span class="sn-na" title="It does not report its earners one by one">not reported</span></td><td class="c-wide">Update the worker app</td></tr>
+              </tbody>
+            </table>
+            <p class="sn-hint">"Not reported": this worker does not report its earners one by one.</p>
+            <details class="sn-more" id="es-steps" style="margin-top:12px"><summary>How to turn on file mode on a box</summary><div class="sn-more-body">
+              <ol class="sn-steps">
+                <li><p class="t">Add this line to the worker's environment.</p>
+                  <div class="sn-code"><pre><code>services:
+  cashpilot-worker:
+    environment:
+      - CASHPILOT_EARNER_SECRETS=file</code></pre><button class="btn btn-ghost btn-sm" type="button">Copy</button></div></li>
+                <li><p class="t">Recreate the worker container.</p>
+                  <div class="sn-code"><pre><code>docker compose up -d cashpilot-worker</code></pre><button class="btn btn-ghost btn-sm" type="button">Copy</button></div></li>
+                <li><p class="t">Redeploy each earner.</p><p>On the dashboard, open the service and press Redeploy. This table then counts it under "In a file".</p></li>
+              </ol>
+              <p><b>To undo:</b> remove the line, recreate the worker, then redeploy. The passwords go back into Docker settings.</p>
+            </div></details>
+          </div>
+        </section>
+
+        <!-- ============ NOTIFICATIONS ============ -->
+        <section class="sn-sec" id="set-notifications" aria-labelledby="h-notif">
+          <p class="sn-eyebrow">Notifications</p>
+          <div class="sn-head"><div><h2 class="sn-title" id="h-notif">Notifications</h2></div></div>
+          <div class="sn-body"><div class="sn-slot">Notifications (designed in the other PR)</div></div>
+        </section>
+
+        <!-- ============ ABOUT ============ -->
+        <section class="sn-sec" id="set-about" aria-labelledby="h-about">
+          <p class="sn-eyebrow">About</p>
+          <div class="sn-head">
+            <div>
+              <h2 class="sn-title" id="h-about">About and updates</h2>
+              <p class="sn-status"><span class="sn-mark ok" aria-hidden="true"></span><b>v3.1.0</b><span class="sep">·</span>the newest known release</p>
+            </div>
+            <div class="sn-actions"><button class="btn btn-secondary btn-sm" type="button">Re-pull images</button><span class="form-hint" id="update-run-status"></span></div>
+          </div>
+          <p class="sn-lede">CashPilot checks GitHub for new releases. The update button runs <code>docker compose pull</code> and <code>up -d</code> for you.</p>
+          <details class="sn-more"><summary>Learn more</summary><div class="sn-more-body">
+            <ul>
+              <li>The button is <b>Update to</b> a version, <b>Pull newest patches</b> or <b>Re-pull images</b>. It runs from a one-shot helper container.</li>
+              <li>It installs the newest patch of the image series your compose file pins.</li>
+              <li>A newer series needs new image tags. Read <a href="#">UPGRADING.md</a> first. Update the UI host first, then each worker.</li>
+              <li>An install not managed by Compose gets the commands to run by hand.</li>
+            </ul>
+          </div></details>
+          <div class="sn-body">
+            <div class="sn-field" style="max-width:280px"><label class="form-label" for="update-worker-select">Server</label>
+              <select id="update-worker-select" class="form-input form-input-select"><option>watchtower</option><option>geiserback</option><option>geiserct</option></select></div>
+            <dl class="sn-facts">
+              <dt>Running</dt><dd class="mono">v3.1.0</dd>
+              <dt>Worker image</dt><dd><code>drumsergio/cashpilot-worker:3.1.0</code></dd>
+              <dt>Dashboard image</dt><dd><code>drumsergio/cashpilot:3.1.0</code></dd>
+              <dt>Latest release</dt><dd class="mono">v3.1.0</dd>
+            </dl>
+            <p class="sn-hint">You are on the newest known release. The button re-runs the documented pull anyway.</p>
+          </div>
+        </section>
+
+        <section class="sn-sec" id="set-env" aria-labelledby="h-env">
+          <p class="sn-eyebrow">About</p>
+          <div class="sn-head">
+            <div>
+              <h2 class="sn-title" id="h-env">Environment</h2>
+              <p class="sn-status"><span class="sn-mark idle" aria-hidden="true"></span><b>6 variables</b><span class="sep">·</span>read once, when CashPilot starts</p>
+            </div>
+          </div>
+          <p class="sn-lede">To change one, set it in your compose file or Unraid template, then restart the container. A change on this page does not take effect.</p>
+          <details class="sn-more"><summary>Learn more</summary><div class="sn-more-body">
+            <p>A variable set with Docker <code>-e</code> shows locked. Some can never change while CashPilot runs:</p>
+            <ul>
+              <li>The session key signs the logins already in use.</li>
+              <li>The data directory holds the open database.</li>
+              <li>The fleet key is what enrolled workers already hold.</li>
+            </ul>
+          </div></details>
+          <div class="sn-body">
+            <table class="breakdown-table sn-table">
+              <thead><tr><th>Setting</th><th>Value</th><th>Source</th></tr></thead>
+              <tbody>
+                <tr><td class="c-first"><span class="sn-name">Fleet API Key</span><span class="sn-subline mono">CASHPILOT_API_KEY</span><span class="sn-subline">Bearer token for worker-to-UI authentication</span></td><td data-label="Value"><code>••••••••</code></td><td data-label="Source"><span class="sn-state"><svg class="kv-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Locked"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span class="badge badge-deployed">From env</span></span></td></tr>
+                <tr><td class="c-first"><span class="sn-name">Session Secret Key</span><span class="sn-subline mono">CASHPILOT_SECRET_KEY</span><span class="sn-subline">Secret for JWT session tokens — change from default for security</span></td><td data-label="Value"><code>••••••••</code></td><td data-label="Source"><span class="sn-state"><svg class="kv-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Locked"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span class="badge">Read-only</span></span></td></tr>
+                <tr><td class="c-first"><span class="sn-name">Hostname Prefix</span><span class="sn-subline mono">CASHPILOT_HOSTNAME_PREFIX</span><span class="sn-subline">Containers named {prefix}-{service}</span></td><td data-label="Value"><code>cashpilot</code></td><td data-label="Source"><span class="badge badge-category">Default</span></td></tr>
+                <tr><td class="c-first"><span class="sn-name">Collect Interval (min)</span><span class="sn-subline mono">CASHPILOT_COLLECT_INTERVAL</span><span class="sn-subline">Minutes between automatic earnings collection</span></td><td data-label="Value"><code>60</code></td><td data-label="Source"><span class="badge badge-category">Default</span></td></tr>
+                <tr><td class="c-first"><span class="sn-name">Data Directory</span><span class="sn-subline mono">CASHPILOT_DATA_DIR</span><span class="sn-subline">Directory containing the SQLite database</span></td><td data-label="Value"><code>/data</code></td><td data-label="Source"><span class="sn-state"><svg class="kv-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Locked"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span class="badge">Read-only</span></span></td></tr>
+                <tr><td class="c-first"><span class="sn-name">System Timezone</span><span class="sn-subline mono">TZ</span><span class="sn-subline">Container timezone in IANA format (e.g. Europe/Madrid)</span></td><td data-label="Value"><code>Europe/Madrid</code></td><td data-label="Source"><span class="sn-state"><svg class="kv-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-label="Locked"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span class="badge badge-deployed">From env</span></span></td></tr>
+              </tbody>
+            </table>
+            <details class="sn-more" style="margin-top:12px"><summary>Store a value that does not take effect</summary><div class="sn-more-body">
+              <p>CashPilot saves it, but nothing reads it back. Use this only to keep a value visible. Set the real value in your compose file and restart.</p>
+              <div class="sn-form-grid">
+                <div class="sn-field"><label class="form-label" for="env-CASHPILOT_HOSTNAME_PREFIX">Hostname Prefix</label><input id="env-CASHPILOT_HOSTNAME_PREFIX" class="form-input" value="cashpilot"></div>
+                <div class="sn-field"><label class="form-label" for="env-CASHPILOT_COLLECT_INTERVAL">Collect Interval (min)</label><input id="env-CASHPILOT_COLLECT_INTERVAL" class="form-input" value="60"></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" type="button" title="Stores the value; it will not take effect until it is set in the environment and the container restarts">Save anyway</button>
+            </div></details>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+  <footer class="page-foot">
+    <span class="sidebar-footer-version">CashPilot v3.1.0</span>
+    <a href="#">Source</a>
+    <a href="#">Report a problem</a>
+  </footer>
+</div>
+
+<!-- =================================================================== -->
+<!--                          STATE PANELS                                -->
+<!-- =================================================================== -->
+<div class="sn-panels">
+  <h2>State panels</h2>
+  <p>Each panel shows one section in another state. Same markup and classes as the page above.</p>
+
+  <!-- (b) -->
+  <div class="sn-panel">
+    <div class="sn-panel-label">(b) Earner credentials, mixed fleet <span>· watchtower done, geiserback halfway, geiserct and the phones on old workers. Steps open.</span></div>
+    <div class="sn-panel-in">
+      <section class="sn-sec" aria-label="Earner credentials, mixed">
+        <p class="sn-eyebrow">Security</p>
+        <div class="sn-head">
+          <div>
+            <h2 class="sn-title">Earner credentials on each box</h2>
+            <p class="sn-status"><span class="sn-mark warn" aria-hidden="true"></span><b>1 of 5 boxes protected</b><span class="sep">·</span>10 earners keep their passwords in Docker settings<span class="sep">·</span>2 boxes do not report</p>
+          </div>
+          <div class="sn-actions"><a class="btn btn-secondary btn-sm" href="#">How to turn it on</a></div>
+        </div>
+        <p class="sn-lede">Docker shows an earner's password in plain text to anyone who can read its settings. In file mode, the password goes in a file that only the earner reads.</p>
+        <details class="sn-more"><summary>Learn more</summary></details>
+        <div class="sn-body">
+          <table class="breakdown-table sn-table sn-boxes">
+            <thead><tr><th>Box</th><th>Mode</th><th class="c-num">In a file</th><th class="c-num">In Docker settings</th><th>What to do</th></tr></thead>
+            <tbody>
+              <tr><td><span class="sn-name">watchtower</span></td><td data-label="Mode"><span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>File</span></td><td class="c-num" data-label="In a file">8</td><td class="c-num" data-label="In Docker settings">0</td><td class="c-wide"><span class="text-ok">Protected</span></td></tr>
+              <tr><td><span class="sn-name">geiserback</span></td><td data-label="Mode"><span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>File</span></td><td class="c-num" data-label="In a file">5</td><td class="c-num" data-label="In Docker settings"><span class="text-warn">3</span></td><td class="c-wide"><a href="#">Redeploy 3 earners</a> on the dashboard</td></tr>
+              <tr><td><span class="sn-name">geiserct</span></td><td data-label="Mode"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>Not known</span><span class="sn-subline">Worker too old to say</span></td><td class="c-num" data-label="In a file">0</td><td class="c-num" data-label="In Docker settings">7</td><td class="c-wide"><a href="#">Update the worker</a> first</td></tr>
+              <tr><td><span class="sn-name">OPPO CPH1951 (5bdadbc5)</span></td><td data-label="Mode"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>Not known</span><span class="sn-subline">Worker too old to say</span></td><td class="c-num" data-label="In a file"><span class="sn-na">not reported</span></td><td class="c-num" data-label="In Docker settings"><span class="sn-na">not reported</span></td><td class="c-wide">Update the worker app</td></tr>
+              <tr><td><span class="sn-name">motorola one fusion+ (1414f972)</span></td><td data-label="Mode"><span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>Not known</span><span class="sn-subline">Worker too old to say</span></td><td class="c-num" data-label="In a file"><span class="sn-na">not reported</span></td><td class="c-num" data-label="In Docker settings"><span class="sn-na">not reported</span></td><td class="c-wide">Update the worker app</td></tr>
+            </tbody>
+          </table>
+          <p class="sn-hint">"Not reported": this worker does not report its earners one by one. A worker image that cannot keep files shows as "Not possible on this image".</p>
+          <details class="sn-more" open style="margin-top:12px"><summary>How to turn on file mode on a box</summary><div class="sn-more-body">
+            <ol class="sn-steps">
+              <li class="done"><p class="t">Add this line to the worker's environment.</p>
+                <div class="sn-code"><pre><code>services:
+  cashpilot-worker:
+    environment:
+      - CASHPILOT_EARNER_SECRETS=file</code></pre><button class="btn btn-ghost btn-sm" type="button">Copy</button></div></li>
+              <li class="done"><p class="t">Recreate the worker container.</p>
+                <div class="sn-code"><pre><code>docker compose up -d cashpilot-worker</code></pre><button class="btn btn-ghost btn-sm" type="button">Copy</button></div></li>
+              <li><p class="t">Redeploy each earner.</p><p>On the dashboard, open the service and press Redeploy. 3 earners on geiserback still wait for it.</p></li>
+            </ol>
+            <p><b>To undo:</b> remove the line, recreate the worker, then redeploy. The passwords go back into Docker settings.</p>
+          </div></details>
+          <p class="sn-hint">Steps 1 and 2 show a tick once a box reports file mode. Step 3 ticks when no earner is left in Docker settings. The ticks read the same data as the table.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- (c) -->
+  <div class="sn-panel">
+    <div class="sn-panel-label">(c) Earner credentials, every box protected</div>
+    <div class="sn-panel-in">
+      <section class="sn-sec" aria-label="Earner credentials, all protected">
+        <p class="sn-eyebrow">Security</p>
+        <div class="sn-head">
+          <div>
+            <h2 class="sn-title">Earner credentials on each box</h2>
+            <p class="sn-status"><span class="sn-mark ok" aria-hidden="true"></span><b>5 of 5 boxes protected</b><span class="sep">·</span>23 earners keep their passwords in a file</p>
+          </div>
+        </div>
+        <p class="sn-lede">Every box runs in file mode. No earner password is left in Docker settings.</p>
+        <details class="sn-more"><summary>Learn more</summary></details>
+        <div class="sn-body">
+          <table class="breakdown-table sn-table sn-boxes">
+            <thead><tr><th>Box</th><th>Mode</th><th class="c-num">In a file</th><th class="c-num">In Docker settings</th><th>What to do</th></tr></thead>
+            <tbody>
+              <tr><td><span class="sn-name">watchtower</span></td><td data-label="Mode"><span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>File</span></td><td class="c-num" data-label="In a file">8</td><td class="c-num" data-label="In Docker settings">0</td><td class="c-wide"><span class="muted">Nothing</span></td></tr>
+              <tr><td><span class="sn-name">geiserback</span></td><td data-label="Mode"><span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>File</span></td><td class="c-num" data-label="In a file">8</td><td class="c-num" data-label="In Docker settings">0</td><td class="c-wide"><span class="muted">Nothing</span></td></tr>
+              <tr><td><span class="sn-name">geiserct</span></td><td data-label="Mode"><span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>File</span></td><td class="c-num" data-label="In a file">7</td><td class="c-num" data-label="In Docker settings">0</td><td class="c-wide"><span class="muted">Nothing</span></td></tr>
+              <tr><td><span class="sn-name">OPPO CPH1951 (5bdadbc5)</span></td><td data-label="Mode"><span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>File</span></td><td class="c-num" data-label="In a file"><span class="sn-na">not reported</span></td><td class="c-num" data-label="In Docker settings"><span class="sn-na">not reported</span></td><td class="c-wide"><span class="muted">Nothing</span></td></tr>
+              <tr><td><span class="sn-name">motorola one fusion+ (1414f972)</span></td><td data-label="Mode"><span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>File</span></td><td class="c-num" data-label="In a file"><span class="sn-na">not reported</span></td><td class="c-num" data-label="In Docker settings"><span class="sn-na">not reported</span></td><td class="c-wide"><span class="muted">Nothing</span></td></tr>
+            </tbody>
+          </table>
+          <details class="sn-more" style="margin-top:12px"><summary>How to undo file mode</summary></details>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- (d) -->
+  <div class="sn-panel">
+    <div class="sn-panel-label">(d) Import from another tool, inside Settings <span>· first: checked, before saving. Then: saved, ready to deploy.</span></div>
+    <div class="sn-panel-in">
+      <section class="sn-sec" aria-label="Import, checked">
+        <p class="sn-eyebrow">Data and import</p>
+        <div class="sn-head"><div>
+          <h2 class="sn-title">Import from another tool</h2>
+          <p class="sn-status"><span class="sn-mark idle" aria-hidden="true"></span><b>4 services found</b><span class="sep">·</span>1 cannot come over</p>
+        </div></div>
+        <div class="sn-body">
+          <ol class="sn-track" aria-label="Import steps">
+            <li class="done"><span>Add the files</span></li>
+            <li class="now" aria-current="step"><span>Check what comes over</span></li>
+            <li><span>Deploy</span></li>
+          </ol>
+          <p class="setup-line">Read as <strong>money4band</strong>. <span class="sn-file muted">user-config.json · 3.1 KiB</span> <a href="#" style="margin-left:8px">Change files</a></p>
+          <p class="setup-line muted">PROXYLITE: money4band knows this service. CashPilot has no catalog entry for it yet.</p>
+          <div class="table-scroll">
+            <table class="breakdown-table sn-table">
+              <thead><tr><th style="width:32px"><span class="sr-only">Bring over</span></th><th>Service</th><th>Settings</th></tr></thead>
+              <tbody>
+                <tr><td><input type="checkbox" class="import-pick" checked aria-label="Bring over Honeygain" style="accent-color:var(--accent);width:15px;height:15px"></td><td class="c-first" data-label="Service"><span class="sn-name">Honeygain</span> <span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>Ready</span><span class="sn-subline">Earnings tracking will use this login too.</span></td><td class="c-wide" data-label="Settings"><span class="sn-fieldstate">Email <code>you@example.com</code> imported</span><span class="sn-fieldstate">Password: set, imported</span></td></tr>
+                <tr><td><input type="checkbox" class="import-pick" checked aria-label="Bring over Earn.fm" style="accent-color:var(--accent);width:15px;height:15px"></td><td class="c-first" data-label="Service"><span class="sn-name">Earn.fm</span> <span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>Ready</span><span class="sn-subline">Earnings login already set; left as it is.</span></td><td class="c-wide" data-label="Settings"><span class="sn-fieldstate">API key: set, imported</span></td></tr>
+                <tr><td><input type="checkbox" class="import-pick" aria-label="Bring over PacketStream" style="accent-color:var(--accent);width:15px;height:15px"></td><td class="c-first" data-label="Service"><span class="sn-name">PacketStream</span> <span class="sn-state text-warn"><span class="sn-mark warn" aria-hidden="true"></span>Needs a value</span></td><td class="c-wide" data-label="Settings"><span class="sn-fieldstate warn">CID: still the example value</span><input class="form-input import-extra" placeholder="CID" style="max-width:260px;margin-top:4px"></td></tr>
+                <tr><td><input type="checkbox" class="import-pick" checked aria-label="Bring over Traffmonetizer" style="accent-color:var(--accent);width:15px;height:15px"></td><td class="c-first" data-label="Service"><span class="sn-name">Traffmonetizer</span> <span class="sn-state text-ok"><span class="sn-mark ok" aria-hidden="true"></span>Ready</span><span class="sn-subline">Already deployed by CashPilot.</span></td><td class="c-wide" data-label="Settings"><span class="sn-fieldstate">Token: set, imported</span></td></tr>
+                <tr><td></td><td class="c-first" data-label="Service"><span class="sn-name">EarnApp</span> <span class="sn-state muted"><span class="sn-mark idle" aria-hidden="true"></span>Cannot bring over</span><span class="sn-subline">The file holds no device id for it.</span></td><td class="c-wide" data-label="Settings"><span class="sn-fieldstate">Device id: missing</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <details class="sn-more" style="margin-top:8px"><summary>Not imported (2)</summary><div class="sn-more-body"><ul><li><code>M4B_PROJECT_NAME</code>: a money4band setting, not a service</li><li><code>PROXYLITE_USER_ID</code>: no catalog entry</li></ul></div></details>
+          <div class="sn-row" style="margin-top:12px"><button class="btn btn-primary" type="button">Save the 3 ticked services</button><span class="muted">Nothing is deployed yet.</span></div>
+        </div>
+      </section>
+
+      <section class="sn-sec" aria-label="Import, saved">
+        <p class="sn-eyebrow">Data and import</p>
+        <div class="sn-head"><div>
+          <h2 class="sn-title">Import from another tool</h2>
+          <p class="sn-status"><span class="sn-mark ok" aria-hidden="true"></span><b>3 saved imports</b><span class="sep">·</span>ready to deploy</p>
+        </div>
+        <div class="sn-actions"><a class="btn btn-ghost btn-sm" href="#">Import more files</a></div></div>
+        <div class="sn-body">
+          <ol class="sn-track" aria-label="Import steps">
+            <li class="done"><span>Add the files</span></li>
+            <li class="done"><span>Check what comes over</span></li>
+            <li class="now" aria-current="step"><span>Deploy</span></li>
+          </ol>
+          <div class="toast success sn-toast" role="status">Imported 3 services</div>
+          <div class="sn-callout warn"><p><b>Stop the old tool on a box before you deploy there.</b> Two copies behind one connection earn as one. A device id must not run twice.</p></div>
+          <p class="sn-sub">Deploy to</p>
+          <div class="sn-row" style="margin-bottom:10px">
+            <label class="sn-check"><input type="checkbox" class="import-worker" checked> watchtower</label>
+            <label class="sn-check"><input type="checkbox" class="import-worker"> geiserback</label>
+            <label class="sn-check"><input type="checkbox" class="import-worker"> geiserct</label>
+          </div>
+          <ul class="sn-drafts">
+            <li><span><span class="sn-name">Honeygain</span><span class="meta">from money4band, 28 Nov 2026 10:41 UTC; EMAIL, PASSWORD</span></span><span class="sn-row"><button class="btn btn-secondary btn-sm">Deploy</button><button class="btn btn-ghost btn-sm">Forget</button></span></li>
+            <li><span><span class="sn-name">Earn.fm</span><span class="meta">from money4band, 28 Nov 2026 10:41 UTC; EARNFM_TOKEN</span></span><span class="sn-row"><button class="btn btn-secondary btn-sm">Deploy</button><button class="btn btn-ghost btn-sm">Forget</button></span></li>
+            <li><span><span class="sn-name">Traffmonetizer</span><span class="meta">from money4band, 28 Nov 2026 10:41 UTC; TOKEN</span></span><span class="sn-row"><button class="btn btn-secondary btn-sm">Deploy</button><button class="btn btn-ghost btn-sm">Forget</button></span></li>
+          </ul>
+          <div class="sn-row" style="margin-top:12px"><button class="btn btn-primary" type="button">Deploy all to 1 box</button><span class="muted">Saved imports stay here, encrypted, so you can deploy them to more boxes later.</span></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- (e) -->
+  <div class="sn-panel">
+    <div class="sn-panel-label">(e) Credential encryption key <span>· key shown and copied; then, after the move, the copy in the data folder deleted. The app has no "regenerate" action: Delete the copy is the destructive step here.</span></div>
+    <div class="sn-panel-in">
+      <section class="sn-sec" aria-label="Key, moving">
+        <p class="sn-eyebrow">Security</p>
+        <div class="sn-head"><div>
+          <h2 class="sn-title">Credential encryption key</h2>
+          <p class="sn-status"><span class="sn-mark warn" aria-hidden="true"></span><b>In the data folder</b><span class="sep">·</span>moving it out: step 1 of 4</p>
+        </div>
+        <div class="sn-actions"><button class="btn btn-ghost btn-sm" type="button" aria-expanded="true">Close the steps</button></div></div>
+        <div class="sn-body">
+          <ol class="sn-steps" id="key-move">
+            <li><p class="t">Show the key and copy it.</p><p class="muted">CashPilot asks for your password first. The reveal goes into the audit log.</p>
+              <div class="sn-row" style="margin-top:6px">
+                <input type="text" class="form-input mono" readonly value="q7Hk2nW0pXr9TfB3yLmZc8VdJ1sAe4Gu6oKiNh5RtEw=" aria-label="Credential encryption key" style="max-width:440px">
+                <button class="btn btn-secondary btn-sm" type="button">Copy</button><button class="btn btn-ghost btn-sm" type="button">Hide</button>
+              </div>
+              <div class="toast success sn-toast" role="status">Key copied. Paste it into your secret store, then clear your clipboard.</div>
+            </li>
+            <li><p class="t">Save the key in a file outside the data folder.</p><p class="muted">The UI runs as user 1000, so that user must read the file. With Compose, put it in <code>./secrets/cashpilot_encryption_key</code>.</p>
+              <div class="sn-code"><pre><code>mkdir -p secrets
+sudo chown 1000:1000 secrets/cashpilot_encryption_key
+sudo chmod 400 secrets/cashpilot_encryption_key</code></pre><button class="btn btn-ghost btn-sm">Copy</button></div>
+              <p class="muted">Then add the secret to your compose file:</p>
+              <div class="sn-code"><pre><code>secrets:
+  cashpilot_encryption_key:
+    file: ./secrets/cashpilot_encryption_key
+
+services:
+  cashpilot-ui:
+    secrets:
+      - cashpilot_encryption_key
+    environment:
+      - CASHPILOT_ENCRYPTION_KEY_FILE=/run/secrets/cashpilot_encryption_key</code></pre><button class="btn btn-ghost btn-sm">Copy</button></div>
+              <details class="sn-more"><summary>Use a secret manager instead</summary><div class="sn-more-body"><p>Anything that writes the key to a file, or sets <code>CASHPILOT_ENCRYPTION_KEY</code>, works. The <a href="#">guide</a> has tested steps for Infisical, Vault, 1Password and Bitwarden.</p></div></details>
+            </li>
+            <li><p class="t">Recreate the UI container, so it reads the new setting.</p>
+              <div class="sn-code"><pre><code>docker compose up -d cashpilot-ui</code></pre><button class="btn btn-ghost btn-sm">Copy</button></div></li>
+            <li><p class="t">Come back to this page.</p><p class="muted">It checks that the key comes from outside the data folder. Then it offers to delete the copy that is still there.</p></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="sn-sec" aria-label="Key, copy left">
+        <p class="sn-eyebrow">Security</p>
+        <div class="sn-head"><div>
+          <h2 class="sn-title">Credential encryption key</h2>
+          <p class="sn-status"><span class="sn-mark warn" aria-hidden="true"></span><b>Outside the data folder</b><span class="sep">·</span>a copy is still inside</p>
+        </div>
+        <div class="sn-actions"><button class="btn btn-primary btn-sm" type="button">Delete the copy in the data folder</button></div></div>
+        <div class="sn-body">
+          <dl class="sn-facts">
+            <dt>The key comes from</dt><dd><code>/run/secrets/cashpilot_encryption_key</code>, outside the data folder</dd>
+            <dt>Copy still in</dt><dd><code>/data/.fernet_key</code></dd>
+          </dl>
+          <div class="sn-confirm" role="group" aria-label="Confirm delete">
+            <p><b>Delete the key file from the data folder?</b> After this, CashPilot can read your credentials only with the key you keep outside it. Make sure that copy is safe first.</p>
+            <div class="sn-row"><button class="btn btn-danger btn-sm" type="button">Delete the copy</button><button class="btn btn-ghost btn-sm" type="button">Cancel</button><span class="muted">Next, CashPilot asks for your password.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sn-sec" aria-label="Key, done">
+        <p class="sn-eyebrow">Security</p>
+        <div class="sn-head"><div>
+          <h2 class="sn-title">Credential encryption key</h2>
+          <p class="sn-status"><span class="sn-mark ok" aria-hidden="true"></span><b>Outside the data folder</b><span class="sep">·</span>no copy left inside</p>
+        </div></div>
+        <div class="sn-body">
+          <div class="toast success sn-toast" role="status">The copy in the data folder is deleted.</div>
+          <div class="sn-callout ok"><p>Done: the data folder holds no copy of the key. Keep the key safe where it is now, because without it nothing can be decrypted.</p></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- (f) -->
+  <div class="sn-panel">
+    <div class="sn-panel-label">(f) Restore from a backup <span>· file chosen and checked, then the confirm step; the unknown-file and live-elsewhere variants; the result.</span></div>
+    <div class="sn-panel-in">
+      <section class="sn-sec" aria-label="Restore, checked">
+        <p class="sn-eyebrow">Data and import</p>
+        <div class="sn-head"><div>
+          <h2 class="sn-title">Restore from a backup</h2>
+          <p class="sn-status"><span class="sn-mark ok" aria-hidden="true"></span><b>File checked</b><span class="sep">·</span>Mysterium, made by this CashPilot</p>
+        </div></div>
+        <div class="sn-body">
+          <div class="sn-drop">
+            <span class="sn-file">mysterium-geiserct-2026-11-20.cpbackup · 18 KiB</span>
+            <label class="btn btn-ghost btn-sm" style="margin-left:auto">Choose another</label>
+          </div>
+          <p class="sn-sub" style="margin-top:14px">What the restore makes</p>
+          <p class="setup-line">Restoring <strong>Mysterium</strong> creates a new container <code>cashpilot-mysterium</code> with:</p>
+          <ul style="margin:0 0 6px;padding-left:18px;font-size:var(--fs-2)"><li>volume <code>cashpilot-mysterium-data</code> at <code>/var/lib/mysterium-node</code></li></ul>
+          <p class="form-hint">It never writes over anything: the box must not run Mysterium and these volumes must not exist. The backup is written and read back before the container first starts.</p>
+          <details class="sn-more"><summary>This CashPilot knows this file (1)</summary><div class="sn-more-body"><ul><li>Downloaded on geiserct, 20 Nov 2026 08:12 UTC</li></ul></div></details>
+          <p class="sn-sub" style="margin-top:14px">Confirm</p>
+          <div class="sn-form-grid" style="max-width:640px">
+            <div class="sn-field"><label class="form-label" for="restore-worker">Box</label>
+              <select id="restore-worker" class="form-input"><option>geiserback</option><option>watchtower</option><option disabled>geiserct (runs Mysterium)</option></select></div>
+            <div class="sn-field"><label class="form-label" for="restore-passphrase">Passphrase of the backup</label><input id="restore-passphrase" class="form-input" type="password" value="••••••••••••"></div>
+          </div>
+          <div class="sn-row"><button class="btn btn-primary" type="button">Restore Mysterium on geiserback</button><span class="muted">Next, CashPilot asks for your password.</span></div>
+        </div>
+      </section>
+
+      <div class="sn-mini" style="margin-bottom:20px">
+        <div><h4>Unknown file</h4>
+          <p class="text-warn" style="font-size:var(--fs-2);margin:0 0 6px">This CashPilot did not make this file, so it cannot tell whose identity or wallet is inside. Restore only a file you made yourself. To go on, type <strong>ProxyBase</strong>:</p>
+          <input class="form-input" aria-label="Type the service name" placeholder="ProxyBase"></div>
+        <div><h4>Identity runs elsewhere</h4>
+          <p class="text-fail" style="font-size:var(--fs-2);margin:0">This identity runs, or may be starting, on geiserct. Two boxes on one identity look like one node to the provider, which may merge or ban them. Remove it there first.</p></div>
+        <div><h4>Box on plain HTTP</h4>
+          <label class="sn-check" style="align-items:flex-start"><input type="checkbox" style="margin-top:3px"> Send the passphrase to a box on plain HTTP anyway: anyone on the network between can read it.</label></div>
+        <div><h4>Done</h4>
+          <div class="toast success sn-toast" role="status">Mysterium restored on geiserback: 3 files checked, started.</div>
+          <p class="sn-hint" style="margin:2px 0 0">With the LAN fence: "It starts once the LAN fence is confirmed." Device ids reload.</p></div>
+        <div><h4>File changed after the check</h4>
+          <p class="text-fail" style="font-size:var(--fs-2);margin:0">The file chosen now is not the one checked. Press Check file again before you restore.</p></div>
+        <div><h4>Checking</h4><p class="loading-line" style="padding:0">Checking the file...</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- (g) -->
+  <div class="sn-panel">
+    <div class="sn-panel-label">(g) The page at 390 px <span>· the side nav becomes one "Go to" select that stays under the top bar. Left: the top of the page. Right: the same page opened at #set-earner-secrets. shot-390.png has the whole page.</span></div>
+    <div class="sn-phones">
+      <div class="sn-phone"><span>top of the page</span><iframe data-phone title="Settings at 390 px, top" loading="eager"></iframe></div>
+      <div class="sn-phone"><span>#set-earner-secrets</span><iframe data-phone data-anchor="set-earner-secrets" title="Settings at 390 px, earner credentials" loading="eager"></iframe></div>
+    </div>
+  </div>
+
+  <!-- (h) -->
+  <div class="sn-panel">
+    <div class="sn-panel-label">(h) Loading, empty and error states <span>· one line each, in the section's own body, so the header and status line stay put.</span></div>
+    <div class="sn-panel-in">
+      <div class="sn-mini" style="margin-bottom:16px">
+        <div><h4>Whole page: config failed</h4><p class="text-fail" style="font-size:var(--fs-2);margin:0">Could not load settings. Your session may have expired — reload the page, and sign in again if you are asked to.</p></div>
+        <div><h4>Any section: loading</h4><p class="loading-line" style="padding:0">Loading...</p><p class="sn-hint">The nav shows "…" in place of the status until it loads.</p></div>
+        <div><h4>Earner credentials: no workers</h4><p class="muted" style="margin:0">No workers yet.</p></div>
+        <div><h4>Earner credentials: load error</h4><p class="text-fail" style="font-size:var(--fs-2);margin:0">Could not load the box report: Error 502</p><p class="sn-hint">Its own message, no longer the key section's one.</p></div>
+        <div><h4>Earnings collection: none</h4><p class="block-empty" style="padding:0">No collectors available.</p></div>
+        <div><h4>Device ids: empty</h4><p class="muted" style="margin:0">No device ids yet. They appear here once you deploy a service that has one, or add one below.</p></div>
+        <div><h4>Import: no service found</h4><p class="setup-line" style="margin:0">These files set up no service CashPilot can bring over.</p></div>
+        <div><h4>Import: no saved imports</h4><p class="setup-line muted" style="margin:0">Nothing imported yet.</p></div>
+        <div><h4>About: no Docker worker online</h4><p class="block-empty" style="padding:0">No Docker worker is online, so the install cannot be inspected or updated right now.</p></div>
+        <div><h4>Environment: none</h4><p class="block-empty" style="padding:0">No environment variable info available.</p></div>
+        <div><h4>Credential health: no rows</h4><p class="sn-hint" style="margin:0">The section and its nav link stay hidden, as today.</p></div>
+        <div><h4>Notifications</h4><div class="sn-slot" style="padding:10px">Notifications (designed in the other PR)</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

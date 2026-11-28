@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Settings - CashPilot (design 3: tabs by task)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<style>
+/* ============================================================
+   Design 3, "Tabs by task". Only the new parts live here; the rest is
+   the app's own style.css. Every class added by this design starts
+   with st- (settings tabs) so an implementation can lift it as one block.
+   ============================================================ */
+
+/* ----- Tab strip ----- */
+.st-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border-light); margin: 0 0 20px; overflow-x: auto; scrollbar-width: none; }
+.st-tabs::-webkit-scrollbar { display: none; }
+.st-tab {
+  appearance: none; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 9px 14px; color: var(--text-secondary); font: inherit; font-size: var(--fs-3); cursor: pointer;
+  white-space: nowrap; display: inline-flex; align-items: center; gap: 8px;
+}
+.st-tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+.st-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: 600; }
+.st-tab:focus-visible { outline-offset: -2px; }
+.st-count {
+  font-family: var(--font-mono); font-size: var(--fs-1); font-weight: 500; line-height: 1;
+  min-width: 20px; height: 20px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid currentColor;
+}
+.st-count-warn { color: var(--warning); }
+.st-count-idle { color: var(--text-muted); }
+
+/* ----- Tab panel and its jump line ----- */
+.st-panel { max-width: 1080px; }
+.st-panel[hidden] { display: none; }
+.st-jump { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; font-size: var(--fs-2); color: var(--text-muted); margin: -6px 0 18px; }
+.st-jump a { color: var(--text-secondary); }
+.st-jump a:hover { color: var(--text-primary); }
+
+/* ----- One section: a head row, then the controls, then "Learn more" ----- */
+.st-sec { border-top: 1px solid var(--border-light); padding-top: 14px; margin-bottom: 36px; scroll-margin-top: 64px; }
+.st-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 20px; margin-bottom: 14px; }
+.st-head-text { min-width: 0; flex: 1 1 420px; }
+.st-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.st-title { font-size: var(--fs-4); font-weight: 600; margin: 0; }
+.st-lede { color: var(--text-secondary); font-size: var(--fs-2); margin: 4px 0 0; max-width: 72ch; line-height: 1.5; }
+.st-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.st-sub { font-size: var(--fs-3); font-weight: 600; margin: 22px 0 8px; }
+
+/* A state: a square of colour and a few words. Colour always means state. */
+.st-state { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); font-weight: 600; white-space: nowrap; }
+.st-state::before { content: ""; width: 8px; height: 8px; background: currentColor; flex: none; }
+.st-ok { color: var(--success); }
+.st-warn { color: var(--warning); }
+.st-fail { color: var(--error); }
+.st-idle { color: var(--text-muted); }
+
+/* "Learn more": every long explanation goes in here. */
+.st-learn { margin-top: 14px; border-top: 1px dashed var(--border-light); }
+.st-learn > summary {
+  cursor: pointer; list-style: none; padding: 8px 0; color: var(--text-secondary); font-size: var(--fs-2);
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.st-learn > summary::-webkit-details-marker { display: none; }
+.st-learn > summary::before { content: "+"; font-family: var(--font-mono); width: 14px; height: 14px; line-height: 12px; text-align: center; border: 1px solid var(--border-strong); font-size: 12px; }
+.st-learn[open] > summary::before { content: "\2212"; }
+.st-learn > summary:hover { color: var(--text-primary); }
+.st-learn-body { padding: 0 0 6px 22px; font-size: var(--fs-2); color: var(--text-secondary); line-height: 1.55; }
+.st-facts { margin: 4px 0 8px; padding: 0; list-style: none; }
+.st-facts > li { position: relative; padding-left: 14px; margin: 4px 0; max-width: 76ch; }
+.st-facts > li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 5px; height: 5px; background: var(--border-strong); }
+
+/* Numbered steps */
+.st-steps { list-style: none; counter-reset: st; padding: 0; margin: 6px 0 0; }
+.st-steps > li { counter-increment: st; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 0 12px; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
+.st-steps > li:last-child { border-bottom: none; }
+.st-steps > li::before {
+  content: counter(st); font-family: var(--font-mono); font-size: var(--fs-1); width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-strong); color: var(--text-primary);
+}
+.st-step-title { font-weight: 600; color: var(--text-primary); }
+.st-step-text { color: var(--text-secondary); font-size: var(--fs-2); margin-top: 2px; max-width: 72ch; }
+
+/* Code to copy */
+.st-code { position: relative; background: var(--bg-input); border: 1px solid var(--border-color); margin: 8px 0 2px; max-width: 640px; }
+.st-code pre { margin: 0; padding: 9px 76px 9px 12px; overflow-x: auto; font-size: var(--fs-1); line-height: 1.5; color: var(--text-primary); }
+.st-code .btn { position: absolute; top: 6px; right: 6px; }
+
+/* Figures strip, smaller than the dashboard's */
+.st-figs { margin: 0 0 16px; }
+.st-figs .stat-card { padding: 8px 26px 8px 0; margin-right: 26px; }
+.st-figs .stat-value { font-size: var(--fs-4); }
+.st-figs .st-fig-warn { color: var(--warning); }
+.st-figs .st-fig-ok { color: var(--success); }
+
+/* ----- Overview: the checklist reuses the dashboard's attention rows ----- */
+.attn-ok { border-left-color: var(--success); }
+.attn-ok .attn-tag { color: var(--success); }
+.st-ov-group { font-size: var(--fs-2); font-weight: 600; color: var(--text-muted); margin: 22px 0 4px; }
+.st-ov .attn-row { grid-template-columns: 92px minmax(170px, 250px) minmax(0, 1fr) fit-content(240px); }
+
+/* ----- Earner credentials: one row per box ----- */
+.st-boxes { border-top: 1px solid var(--border-light); }
+.st-box {
+  display: grid; grid-template-columns: minmax(180px, 1.2fr) minmax(170px, 1fr) 104px 104px minmax(240px, 1.7fr);
+  gap: 4px 16px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border-color);
+}
+.st-box-head { padding: 6px 0; font-size: var(--fs-2); color: var(--text-muted); font-weight: 500; }
+.st-box-head .st-num { font-family: var(--font-ui); font-size: var(--fs-2); }
+.st-box-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.st-box-kind { display: block; font-weight: 400; font-size: var(--fs-1); color: var(--text-muted); margin-top: 1px; }
+.st-num { font-family: var(--font-mono); font-size: var(--fs-3); text-align: right; }
+.st-num-warn { color: var(--warning); }
+.st-num-none { color: var(--text-muted); font-family: var(--font-ui); font-size: var(--fs-2); }
+.st-box-do { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; min-width: 0; }
+.st-box-do-text { color: var(--text-secondary); font-size: var(--fs-2); }
+.st-lbl { display: none; }
+
+#collector-save-status:empty { display: none; }
+.st-panel .kv-val .form-hint { word-break: normal; overflow-wrap: break-word; }
+
+/* Status / control rows (device ids, health, environment) */
+.st-list { border-top: 1px solid var(--border-light); }
+.st-row {
+  display: grid; grid-template-columns: minmax(170px, 1fr) minmax(0, 1.9fr) 190px 220px;
+  gap: 4px 16px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border-color);
+}
+.st-row-name { font-weight: 600; min-width: 0; }
+.st-row-name .optional { font-weight: 400; color: var(--text-muted); margin-left: 6px; }
+.st-row-detail { min-width: 0; color: var(--text-secondary); font-size: var(--fs-2); overflow-wrap: anywhere; }
+.st-row-detail code { color: var(--text-primary); }
+.st-row-hint { display: block; color: var(--text-muted); font-size: var(--fs-1); margin-top: 2px; }
+.st-row-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.st-row-head { padding: 6px 0; font-size: var(--fs-2); color: var(--text-muted); font-weight: 500; }
+
+/* Collectors: the app's own details, with a footer per collector */
+.st-coll-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.st-folded { margin-top: 10px; }
+.st-folded > summary { cursor: pointer; padding: 8px 0; color: var(--text-secondary); font-size: var(--fs-2); }
+.st-folded > summary:hover { color: var(--text-primary); }
+.st-names { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.st-names .collector-section { margin: 0; }
+
+/* Import: the three steps in one strip */
+.st-stepper { display: flex; flex-wrap: wrap; gap: 0; margin: 0 0 16px; border: 1px solid var(--border-color); }
+.st-stepper > li { list-style: none; flex: 1 1 180px; padding: 8px 12px; font-size: var(--fs-2); color: var(--text-muted); display: flex; align-items: center; gap: 8px; border-right: 1px solid var(--border-color); }
+.st-stepper > li:last-child { border-right: none; }
+.st-stepper .n { font-family: var(--font-mono); width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-strong); flex: none; }
+.st-stepper .is-now { color: var(--text-primary); font-weight: 600; background: var(--accent-soft); }
+.st-stepper .is-now .n { border-color: var(--accent); color: var(--accent); }
+.st-stepper .is-done { color: var(--text-secondary); }
+.st-stepper .is-done .n { border-color: var(--success); color: var(--success); }
+.st-form { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 12px 16px; align-items: start; max-width: 860px; }
+.st-form .form-group { margin: 0; }
+.st-form .st-span { grid-column: 1 / -1; }
+.st-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.st-import-table td { vertical-align: top; }
+.st-import-table .import-field { font-size: var(--fs-2); color: var(--text-secondary); margin: 2px 0; }
+.st-import-table .form-input { max-width: 260px; margin-top: 4px; }
+
+/* Inline confirm: replaces the browser's confirm() for the risky steps */
+.st-confirm { border: 1px solid var(--warning); background: var(--warning-soft); padding: 12px 14px; margin-top: 12px; max-width: 760px; }
+.st-confirm-title { font-weight: 600; color: var(--text-primary); }
+.st-confirm p { margin: 4px 0 0; font-size: var(--fs-2); color: var(--text-secondary); }
+.st-confirm .st-actions { margin-top: 10px; }
+.st-done { border-left: 3px solid var(--success); padding: 8px 12px; background: var(--success-soft); max-width: 760px; margin-top: 12px; font-size: var(--fs-2); }
+.st-err { border-left: 3px solid var(--error); padding: 8px 12px; background: var(--error-soft); max-width: 760px; margin-top: 12px; font-size: var(--fs-2); }
+.st-toast { display: inline-flex; gap: 10px; align-items: center; margin-top: 10px; padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border-light); border-left: 3px solid var(--success); font-size: var(--fs-2); }
+.st-toast-label { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); }
+
+/* The Notifications slot: deliberately empty */
+.st-slot { border: 1px dashed var(--border-strong); padding: 28px 20px; text-align: center; color: var(--text-secondary); }
+.st-slot strong { display: block; color: var(--text-primary); font-size: var(--fs-4); margin-bottom: 4px; }
+
+/* Encryption key status block */
+.st-keybox { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 20px; align-items: center; padding: 12px 14px; border: 1px solid var(--border-color); border-left: 3px solid var(--warning); max-width: 860px; }
+.st-keybox-ok { border-left-color: var(--success); }
+.st-keybox code { font-size: var(--fs-2); }
+
+/* ----- Mockup scaffolding (not part of the design) ----- */
+.mock-gallery { max-width: 1600px; margin: 0 auto; padding: 0 24px 60px; }
+.mock-frame { border-top: 2px solid var(--accent); margin-top: 56px; padding-top: 14px; }
+.mock-label { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--accent); letter-spacing: 0.02em; margin: 0 0 4px; }
+.mock-note { color: var(--text-muted); font-size: var(--fs-2); margin: 0 0 18px; max-width: 90ch; }
+.mock-tabcopy { margin-top: 30px; }
+.mock-tabcopy-label { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); margin: 0 0 6px; }
+.mock-phones { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.mock-phone { width: 390px; max-width: 100%; border: 1px solid var(--border-light); background: var(--bg-primary); }
+.mock-phone-cap { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); margin: 0 0 6px; }
+html.embed .mock-gallery { display: none; }
+
+/* ----- Narrow screens ----- */
+@media (max-width: 900px) {
+  .st-box { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name state" "file conf" "do do"; padding: 12px 0; }
+  .st-box-head { display: none; }
+  .st-box > :nth-child(1) { grid-area: name; }
+  .st-box > :nth-child(2) { grid-area: state; justify-self: end; }
+  .st-box > :nth-child(3) { grid-area: file; text-align: left; }
+  .st-box > :nth-child(4) { grid-area: conf; text-align: right; }
+  .st-box > :nth-child(5) { grid-area: do; }
+  .st-lbl { display: inline; font-family: var(--font-ui); font-size: var(--fs-1); color: var(--text-muted); margin-right: 6px; }
+  .st-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .st-row > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .st-row > .st-row-acts { grid-column: 1 / -1; justify-content: flex-start; }
+  .st-row-head { display: none; }
+  .st-ov .attn-row { grid-template-columns: 64px minmax(140px, 200px) minmax(0, 1fr) auto; }
+  .st-names { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+  .st-ov .attn-row { grid-template-columns: auto minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .st-tabs { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .st-form { grid-template-columns: minmax(0, 1fr); }
+  .st-keybox { grid-template-columns: minmax(0, 1fr); }
+  .st-tab { padding: 9px 10px; }
+  .st-figs { display: grid; grid-template-columns: 1fr 1fr; }
+  .st-figs .stat-card { margin-right: 0; padding: 8px 10px 8px 0; border-right: none; border-bottom: 1px solid var(--border-color); }
+  .st-figs .stat-card:nth-child(even) { padding-left: 12px; border-left: 1px solid var(--border-color); }
+  .st-figs .stat-card:nth-last-child(-n+2) { border-bottom: none; }
+  .st-names { grid-template-columns: minmax(0, 1fr); }
+  .st-stepper > li { flex-basis: 100%; border-right: none; border-bottom: 1px solid var(--border-color); }
+  .st-stepper > li:last-child { border-bottom: none; }
+  .st-code pre { padding-right: 12px; padding-top: 38px; }
+  .mock-gallery { padding: 0 12px 40px; }
+}
+</style>
+<script>
+  // Mockup only: inside the 390 px frames the page hides its own gallery.
+  if (window.self !== window.top) document.documentElement.classList.add('embed');
+</script>
+</head>
+<body data-page="settings">
+<div class="main-content">
+  <header class="topbar">
+    <a href="#" class="topbar-brand" aria-label="CashPilot home"><span aria-hidden="true" style="display:inline-block;width:16px;height:16px;border-radius:50%;background:linear-gradient(180deg,#f9a8d4,#f472b6 55%,#8b5cf6)"></span><span>CashPilot</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="#" class="sidebar-link">Dashboard</a>
+      <a href="#" class="sidebar-link">Fleet</a>
+      <a href="#" class="sidebar-link">Catalog</a>
+      <a href="#" class="sidebar-link">Payouts</a>
+      <a href="#" class="sidebar-link">Activity</a>
+      <a href="#" class="sidebar-link active" aria-current="page">Settings</a>
+    </nav>
+    <div class="topbar-right">
+      <a href="#" class="btn btn-primary btn-sm topbar-add" aria-label="Add service"><span aria-hidden="true">+</span><span class="topbar-add-label" aria-hidden="true"> Add service</span></a>
+      <div class="topbar-earnings"><span id="topbar-total">$52.07</span><select class="topbar-currency-select" aria-label="Currency"><option>USD</option></select></div>
+      <button class="topbar-icon-btn" aria-label="Alerts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></button>
+      <button class="topbar-avatar" aria-label="User menu">S</button>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <div class="page-head"><h1 class="page-title">Settings</h1></div>
+
+    <!-- The tab strip. Buttons, not links: arrow keys move between them, the
+         URL hash keeps the open tab (#overview, #data, #security,
+         #notifications, #about), and any old section anchor opens its tab. -->
+    <div class="st-tabs" role="tablist" aria-label="Settings sections">
+      <button class="st-tab" role="tab" id="tab-overview" aria-controls="overview" aria-selected="true">Overview <span class="st-count st-count-warn" aria-label="4 need attention">4</span></button>
+      <button class="st-tab" role="tab" id="tab-data" aria-controls="data" aria-selected="false" tabindex="-1">Data <span class="st-count st-count-warn" aria-label="1 needs attention">1</span></button>
+      <button class="st-tab" role="tab" id="tab-security" aria-controls="security" aria-selected="false" tabindex="-1">Security <span class="st-count st-count-warn" aria-label="2 need attention">2</span></button>
+      <button class="st-tab" role="tab" id="tab-notifications" aria-controls="notifications" aria-selected="false" tabindex="-1">Notifications</button>
+      <button class="st-tab" role="tab" id="tab-about" aria-controls="about" aria-selected="false" tabindex="-1">About <span class="st-count st-count-idle" aria-label="1 note">1</span></button>
+    </div>
+
+    <!-- =================== OVERVIEW =================== -->
+    <section class="st-panel st-ov" role="tabpanel" id="overview" aria-labelledby="tab-overview">
+      <div class="stats-grid st-figs">
+        <div class="stat-card"><p class="stat-label">Needs attention</p><p class="stat-value st-fig-warn">4</p></div>
+        <div class="stat-card"><p class="stat-label">Collectors set up</p><p class="stat-value">11 <span class="stat-qual">/ 20</span></p></div>
+        <div class="stat-card"><p class="stat-label">Boxes with passwords in a file</p><p class="stat-value st-fig-warn">0 <span class="stat-qual">/ 5</span></p></div>
+        <div class="stat-card"><p class="stat-label">Version</p><p class="stat-value">v3.1.0</p><p class="stat-note">Newest release</p></div>
+      </div>
+
+      <h2 class="st-ov-group">Needs attention</h2>
+      <div class="attn-list">
+        <div class="attn-row attn-warn">
+          <span class="attn-tag">Fix</span>
+          <span class="attn-what">Earner passwords are visible</span>
+          <span class="attn-why">23 earners on 3 boxes keep their password in Docker's container settings.</span>
+          <span class="attn-actions"><a class="btn btn-secondary btn-sm" href="#set-earner-secrets" data-go>Fix in Security</a></span>
+        </div>
+        <div class="attn-row attn-warn">
+          <span class="attn-tag">Fix</span>
+          <span class="attn-what">Encryption key is in the data folder</span>
+          <span class="attn-why">A copy of <code>/data</code> can decrypt every saved credential.</span>
+          <span class="attn-actions"><a class="btn btn-secondary btn-sm" href="#set-key" data-go>Move the key</a></span>
+        </div>
+        <div class="attn-row attn-warn">
+          <span class="attn-tag">Soon</span>
+          <span class="attn-what">Traffmonetizer login expires<span class="attn-where">token</span></span>
+          <span class="attn-why">It stops working on 30 Nov 2026. Then CashPilot cannot read that balance.</span>
+          <span class="attn-actions"><a class="btn btn-secondary btn-sm" href="#collector-traffmonetizer" data-go>Update it</a></span>
+        </div>
+        <div class="attn-row attn-unknown">
+          <span class="attn-tag">Old</span>
+          <span class="attn-what">3 boxes run an old worker</span>
+          <span class="attn-why">geiserct and the two phones cannot report how they keep passwords.</span>
+          <span class="attn-actions"><a class="btn btn-ghost btn-sm" href="#set-about" data-go>See updates</a></span>
+        </div>
+      </div>
+
+      <h2 class="st-ov-group">In order</h2>
+      <div class="attn-list">
+        <div class="attn-row attn-ok">
+          <span class="attn-tag">OK</span>
+          <span class="attn-what">Earnings collection</span>
+          <span class="attn-why">11 of 20 collectors set up. None is missing a value.</span>
+          <span class="attn-actions"><a class="btn btn-ghost btn-sm" href="#set-collection" data-go>Open</a></span>
+        </div>
+        <div class="attn-row attn-ok">
+          <span class="attn-tag">OK</span>
+          <span class="attn-what">Device ids</span>
+          <span class="attn-why">4 in use, 1 removed. Download a copy before you change a box.</span>
+          <span class="attn-actions"><a class="btn btn-ghost btn-sm" href="#set-identities" data-go>Open</a></span>
+        </div>
+        <div class="attn-row attn-ok">
+          <span class="attn-tag">OK</span>
+          <span class="attn-what">Up to date</span>
+          <span class="attn-why">v3.1.0 runs on the dashboard and on every server.</span>
+          <span class="attn-actions"><a class="btn btn-ghost btn-sm" href="#set-about" data-go>About</a></span>
+        </div>
+        <div class="attn-row attn-ask">
+          <span class="attn-tag">Idle</span>
+          <span class="attn-what">Import from another tool</span>
+          <span class="attn-why">Nothing waits to be deployed.</span>
+          <span class="attn-actions"><a class="btn btn-ghost btn-sm" href="#set-import" data-go>Import</a></span>
+        </div>
+        <div class="attn-row attn-ask">
+          <span class="attn-tag">Slot</span>
+          <span class="attn-what">Notifications</span>
+          <span class="attn-why">Notifications (designed in the other PR) adds its own line here.</span>
+          <span class="attn-actions"><a class="btn btn-ghost btn-sm" href="#notifications" data-go>Open</a></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================== DATA =================== -->
+    <section class="st-panel" role="tabpanel" id="data" aria-labelledby="tab-data" hidden>
+      <nav class="st-jump" aria-label="On this tab">
+        <span>On this tab:</span>
+        <a href="#set-collection">Earnings collection</a>
+        <a href="#credential-health-card">Credential health</a>
+        <a href="#set-import">Import from another tool</a>
+        <a href="#set-restore">Restore from a backup</a>
+      </nav>
+
+      <!-- Earnings collection -->
+      <div class="st-sec" id="set-collection">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">Earnings collection</h2><span class="st-state st-ok">11 of 20 set up</span></div>
+            <p class="st-lede">The logins CashPilot uses to read your balance at each service. You do not have to deploy a service to track it.</p>
+          </div>
+          <div class="st-head-actions">
+            <span class="muted" id="collector-save-status"></span>
+            <button class="btn btn-secondary" data-action="testCollectors">Collect now</button>
+          </div>
+        </div>
+        <div class="collectors-grid">
+          <div class="collectors-col">
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Bitping</span><span class="badge badge-deployed">Configured</span></summary></details>
+            <details class="collector-section" open><summary class="collector-header"><span class="collector-name">Bytelixir</span><span class="badge badge-deployed">Configured</span></summary>
+              <div class="collector-body">
+                <div class="form-hint collector-hint">Log in at dash.bytelixir.com and tick <b>Remember Me</b>. Press F12, open Application, then Cookies, and copy three values: <b>bytelixir_session</b>, <b>remember_web_…</b> and <b>XSRF-TOKEN</b>. The remember_web cookie lasts a year; the session cookie alone lasts two hours.</div>
+                <div class="form-group"><label class="form-label" for="cred-bx1">Session Cookie</label><input class="form-input collector-input" id="cred-bx1" type="password" placeholder="•••••••• (set — leave blank to keep)"></div>
+                <div class="form-group"><label class="form-label" for="cred-bx2">Remember Web <span class="optional">(optional)</span></label><input class="form-input collector-input" id="cred-bx2" type="password" placeholder="•••••••• (set — leave blank to keep)"></div>
+                <div class="form-group"><label class="form-label" for="cred-bx3">Xsrf Token <span class="optional">(optional)</span></label><input class="form-input collector-input" id="cred-bx3" type="password" placeholder="Not set"></div>
+                <div class="st-coll-foot">
+                  <button class="btn btn-primary btn-sm" data-action="saveCollectorCredentials">Save</button>
+                  <button class="btn btn-danger btn-sm" data-action="clearServiceCredentials">Clear credentials</button>
+                </div>
+              </div>
+            </details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Earn.fm</span><span class="badge badge-deployed">Configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Honeygain</span><span class="badge badge-deployed">Configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">IPRoyal Pawns</span><span class="badge badge-deployed">Configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Mysterium</span><span class="badge badge-deployed">Configured</span></summary></details>
+          </div>
+          <div class="collectors-col">
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">PacketStream</span><span class="badge badge-deployed">Configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">ProxyRack</span><span class="badge badge-deployed">Configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Repocket</span><span class="badge badge-deployed">Configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Storj</span><span class="badge badge-deployed">Configured</span></summary></details>
+            <details class="collector-section" id="collector-traffmonetizer"><summary class="collector-header"><span class="collector-name">Traffmonetizer</span><span class="badge badge-deployed">Configured</span> <span class="st-state st-warn">Expires soon</span></summary></details>
+          </div>
+        </div>
+        <details class="st-folded">
+          <summary>Not set up yet (9): Anyone Protocol, EarnApp, Grass, Salad, Ocean and 4 more</summary>
+          <div class="st-names">
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">2Miners ETC</span><span class="badge badge-category">Not configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Anyone Protocol</span><span class="badge badge-category">Not configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">EarnApp</span><span class="badge badge-category">Not configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Grass</span><span class="badge badge-category">Not configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">HeroMiners KAS</span><span class="badge badge-category">Not configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Ocean</span><span class="badge badge-category">Not configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">Salad</span><span class="badge badge-category">Not configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">SupportXMR</span><span class="badge badge-category">Not configured</span></summary></details>
+            <details class="collector-section"><summary class="collector-header"><span class="collector-name">unMineable</span><span class="badge badge-category">Not configured</span></summary></details>
+          </div>
+        </details>
+      </div>
+
+      <!-- Credential health: shown only when it has rows -->
+      <div class="st-sec" id="credential-health-card">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">Credential health</h2><span class="st-state st-warn">1 expires soon</span></div>
+            <p class="st-lede">How long each saved login should keep working. CashPilot never shows the values here.</p>
+          </div>
+        </div>
+        <div class="st-list">
+          <div class="st-row st-row-head" aria-hidden="true"><span>Service and field</span><span>Age</span><span>Status</span><span></span></div>
+          <div class="st-row">
+            <span class="st-row-name">Traffmonetizer<span class="optional">token</span></span>
+            <span class="st-row-detail">41 days old · expires 30 Nov 2026</span>
+            <span class="st-state st-warn">Expiring soon</span>
+            <span class="st-row-acts"><a class="btn btn-secondary btn-sm" href="#collector-traffmonetizer" data-go>Update</a></span>
+          </div>
+          <div class="st-row">
+            <span class="st-row-name">Bytelixir<span class="optional">session_cookie</span></span>
+            <span class="st-row-detail">3 days old · expected to last about 2 hours<span class="st-row-hint">Re-created on every run from the saved remember-me cookie.</span></span>
+            <span class="st-state st-idle">No known expiry</span>
+            <span class="st-row-acts"></span>
+          </div>
+          <div class="st-row">
+            <span class="st-row-name">PacketStream<span class="optional">auth_token</span></span>
+            <span class="st-row-detail">64 days old</span>
+            <span class="st-state st-idle">No known expiry</span>
+            <span class="st-row-acts"></span>
+          </div>
+          <div class="st-row">
+            <span class="st-row-name">Honeygain<span class="optional">password</span></span>
+            <span class="st-row-detail">120 days old</span>
+            <span class="st-state st-idle">No known expiry</span>
+            <span class="st-row-acts"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Import, moved in from /import -->
+      <div class="st-sec" id="set-import">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">Import from another tool</h2><span class="st-state st-idle">Nothing saved</span></div>
+            <p class="st-lede">Bring services over from money4band, CashFactory or InternetIncome. CashPilot shows what it found before it saves anything.</p>
+          </div>
+        </div>
+        <ol class="st-stepper" aria-label="Import steps">
+          <li class="is-now" aria-current="step"><span class="n">1</span>Add your old config</li>
+          <li><span class="n">2</span>Pick what comes over</li>
+          <li><span class="n">3</span>Deploy it</li>
+        </ol>
+        <div class="st-form">
+          <div class="form-group">
+            <label class="form-label" for="import-source">Tool</label>
+            <select class="form-input" id="import-source"><option>Tell from the files</option><option>money4band</option><option>CashFactory</option><option>InternetIncome</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="import-files">Files</label>
+            <input type="file" id="import-files" multiple class="form-input" style="padding-top:3px">
+            <div class="form-hint">Up to 4 files, 64 KiB in total. Not sure which files? Open "Which files to add" below.</div>
+          </div>
+          <details class="st-folded st-span">
+            <summary>Or paste one file instead</summary>
+            <label class="form-label" for="import-paste">Paste one file here</label>
+            <textarea class="form-input" id="import-paste" rows="5" style="height:auto;width:100%;max-width:640px;padding:6px 8px;font-family:var(--font-mono)"></textarea>
+          </details>
+        </div>
+        <div class="st-actions">
+          <button class="btn btn-primary" data-action="importPreview">Check what comes over</button>
+          <span class="muted" id="import-status"></span>
+        </div>
+        <h3 class="st-sub">Saved imports</h3>
+        <p class="setup-line muted">Nothing imported yet.</p>
+        <details class="st-learn">
+          <summary>Which files to add, and what CashPilot does with them</summary>
+          <div class="st-learn-body">
+            <ul class="st-facts">
+              <li><b>money4band:</b> <code>config/user-config.json</code>, or its <code>.env</code>.</li>
+              <li><b>CashFactory:</b> <code>.env</code>.</li>
+              <li><b>InternetIncome:</b> <code>properties.conf</code>. Add <code>earnapp.txt</code> and <code>proxyrack.txt</code> too, so your linked devices come over.</li>
+              <li>CashPilot runs nothing and fetches nothing from the files. It does not keep the files.</li>
+              <li>Stop the old tool on a box before you deploy there. Two copies behind one connection earn as one, and a device id must not run twice.</li>
+            </ul>
+            Guides: <a href="#">money4band</a> · <a href="#">CashFactory</a> · <a href="#">InternetIncome</a>
+          </div>
+        </details>
+      </div>
+
+      <!-- Restore -->
+      <div class="st-sec" id="set-restore">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">Restore from a backup</h2><span class="st-state st-idle">Creates only, never overwrites</span></div>
+            <p class="st-lede">Put a Mysterium, ProxyBase or Anyone identity back from a <code>.cpbackup</code> file made with a passphrase.</p>
+          </div>
+        </div>
+        <div class="st-form">
+          <div class="form-group st-span">
+            <label class="form-label" for="restore-file">Backup file</label>
+            <div class="st-actions" style="margin-top:0">
+              <input type="file" id="restore-file" accept=".cpbackup,application/octet-stream" class="form-input" style="max-width:360px;padding-top:3px">
+              <button class="btn btn-ghost" data-action="checkRestoreFile">Check file</button>
+            </div>
+          </div>
+        </div>
+        <div id="restore-preview"></div>
+        <details class="st-learn">
+          <summary>How restore works, and how to replace a running identity</summary>
+          <div class="st-learn-body">
+            <ul class="st-facts">
+              <li>A restore makes a new container on a box that does not run the service. It never writes over a running one.</li>
+              <li>Files sealed to a key, Storj and Sia use the <a href="#">command line steps</a>.</li>
+            </ul>
+            <b>To replace a running identity:</b>
+            <ol class="st-steps">
+              <li><div><div class="st-step-title">Download its backup first.</div></div></li>
+              <li><div><div class="st-step-title">Remove the service from that box on the Dashboard.</div><div class="st-step-text">Say yes when it asks to delete its data.</div></div></li>
+              <li><div><div class="st-step-title">Restore the file here.</div></div></li>
+            </ol>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- =================== SECURITY =================== -->
+    <section class="st-panel" role="tabpanel" id="security" aria-labelledby="tab-security" hidden>
+      <nav class="st-jump" aria-label="On this tab">
+        <span>On this tab:</span>
+        <a href="#set-key">Credential encryption key</a>
+        <a href="#set-earner-secrets">Earner passwords on each box</a>
+        <a href="#set-identities">Device ids</a>
+      </nav>
+
+      <!-- Credential encryption key -->
+      <div class="st-sec" id="set-key">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">Credential encryption key</h2><span class="st-state st-warn">In the data folder</span></div>
+            <p class="st-lede">One key decrypts every credential CashPilot saves. Keep it outside the data folder.</p>
+          </div>
+        </div>
+        <div class="st-keybox">
+          <div>
+            <div>The key is in the data folder (<code>/data/.fernet_key</code>).</div>
+            <div class="form-hint">A copy of that folder can decrypt every stored credential.</div>
+          </div>
+          <div><button class="btn btn-primary" data-action="toggleEncryptionKeyMove" aria-expanded="false">Move the key out of the data folder</button></div>
+        </div>
+        <details class="st-learn">
+          <summary>Why this matters</summary>
+          <div class="st-learn-body">
+            <ul class="st-facts">
+              <li>On a default install the key sits next to the database it decrypts.</li>
+              <li>So anyone with a copy of the data folder can read your credentials.</li>
+              <li>With the key outside the folder, a copy of the folder alone is not enough.</li>
+            </ul>
+            <a href="#">Read the encryption key guide</a>
+          </div>
+        </details>
+      </div>
+
+      <!-- Earner credentials on each box -->
+      <div class="st-sec" id="set-earner-secrets" data-mock="earner-mixed">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">Earner passwords on each box</h2><span class="st-state st-warn">23 visible in Docker</span></div>
+            <p class="st-lede">Docker shows a container's settings to anyone who can read them. <b>File mode</b> moves each earner's password into a file that only that earner reads.</p>
+          </div>
+          <div class="st-head-actions"><a class="btn btn-primary" href="#earner-howto" data-open="earner-howto">Turn on file mode</a></div>
+        </div>
+        <div class="stats-grid st-figs">
+          <div class="stat-card"><p class="stat-label">Boxes in file mode</p><p class="stat-value st-fig-warn">0 <span class="stat-qual">/ 5</span></p></div>
+          <div class="stat-card"><p class="stat-label">Passwords in a file</p><p class="stat-value">0</p></div>
+          <div class="stat-card"><p class="stat-label">Passwords visible in Docker</p><p class="stat-value st-fig-warn">23</p></div>
+          <div class="stat-card"><p class="stat-label">Boxes that cannot report</p><p class="stat-value">3</p></div>
+        </div>
+        <div class="st-boxes" role="table" aria-label="Earner passwords per box">
+          <div class="st-box st-box-head" role="row"><span role="columnheader">Box</span><span role="columnheader">Where passwords go</span><span role="columnheader" class="st-num">In a file</span><span role="columnheader" class="st-num">In Docker</span><span role="columnheader">What to do</span></div>
+          <div class="st-box" role="row">
+            <span class="st-box-name" role="cell">watchtower<span class="st-box-kind">Docker server</span></span>
+            <span role="cell"><span class="st-state st-warn">Docker settings</span></span>
+            <span role="cell" class="st-num"><span class="st-lbl">In a file</span>0</span>
+            <span role="cell" class="st-num st-num-warn"><span class="st-lbl">In Docker</span>8</span>
+            <span role="cell" class="st-box-do"><span class="st-box-do-text">Turn on file mode, then redeploy 8 earners.</span><a class="btn btn-secondary btn-sm" href="#earner-howto" data-open="earner-howto">Show steps</a></span>
+          </div>
+          <div class="st-box" role="row">
+            <span class="st-box-name" role="cell">geiserback<span class="st-box-kind">Docker server</span></span>
+            <span role="cell"><span class="st-state st-warn">Docker settings</span></span>
+            <span role="cell" class="st-num"><span class="st-lbl">In a file</span>0</span>
+            <span role="cell" class="st-num st-num-warn"><span class="st-lbl">In Docker</span>8</span>
+            <span role="cell" class="st-box-do"><span class="st-box-do-text">Turn on file mode, then redeploy 8 earners.</span><a class="btn btn-secondary btn-sm" href="#earner-howto" data-open="earner-howto">Show steps</a></span>
+          </div>
+          <div class="st-box" role="row">
+            <span class="st-box-name" role="cell">geiserct<span class="st-box-kind">Docker server</span></span>
+            <span role="cell"><span class="st-state st-idle">Unknown: old worker</span></span>
+            <span role="cell" class="st-num"><span class="st-lbl">In a file</span>0</span>
+            <span role="cell" class="st-num st-num-warn"><span class="st-lbl">In Docker</span>7</span>
+            <span role="cell" class="st-box-do"><span class="st-box-do-text">Update the worker first. Then turn on file mode.</span><a class="btn btn-ghost btn-sm" href="#set-about" data-go>Go to updates</a></span>
+          </div>
+          <div class="st-box" role="row">
+            <span class="st-box-name" role="cell">OPPO CPH1951 (5bdadbc5)<span class="st-box-kind">Android phone</span></span>
+            <span role="cell"><span class="st-state st-idle">Unknown: old worker</span></span>
+            <span role="cell" class="st-num st-num-none"><span class="st-lbl">In a file</span>Not reported</span>
+            <span role="cell" class="st-num st-num-none"><span class="st-lbl">In Docker</span>Not reported</span>
+            <span role="cell" class="st-box-do"><span class="st-box-do-text">Update the app on the phone. It does not list its earners one by one.</span></span>
+          </div>
+          <div class="st-box" role="row">
+            <span class="st-box-name" role="cell">motorola one fusion+ (1414f972)<span class="st-box-kind">Android phone</span></span>
+            <span role="cell"><span class="st-state st-idle">Unknown: old worker</span></span>
+            <span role="cell" class="st-num st-num-none"><span class="st-lbl">In a file</span>Not reported</span>
+            <span role="cell" class="st-num st-num-none"><span class="st-lbl">In Docker</span>Not reported</span>
+            <span role="cell" class="st-box-do"><span class="st-box-do-text">Update the app on the phone. It does not list its earners one by one.</span></span>
+          </div>
+        </div>
+        <details class="st-learn" id="earner-howto">
+          <summary>How to turn on file mode, and how to undo it</summary>
+          <div class="st-learn-body">
+            <ol class="st-steps">
+              <li><div><div class="st-step-title">Add this line to the worker's environment.</div><div class="st-step-text">Put it in the compose file on that box.</div>
+                <div class="st-code"><pre><code>services:
+  cashpilot-worker:
+    environment:
+      - CASHPILOT_EARNER_SECRETS=file</code></pre><button class="btn btn-ghost btn-sm">Copy</button></div></div></li>
+              <li><div><div class="st-step-title">Recreate the worker container.</div>
+                <div class="st-code"><pre><code>docker compose up -d cashpilot-worker</code></pre><button class="btn btn-ghost btn-sm">Copy</button></div></div></li>
+              <li><div><div class="st-step-title">Redeploy each earner on that box.</div><div class="st-step-text">Open the service on the Dashboard and press <b>Redeploy</b>. This page counts down as each one moves to a file.</div></div></li>
+            </ol>
+            <p style="margin:10px 0 0"><b>To undo:</b> remove the line, then do steps 2 and 3 again. The next redeploy puts the passwords back in the container settings.</p>
+          </div>
+        </details>
+        <details class="st-learn">
+          <summary>What file mode protects against, and what it does not</summary>
+          <div class="st-learn-body">
+            <ul class="st-facts">
+              <li>Without it, <code>docker inspect</code>, a backup of Docker's folder and any tool with the Docker socket show every earner password in plain text.</li>
+              <li>With it, each earner reads its password from a file that only that earner reads.</li>
+              <li>Root on the box can still read the file. File mode is not a wall against root.</li>
+              <li>It covers Bitping, Earn.fm, Honeygain, IPRoyal Pawns, ProxyBase, ProxyRack, Repocket, Traffmonetizer, URnetwork and Sia hostd. It does not cover custom services or Sia's wallet seed.</li>
+            </ul>
+            <a href="#">Read the earner passwords guide</a>
+          </div>
+        </details>
+      </div>
+
+      <!-- Device ids -->
+      <div class="st-sec" id="set-identities">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">Device ids</h2><span class="st-state st-ok">4 in use · 1 removed</span></div>
+            <p class="st-lede">The device id each service was deployed with, per box. An id stays here after you remove its service.</p>
+          </div>
+          <div class="st-head-actions">
+            <button class="btn btn-secondary btn-sm" data-action="openIdentityForm">Add an id</button>
+            <button class="btn btn-ghost btn-sm" data-action="exportIdentities">Download all</button>
+          </div>
+        </div>
+        <div class="st-list">
+          <div class="st-row st-row-head" aria-hidden="true"><span>Service and field</span><span>Id · box</span><span>State</span><span></span></div>
+          <div class="st-row">
+            <span class="st-row-name">ProxyRack<span class="optional">device UUID</span></span>
+            <span class="st-row-detail"><code>••••••••-••••-9f2c</code> · watchtower, copy 1<span class="st-row-hint">First seen 12 Sep 2026 09:14 UTC · last seen 28 Nov 2026 13:50 UTC</span></span>
+            <span class="st-state st-ok">In use</span>
+            <span class="st-row-acts"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-ghost btn-sm">Change</button></span>
+          </div>
+          <div class="st-row">
+            <span class="st-row-name">ProxyBase<span class="optional">device ID</span></span>
+            <span class="st-row-detail"><code>••••••••3a7d</code> · geiserback, copy 1<span class="st-row-hint">First seen 2 Oct 2026 18:02 UTC · last seen 28 Nov 2026 13:49 UTC</span></span>
+            <span class="st-state st-ok">In use</span>
+            <span class="st-row-acts"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-ghost btn-sm">Change</button></span>
+          </div>
+          <div class="st-row">
+            <span class="st-row-name">Mysterium<span class="optional">node identity</span></span>
+            <span class="st-row-detail"><code>0x••••••a41e</code> · geiserct, copy 1<span class="st-row-hint">Reported by the node itself, not checked by CashPilot.</span></span>
+            <span class="st-state st-ok">In use</span>
+            <span class="st-row-acts"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button></span>
+          </div>
+          <div class="st-row">
+            <span class="st-row-name">Mysterium<span class="optional">backup SHA-256</span></span>
+            <span class="st-row-detail"><code>••••••••c09b</code> · geiserct<span class="st-row-hint">A backup file this CashPilot made or restored. Restoring it again needs no typed confirmation.</span></span>
+            <span class="st-state st-idle">Downloaded from here</span>
+            <span class="st-row-acts"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-danger btn-sm">Forget</button></span>
+          </div>
+          <div class="st-row">
+            <span class="st-row-name">ProxyRack<span class="optional">device UUID</span></span>
+            <span class="st-row-detail"><code>••••••••-••••-51e0</code> · nas-old, copy 1<span class="st-row-hint">First seen 3 Mar 2026 · last seen 11 Sep 2026 22:40 UTC</span></span>
+            <span class="st-state st-idle">Removed</span>
+            <span class="st-row-acts"><button class="btn btn-ghost btn-sm">Show</button><button class="btn btn-ghost btn-sm">Copy</button><button class="btn btn-danger btn-sm">Forget</button></span>
+          </div>
+        </div>
+        <details class="st-learn">
+          <summary>What is kept here, and who can see it</summary>
+          <div class="st-learn-body">
+            <ul class="st-facts">
+              <li>Use an id to find the device at the provider, or to give a new box the same id.</li>
+              <li>Each value stays hidden until you show or copy it. The audit log records every show.</li>
+              <li>CashPilot never keeps passwords, keys or wallet seeds here.</li>
+              <li><b>Change</b> gives a box a new id. To the provider it is a new device.</li>
+              <li><b>Add an id</b> keeps an id CashPilot did not deploy with, such as one from before you used CashPilot.</li>
+              <li><b>Download all</b> asks for your password. The file holds every id in full.</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- =================== NOTIFICATIONS =================== -->
+    <section class="st-panel" role="tabpanel" id="notifications" aria-labelledby="tab-notifications" hidden>
+      <div class="st-sec" id="set-notifications">
+        <div class="st-slot"><strong>Notifications (designed in the other PR)</strong>This tab is the slot for that design. It is empty on purpose.</div>
+      </div>
+    </section>
+
+    <!-- =================== ABOUT =================== -->
+    <section class="st-panel" role="tabpanel" id="about" aria-labelledby="tab-about" hidden>
+      <nav class="st-jump" aria-label="On this tab">
+        <span>On this tab:</span>
+        <a href="#set-about">About and updates</a>
+        <a href="#set-env">Environment</a>
+      </nav>
+
+      <div class="st-sec" id="set-about">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">About and updates</h2><span class="st-state st-ok">Up to date</span></div>
+            <p class="st-lede">CashPilot checks GitHub for the latest release and can update itself.</p>
+          </div>
+          <div class="st-head-actions">
+            <label class="form-label" for="update-worker-select" style="margin:0">Server</label>
+            <select class="form-input form-input-select" id="update-worker-select" style="width:auto"><option>watchtower</option><option>geiserback</option><option>geiserct</option></select>
+          </div>
+        </div>
+        <div class="kv-row"><div class="kv-key">Running</div><div class="kv-val mono">v3.1.0</div></div>
+        <div class="kv-row"><div class="kv-key">Latest release</div><div class="kv-val mono">v3.1.0</div></div>
+        <div class="kv-row"><div class="kv-key">Worker image</div><div class="kv-val mono">drumsergio/cashpilot-worker:3.1</div></div>
+        <div class="kv-row"><div class="kv-key">Dashboard image</div><div class="kv-val mono">drumsergio/cashpilot:3.1</div></div>
+        <div class="st-actions">
+          <button class="btn btn-primary" data-action="runSelfUpdate">Re-pull images</button>
+          <span class="form-hint" id="update-run-status" style="margin:0">You are on the newest known release. The button runs the pull anyway.</span>
+        </div>
+        <details class="st-learn">
+          <summary>What the update button does</summary>
+          <div class="st-learn-body">
+            <ul class="st-facts">
+              <li>It runs <code>docker compose pull &amp;&amp; docker compose up -d</code> for you, from a one-shot helper container.</li>
+              <li>It installs the newest patch of the image series your compose file pins.</li>
+              <li>A newer series means you edit the image tags. Read UPGRADING.md first. Update the UI host first, then every worker.</li>
+              <li>An install not managed by Compose gets the manual commands instead.</li>
+            </ul>
+            <a href="#">Read UPGRADING.md</a>
+          </div>
+        </details>
+      </div>
+
+      <div class="st-sec" id="set-env">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">Environment</h2><span class="st-state st-idle">Read when CashPilot starts</span></div>
+            <p class="st-lede">To change one, edit your compose file or Unraid template, then restart the container.</p>
+          </div>
+        </div>
+        <div class="kv-row"><div class="kv-key">Fleet API Key <svg class="kv-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" role="img" aria-label="Locked"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span class="badge badge-deployed kv-badge">From env</span><div class="kv-sub mono" style="width:100%">CASHPILOT_API_KEY</div></div><div class="kv-val">•••••••• <div class="form-hint">Bearer token for worker-to-UI authentication</div></div></div>
+        <div class="kv-row"><div class="kv-key">Session Secret Key <svg class="kv-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" role="img" aria-label="Locked"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span class="badge badge-category kv-badge">Read-only</span><div class="kv-sub mono" style="width:100%">CASHPILOT_SECRET_KEY</div></div><div class="kv-val">•••••••• <div class="form-hint">Secret for JWT session tokens — change from default for security</div></div></div>
+        <div class="kv-row"><div class="kv-key">Hostname Prefix <span class="badge badge-category kv-badge">Default</span><div class="kv-sub mono" style="width:100%">CASHPILOT_HOSTNAME_PREFIX</div></div><div class="kv-val mono">cashpilot <div class="form-hint" style="font-family:var(--font-ui)">Containers named {prefix}-{service}</div></div></div>
+        <div class="kv-row"><div class="kv-key">Collect Interval (min) <span class="badge badge-category kv-badge">Default</span><div class="kv-sub mono" style="width:100%">CASHPILOT_COLLECT_INTERVAL</div></div><div class="kv-val mono">60 <div class="form-hint" style="font-family:var(--font-ui)">Minutes between automatic earnings collection</div></div></div>
+        <div class="kv-row"><div class="kv-key">Data Directory <svg class="kv-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" role="img" aria-label="Locked"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span class="badge badge-category kv-badge">Read-only</span><div class="kv-sub mono" style="width:100%">CASHPILOT_DATA_DIR</div></div><div class="kv-val mono">/data <div class="form-hint" style="font-family:var(--font-ui)">Directory containing the SQLite database</div></div></div>
+        <div class="kv-row"><div class="kv-key">System Timezone <svg class="kv-lock" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" role="img" aria-label="Locked"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span class="badge badge-deployed kv-badge">From env</span><div class="kv-sub mono" style="width:100%">TZ</div></div><div class="kv-val mono">Europe/Madrid <div class="form-hint" style="font-family:var(--font-ui)">Container timezone in IANA format (e.g. Europe/Madrid)</div></div></div>
+        <details class="st-learn">
+          <summary>Store a value here anyway (it does not take effect)</summary>
+          <div class="st-learn-body">
+            <p style="margin:4px 0 8px">Saving stores the value, but CashPilot does not read it back. Set it in your compose file instead. The field exists so a value stored before stays visible.</p>
+            <div class="st-form" style="max-width:640px">
+              <div class="form-group"><label class="form-label" for="env-a">Hostname Prefix</label><input class="form-input env-var-input" id="env-a" placeholder="Containers named {prefix}-{service}"></div>
+              <div class="form-group"><label class="form-label" for="env-b">Collect Interval (min)</label><input class="form-input env-var-input" id="env-b" placeholder="Minutes between automatic earnings collection"></div>
+            </div>
+            <div class="st-actions"><button class="btn btn-ghost" data-action="saveEnvSettings" title="Stores the value; it will not take effect until it is set in the environment and the container restarts">Save anyway</button></div>
+          </div>
+        </details>
+        <details class="st-learn">
+          <summary>Which settings can never change while CashPilot runs</summary>
+          <div class="st-learn-body">
+            <ul class="st-facts">
+              <li>The session key signs the logins already in use.</li>
+              <li>The data directory is where the open database lives.</li>
+              <li>The fleet key is what enrolled workers already hold.</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </section>
+  </main>
+  <footer class="page-foot">
+    <span class="sidebar-footer-version">CashPilot v3.1.0</span>
+    <a href="#">Source</a><a href="#">Report an issue</a><a href="#">Sponsor</a>
+  </footer>
+</div>
+
+<!-- ===================================================================
+     STATE PANELS. Mockup scaffolding: each frame shows one state so a
+     single full-page screenshot carries them all.
+     =================================================================== -->
+<div class="mock-gallery">
+
+  <section class="mock-frame">
+    <p class="mock-label">(a) Settings at 1440: every tab</p>
+    <p class="mock-note">The live page above opens on Overview. Below are the other four tabs as they look when you open them. Only one tab shows at a time on the real page.</p>
+    <div id="mock-alltabs"></div>
+  </section>
+
+  <section class="mock-frame">
+    <p class="mock-label">(b) Earner passwords: the owner's fleet today, steps open</p>
+    <p class="mock-note">Real data: two servers in Docker-settings mode, one old server, two old phones. "Turn on file mode" and every "Show steps" open the steps in place.</p>
+    <div id="mock-earner-mixed" class="st-panel"></div>
+  </section>
+
+  <section class="mock-frame">
+    <p class="mock-label">(b2) Earner passwords: halfway through the fix, and every state a row can show</p>
+    <div class="st-panel">
+      <div class="st-sec">
+        <div class="st-head"><div class="st-head-text"><div class="st-title-row"><h2 class="st-title">Earner passwords on each box</h2><span class="st-state st-warn">11 visible in Docker</span></div></div></div>
+        <div class="st-boxes" role="table" aria-label="Earner passwords per box">
+          <div class="st-box st-box-head" role="row"><span role="columnheader">Box</span><span role="columnheader">Where passwords go</span><span role="columnheader" class="st-num">In a file</span><span role="columnheader" class="st-num">In Docker</span><span role="columnheader">What to do</span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">watchtower<span class="st-box-kind">Docker server</span></span><span role="cell"><span class="st-state st-ok">File</span></span><span role="cell" class="st-num"><span class="st-lbl">In a file</span>5</span><span role="cell" class="st-num st-num-warn"><span class="st-lbl">In Docker</span>3</span><span role="cell" class="st-box-do"><span class="st-box-do-text">Redeploy 3 earners: honeygain, repocket, bitping.</span><a class="btn btn-secondary btn-sm" href="#">Open Dashboard</a></span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">geiserback<span class="st-box-kind">Docker server</span></span><span role="cell"><span class="st-state st-warn">Docker settings</span></span><span role="cell" class="st-num"><span class="st-lbl">In a file</span>0</span><span role="cell" class="st-num st-num-warn"><span class="st-lbl">In Docker</span>8</span><span role="cell" class="st-box-do"><span class="st-box-do-text">Turn on file mode, then redeploy 8 earners.</span><a class="btn btn-secondary btn-sm" href="#">Show steps</a></span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">geiserct<span class="st-box-kind">Docker server</span></span><span role="cell"><span class="st-state st-ok">File</span></span><span role="cell" class="st-num"><span class="st-lbl">In a file</span>7</span><span role="cell" class="st-num"><span class="st-lbl">In Docker</span>0</span><span role="cell" class="st-box-do"><span class="st-box-do-text">Nothing to do.</span></span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">example-box<span class="st-box-kind">Docker server · state sample</span></span><span role="cell"><span class="st-state st-fail">Image cannot</span></span><span role="cell" class="st-num st-num-none"><span class="st-lbl">In a file</span>Not reported</span><span role="cell" class="st-num st-num-none"><span class="st-lbl">In Docker</span>Not reported</span><span role="cell" class="st-box-do"><span class="st-box-do-text">This worker image cannot keep passwords in a file. Use the standard worker image.</span></span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">OPPO CPH1951 (5bdadbc5)<span class="st-box-kind">Android phone</span></span><span role="cell"><span class="st-state st-idle">Unknown: old worker</span></span><span role="cell" class="st-num st-num-none"><span class="st-lbl">In a file</span>Not reported</span><span role="cell" class="st-num st-num-none"><span class="st-lbl">In Docker</span>Not reported</span><span role="cell" class="st-box-do"><span class="st-box-do-text">Update the app on the phone. It does not list its earners one by one.</span></span></div>
+        </div>
+        <p class="form-hint" style="margin-top:10px">Other states of this section: <span class="muted">Loading...</span> · "Could not load the earner password report: {error}" (its own message, no longer the key section's) · "No workers yet."</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="mock-frame">
+    <p class="mock-label">(c) Earner passwords: every box protected</p>
+    <div class="st-panel">
+      <div class="st-sec">
+        <div class="st-head">
+          <div class="st-head-text">
+            <div class="st-title-row"><h2 class="st-title">Earner passwords on each box</h2><span class="st-state st-ok">All in files</span></div>
+            <p class="st-lede">Docker shows a container's settings to anyone who can read them. <b>File mode</b> moves each earner's password into a file that only that earner reads.</p>
+          </div>
+        </div>
+        <div class="stats-grid st-figs">
+          <div class="stat-card"><p class="stat-label">Boxes in file mode</p><p class="stat-value st-fig-ok">5 <span class="stat-qual">/ 5</span></p></div>
+          <div class="stat-card"><p class="stat-label">Passwords in a file</p><p class="stat-value">23</p></div>
+          <div class="stat-card"><p class="stat-label">Passwords visible in Docker</p><p class="stat-value st-fig-ok">0</p></div>
+          <div class="stat-card"><p class="stat-label">Boxes that cannot report</p><p class="stat-value">0</p></div>
+        </div>
+        <div class="st-boxes" role="table" aria-label="Earner passwords per box">
+          <div class="st-box st-box-head" role="row"><span role="columnheader">Box</span><span role="columnheader">Where passwords go</span><span role="columnheader" class="st-num">In a file</span><span role="columnheader" class="st-num">In Docker</span><span role="columnheader">What to do</span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">watchtower<span class="st-box-kind">Docker server</span></span><span role="cell"><span class="st-state st-ok">File</span></span><span role="cell" class="st-num"><span class="st-lbl">In a file</span>8</span><span role="cell" class="st-num"><span class="st-lbl">In Docker</span>0</span><span role="cell" class="st-box-do"><span class="st-box-do-text">Nothing to do.</span></span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">geiserback<span class="st-box-kind">Docker server</span></span><span role="cell"><span class="st-state st-ok">File</span></span><span role="cell" class="st-num"><span class="st-lbl">In a file</span>8</span><span role="cell" class="st-num"><span class="st-lbl">In Docker</span>0</span><span role="cell" class="st-box-do"><span class="st-box-do-text">Nothing to do.</span></span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">geiserct<span class="st-box-kind">Docker server</span></span><span role="cell"><span class="st-state st-ok">File</span></span><span role="cell" class="st-num"><span class="st-lbl">In a file</span>7</span><span role="cell" class="st-num"><span class="st-lbl">In Docker</span>0</span><span role="cell" class="st-box-do"><span class="st-box-do-text">Nothing to do.</span></span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">OPPO CPH1951 (5bdadbc5)<span class="st-box-kind">Android phone</span></span><span role="cell"><span class="st-state st-ok">File</span></span><span role="cell" class="st-num st-num-none"><span class="st-lbl">In a file</span>Not reported</span><span role="cell" class="st-num st-num-none"><span class="st-lbl">In Docker</span>Not reported</span><span role="cell" class="st-box-do"><span class="st-box-do-text">Nothing to do. It does not list its earners one by one.</span></span></div>
+          <div class="st-box" role="row"><span class="st-box-name" role="cell">motorola one fusion+ (1414f972)<span class="st-box-kind">Android phone</span></span><span role="cell"><span class="st-state st-ok">File</span></span><span role="cell" class="st-num st-num-none"><span class="st-lbl">In a file</span>Not reported</span><span role="cell" class="st-num st-num-none"><span class="st-lbl">In Docker</span>Not reported</span><span role="cell" class="st-box-do"><span class="st-box-do-text">Nothing to do. It does not list its earners one by one.</span></span></div>
+        </div>
+        <details class="st-learn"><summary>How to undo file mode</summary><div class="st-learn-body">Remove <code>CASHPILOT_EARNER_SECRETS=file</code> from the worker, recreate the worker, then redeploy each earner. The next redeploy puts the passwords back in the container settings.</div></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="mock-frame">
+    <p class="mock-label">(d1) Import, in progress: step 2, pick what comes over</p>
+    <div class="st-panel">
+      <div class="st-sec">
+        <div class="st-head"><div class="st-head-text"><div class="st-title-row"><h2 class="st-title">Import from another tool</h2><span class="st-state st-warn">Not saved yet</span></div><p class="st-lede">Bring services over from money4band, CashFactory or InternetIncome. CashPilot shows what it found before it saves anything.</p></div></div>
+        <ol class="st-stepper" aria-label="Import steps">
+          <li class="is-done"><span class="n">1</span>Add your old config: <code>user-config.json</code></li>
+          <li class="is-now" aria-current="step"><span class="n">2</span>Pick what comes over</li>
+          <li><span class="n">3</span>Deploy it</li>
+        </ol>
+        <p class="setup-line">Read as <b>money4band</b>.</p>
+        <div class="table-scroll">
+          <table class="breakdown-table st-import-table">
+            <thead><tr><th style="width:36px"><span class="sr-only" style="position:absolute;left:-9999px">Pick</span></th><th>Service</th><th>Settings</th></tr></thead>
+            <tbody>
+              <tr><td><input type="checkbox" checked aria-label="Honeygain"></td><td><b>Honeygain</b><br><span class="st-state st-ok">Ready</span></td><td><div class="import-field">email: <code>s••••@gmail.com</code> imported</div><div class="import-field">password: set</div><div class="import-field muted">earnings tracking will use this login too</div></td></tr>
+              <tr><td><input type="checkbox" checked aria-label="Earn.fm"></td><td><b>Earn.fm</b><br><span class="st-state st-ok">Ready</span></td><td><div class="import-field">api key: set</div><div class="import-field muted">earnings login already set; left as it is</div></td></tr>
+              <tr><td><input type="checkbox" checked aria-label="Repocket"></td><td><b>Repocket</b><br><span class="st-state st-warn">Needs a value</span></td><td><div class="import-field">email: imported</div><div class="import-field text-warn">api key: missing</div><input class="form-input import-extra" type="password" placeholder="Api Key" aria-label="Repocket api key"></td></tr>
+              <tr><td><input type="checkbox" aria-label="Traffmonetizer"></td><td><b>Traffmonetizer</b><br><span class="st-state st-warn">Check a value</span></td><td><div class="import-field text-warn">token: needs retyping (uses $ or quotes a shell would change)</div><input class="form-input import-extra" type="password" placeholder="Token" aria-label="Traffmonetizer token"><div class="import-field muted">already deployed by CashPilot</div></td></tr>
+              <tr><td></td><td><b>Mysterium</b><br><span class="st-state st-idle">Nothing to deploy</span></td><td><div class="import-field muted">Its identity lives in a volume, not in the config. Use Restore from a backup.</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <details class="st-folded"><summary>Not imported (2)</summary><ul class="st-facts"><li><code>PEER2PROFIT_EMAIL</code>: CashPilot has no Peer2Profit service.</li><li><code>DEVICE_NAME</code>: CashPilot names devices itself.</li></ul></details>
+        <div class="st-actions"><button class="btn btn-primary">Save the 3 ticked services</button><button class="btn btn-ghost">Start again</button><span class="muted">Repocket needs its api key before you save.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mock-frame">
+    <p class="mock-label">(d2) Import, finished: saved, step 3 deploys</p>
+    <div class="st-panel">
+      <div class="st-sec">
+        <div class="st-head"><div class="st-head-text"><div class="st-title-row"><h2 class="st-title">Import from another tool</h2><span class="st-state st-ok">3 saved</span></div><p class="st-lede">Bring services over from money4band, CashFactory or InternetIncome. CashPilot shows what it found before it saves anything.</p></div><div class="st-head-actions"><button class="btn btn-ghost btn-sm">Import more files</button></div></div>
+        <ol class="st-stepper" aria-label="Import steps">
+          <li class="is-done"><span class="n">1</span>Add your old config</li>
+          <li class="is-done"><span class="n">2</span>Saved 3 services</li>
+          <li class="is-now" aria-current="step"><span class="n">3</span>Deploy it</li>
+        </ol>
+        <div class="st-done">Saved 3 services. They stay here, encrypted, so you can deploy them to more boxes later.</div>
+        <p class="st-lede" style="margin:14px 0 6px"><b class="text-warn">Stop the old tool on a box before you deploy there.</b> Two copies behind one connection earn as one.</p>
+        <div class="form-group"><span class="form-label">Deploy to</span>
+          <div class="st-actions" style="margin-top:2px">
+            <label class="checkbox-label"><input type="checkbox" checked> watchtower</label>
+            <label class="checkbox-label"><input type="checkbox"> geiserback</label>
+            <label class="checkbox-label"><input type="checkbox"> geiserct</label>
+          </div>
+        </div>
+        <div class="st-list">
+          <div class="st-row"><span class="st-row-name">Honeygain</span><span class="st-row-detail">from money4band, 28 Nov 2026 14:02 UTC; email, password<span class="st-row-hint text-ok" style="color:var(--success)">Deployed to watchtower. Device id: cashpilot-honeygain.</span></span><span class="st-state st-ok">Deployed</span><span class="st-row-acts"><button class="btn btn-ghost btn-sm">Deploy</button><button class="btn btn-danger btn-sm">Forget</button></span></div>
+          <div class="st-row"><span class="st-row-name">Earn.fm</span><span class="st-row-detail">from money4band, 28 Nov 2026 14:02 UTC; api key</span><span class="st-state st-idle">Saved</span><span class="st-row-acts"><button class="btn btn-ghost btn-sm">Deploy</button><button class="btn btn-danger btn-sm">Forget</button></span></div>
+          <div class="st-row"><span class="st-row-name">Repocket</span><span class="st-row-detail">from money4band, 28 Nov 2026 14:02 UTC; email, api key</span><span class="st-state st-idle">Saved</span><span class="st-row-acts"><button class="btn btn-ghost btn-sm">Deploy</button><button class="btn btn-danger btn-sm">Forget</button></span></div>
+        </div>
+        <div class="st-actions"><button class="btn btn-primary">Deploy all to 1 box</button></div>
+        <div class="st-toast"><span class="st-toast-label">toast</span> honeygain deployed to 1 worker</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mock-frame">
+    <p class="mock-label">(e) Encryption key: moving it out, key shown, then deleting the copy left behind</p>
+    <div class="st-panel">
+      <div class="st-sec">
+        <div class="st-head"><div class="st-head-text"><div class="st-title-row"><h2 class="st-title">Credential encryption key</h2><span class="st-state st-warn">In the data folder</span></div><p class="st-lede">One key decrypts every credential CashPilot saves. Keep it outside the data folder.</p></div></div>
+        <div class="st-keybox"><div><div>The key is in the data folder (<code>/data/.fernet_key</code>).</div><div class="form-hint">A copy of that folder can decrypt every stored credential.</div></div><div><button class="btn btn-secondary" aria-expanded="true">Hide the steps</button></div></div>
+        <ol class="st-steps" style="max-width:860px;margin-top:10px">
+          <li><div><div class="st-step-title">Show the key and copy it.</div><div class="st-step-text">CashPilot asks for your password first and writes the reveal to the audit log.</div>
+            <div class="st-actions" style="margin-top:8px;max-width:640px"><input class="form-input mono" readonly value="q7Zb1tVY-3mK0eLr8xWc9pHf2nUa6sJd4gTo5iRyEw0=" aria-label="Credential encryption key" style="flex:1;min-width:0"><button class="btn btn-primary btn-sm">Copy</button><button class="btn btn-ghost btn-sm">Hide</button></div>
+            <div class="st-toast"><span class="st-toast-label">toast</span> Key copied. Paste it into your secret store, then clear your clipboard.</div></div></li>
+          <li><div><div class="st-step-title">Save the key in a file outside the data folder.</div><div class="st-step-text">The UI runs as user 1000, so that user must read the file. With Compose, use <code>./secrets/cashpilot_encryption_key</code>.</div>
+            <div class="st-code"><pre><code>mkdir -p secrets
+sudo chown 1000:1000 secrets/cashpilot_encryption_key
+sudo chmod 400 secrets/cashpilot_encryption_key</code></pre><button class="btn btn-ghost btn-sm">Copy</button></div>
+            <div class="st-step-text">Then add the secret to your compose file:</div>
+            <div class="st-code"><pre><code>secrets:
+  cashpilot_encryption_key:
+    file: ./secrets/cashpilot_encryption_key
+
+services:
+  cashpilot-ui:
+    secrets:
+      - cashpilot_encryption_key
+    environment:
+      - CASHPILOT_ENCRYPTION_KEY_FILE=/run/secrets/cashpilot_encryption_key</code></pre><button class="btn btn-ghost btn-sm">Copy</button></div>
+            <div class="st-step-text">A secret manager works too. The <a href="#">guide</a> has steps for Infisical, Vault, 1Password and Bitwarden.</div></div></li>
+          <li><div><div class="st-step-title">Recreate the UI container, so it reads the new setting.</div>
+            <div class="st-code"><pre><code>docker compose up -d cashpilot-ui</code></pre><button class="btn btn-ghost btn-sm">Copy</button></div></div></li>
+          <li><div><div class="st-step-title">Come back to this page.</div><div class="st-step-text">It checks that the key now comes from outside the data folder. Then it offers to delete the copy still there.</div></div></li>
+        </ol>
+      </div>
+      <p class="mock-tabcopy-label">After step 4, the same section:</p>
+      <div class="st-sec">
+        <div class="st-head"><div class="st-head-text"><div class="st-title-row"><h2 class="st-title">Credential encryption key</h2><span class="st-state st-warn">Copy left in the data folder</span></div><p class="st-lede">One key decrypts every credential CashPilot saves. Keep it outside the data folder.</p></div></div>
+        <div class="st-keybox"><div><div>The key comes from <code>/run/secrets/cashpilot_encryption_key</code>, outside the data folder.</div><div class="form-hint text-warn">A copy of the key is still in the data folder (<code>/data/.fernet_key</code>). Delete it.</div></div><div><button class="btn btn-primary">Delete the copy in the data folder</button></div></div>
+        <div class="st-confirm" role="alertdialog" aria-labelledby="cf-t">
+          <div class="st-confirm-title" id="cf-t">Delete /data/.fernet_key?</div>
+          <p>CashPilot keeps reading the key from /run/secrets/cashpilot_encryption_key. Keep that file safe: without it nothing can be decrypted. CashPilot asks for your password next.</p>
+          <div class="st-actions"><button class="btn btn-danger">Delete the copy</button><button class="btn btn-ghost">Cancel</button></div>
+        </div>
+      </div>
+      <p class="mock-tabcopy-label">Deleted:</p>
+      <div class="st-sec">
+        <div class="st-head"><div class="st-head-text"><div class="st-title-row"><h2 class="st-title">Credential encryption key</h2><span class="st-state st-ok">Outside the data folder</span></div></div></div>
+        <div class="st-keybox st-keybox-ok"><div><div>The key comes from <code>/run/secrets/cashpilot_encryption_key</code>, outside the data folder.</div><div class="form-hint">Done: the data folder holds no copy of the key. Keep the key safe where it is now, because without it nothing can be decrypted.</div></div></div>
+        <div class="st-toast"><span class="st-toast-label">toast</span> The copy in the data folder is deleted.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mock-frame">
+    <p class="mock-label">(f) Restore: file chosen and checked, then the confirm step</p>
+    <div class="st-panel">
+      <div class="st-sec">
+        <div class="st-head"><div class="st-head-text"><div class="st-title-row"><h2 class="st-title">Restore from a backup</h2><span class="st-state st-idle">Creates only, never overwrites</span></div><p class="st-lede">Put a Mysterium, ProxyBase or Anyone identity back from a <code>.cpbackup</code> file made with a passphrase.</p></div></div>
+        <div class="st-actions" style="margin-top:0"><span class="form-label" style="margin:0">Backup file</span><code>mysterium-geiserct-2026-11-20.cpbackup</code><span class="st-state st-ok">Checked</span><button class="btn btn-ghost btn-sm">Choose another file</button></div>
+        <div class="st-keybox st-keybox-ok" style="margin-top:12px;display:block">
+          <div>Restoring <b>Mysterium</b> creates a new container <code>cashpilot-mysterium</code> with:</div>
+          <ul class="st-facts" style="margin-top:6px"><li>volume <code>cashpilot-mysterium-data</code> at <code>/var/lib/mysterium-node</code></li></ul>
+          <div class="form-hint">It never writes over anything: the box must not run Mysterium and these volumes must not exist. The backup is written and read back before the container first starts.</div>
+          <div style="margin-top:8px">This CashPilot knows this file:</div>
+          <ul class="st-facts"><li>Downloaded on geiserct, 20 Nov 2026 10:31 UTC</li></ul>
+        </div>
+        <div class="st-form" style="margin-top:14px">
+          <div class="form-group"><label class="form-label" for="rw">Box</label><select class="form-input" id="rw"><option>watchtower</option><option>geiserback</option><option disabled>geiserct (runs Mysterium)</option></select></div>
+          <div class="form-group"><label class="form-label" for="rp">Passphrase of the backup</label><input class="form-input" id="rp" type="password" value="passphrase" style="max-width:360px"></div>
+        </div>
+        <div class="st-actions"><button class="btn btn-primary">Restore</button><span class="form-hint" style="margin:0">CashPilot asks for your password next.</span></div>
+        <p class="mock-tabcopy-label" style="margin-top:20px">An unknown file asks for the service name first:</p>
+        <div class="st-confirm">
+          <div class="st-confirm-title">This CashPilot did not make this file.</div>
+          <p>It cannot tell whose identity or wallet is inside. Restore only a file you made yourself. To go on, type <b>Mysterium</b>:</p>
+          <input class="form-input" style="max-width:280px;margin-top:8px" aria-label="Type the service name" value="Mysterium">
+        </div>
+        <div class="st-err">This identity runs, or may be starting, on geiserct. Two boxes on one identity look like one node to the provider, which may merge or ban them. Remove it there first.</div>
+        <p class="mock-tabcopy-label" style="margin-top:20px">Done:</p>
+        <div class="st-done">Mysterium restored on watchtower: 3 files checked, started.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="mock-frame">
+    <p class="mock-label">(g) The page at 390 px: Overview and Security</p>
+    <p class="mock-note">The tab strip scrolls sideways. Box rows stack: name and state, then the two counts, then what to do.</p>
+    <div class="mock-phones">
+      <div><p class="mock-phone-cap">#overview</p><iframe class="mock-phone" data-tab="overview" height="1200" title="Overview at 390 px"></iframe></div>
+      <div><p class="mock-phone-cap">#security</p><iframe class="mock-phone" data-tab="security" height="2900" title="Security at 390 px"></iframe></div>
+    </div>
+  </section>
+
+  <section class="mock-frame">
+    <p class="mock-label">(h) Page-wide states</p>
+    <div class="st-panel">
+      <div class="st-err">Could not load settings. Your session may have expired — reload the page, and sign in again if you are asked to.</div>
+      <p class="form-hint" style="margin-top:10px">Shown once, above the tab strip, when <code>GET /api/config</code> fails. Each section keeps its own "Loading..." line and its own error. A tab whose sections all failed shows its count as "!".</p>
+    </div>
+  </section>
+</div>
+
+<script>
+// Mockup behaviour only: tabs, hash, and copying panels into the gallery.
+(function () {
+  var pageHtml = '<!DOCTYPE html>' + document.documentElement.outerHTML;
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.main-content [role=tab]'));
+  function panelOf(el) { return el && el.closest('[role=tabpanel]'); }
+  function show(id, focusTab) {
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('aria-controls') === id;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+      if (on && focusTab) t.focus();
+    });
+  }
+  function go(hash) {
+    var id = (hash || '').replace('#', '') || window.__tab || 'overview';
+    var el = document.getElementById(id);
+    var panel = el && (el.getAttribute('role') === 'tabpanel' ? el : panelOf(el));
+    if (!panel || !panel.closest('.main-content')) { show('overview'); return; }
+    show(panel.id);
+    if (el !== panel) {
+      if (el.tagName === 'DETAILS') el.open = true;
+      setTimeout(function () { el.scrollIntoView({ block: 'start' }); }, 0);
+    }
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { show(t.getAttribute('aria-controls')); history.replaceState(null, '', '#' + t.getAttribute('aria-controls')); });
+    t.addEventListener('keydown', function (e) {
+      var n = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!n) return;
+      var next = tabs[(i + n + tabs.length) % tabs.length];
+      show(next.getAttribute('aria-controls'), true);
+      e.preventDefault();
+    });
+  });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a[data-go], .st-jump a, a[data-open]');
+    if (!a || !a.closest('.main-content')) return;
+    e.preventDefault();
+    var h = a.getAttribute('href');
+    history.replaceState(null, '', h);
+    go(h);
+  });
+  window.addEventListener('hashchange', function () { go(location.hash); });
+
+  // Gallery: copy the four closed tabs and the earner section, ids removed.
+  function strip(node) {
+    node.removeAttribute('id');
+    node.querySelectorAll('[id]').forEach(function (n) { n.removeAttribute('id'); });
+    node.querySelectorAll('[for]').forEach(function (n) { n.removeAttribute('for'); });
+    return node;
+  }
+  var all = document.getElementById('mock-alltabs');
+  if (all && !document.documentElement.classList.contains('embed')) {
+    ['data', 'security', 'notifications', 'about'].forEach(function (id) {
+      var wrap = document.createElement('div');
+      wrap.className = 'mock-tabcopy';
+      var strip1 = strip(document.querySelector('.main-content .st-tabs').cloneNode(true));
+      strip1.removeAttribute('role');
+      strip1.querySelectorAll('[role=tab]').forEach(function (t) {
+        t.setAttribute('aria-selected', t.getAttribute('aria-controls') === id ? 'true' : 'false');
+        t.removeAttribute('role'); t.tabIndex = -1;
+      });
+      var label = document.createElement('p');
+      label.className = 'mock-tabcopy-label';
+      label.textContent = '#' + id;
+      var p = strip(document.getElementById(id).cloneNode(true));
+      p.hidden = false; p.removeAttribute('role');
+      wrap.appendChild(label); wrap.appendChild(strip1); wrap.appendChild(p);
+      all.appendChild(wrap);
+    });
+    var em = strip(document.getElementById('set-earner-secrets').cloneNode(true));
+    em.querySelectorAll('details').forEach(function (d) { d.open = true; });
+    document.getElementById('mock-earner-mixed').appendChild(em);
+  }
+  // The 390 px frames: the same page as srcdoc (same origin, so a
+  // full-page screenshot paints them), each opened on one tab.
+  if (!document.documentElement.classList.contains('embed')) {
+    var base = location.href.split('#')[0];
+    document.querySelectorAll('iframe[data-tab]').forEach(function (f) {
+      f.addEventListener('load', function () {
+        try { f.style.height = f.contentDocument.documentElement.scrollHeight + 'px'; } catch (e) {}
+      });
+      f.srcdoc = pageHtml.replace('<head>', '<head><base href="' + base + '"><script>window.__tab=' + JSON.stringify(f.dataset.tab) + '<\/script>');
+    });
+  }
+  go(location.hash);
+})();
+</script>
+</body>
+</html>
