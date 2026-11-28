@@ -1329,15 +1329,32 @@ class TestTheUiDeploysARoute:
         ui = _Ui(_worker_row(features=("proxy_tunnel", "route_at_deploy", "proxied_isolation")))
         checked = AsyncMock()
 
+        order = []
+        real_sign, real_target = main._approve_spec, main._worker_deploy_target
+
+        async def sign(*args, **kwargs):
+            order.append("sign")
+            return await real_sign(*args, **kwargs)
+
+        async def look_up(*args, **kwargs):
+            order.append("target")
+            return await real_target(*args, **kwargs)
+
         async def go():
             pid = await ui.proxy()
-            with patch.object(main, "require_step_up", checked):
+            with (
+                patch.object(main, "require_step_up", checked),
+                patch.object(main, "_approve_spec", sign),
+                patch.object(main, "_worker_deploy_target", look_up),
+            ):
                 await ui.deploy(
                     main.DeployRequest(image="custom/proxybase:1", step_up_password="pw", route=pid),
                     slug="proxybase-xyz",
                 )
 
         _run(go)
+        # Minted after the deploy lock and the target lookup, just before the send.
+        assert order[-2:] == ["target", "sign"], order
         assert checked.await_count == 1
         earner = ui.calls[-1][2]["earner"]
         assert earner["image"] == "custom/proxybase:1"
@@ -1363,25 +1380,46 @@ class TestTheUiDeploysARoute:
                     _request(), pid, main.ProxyCopyRequest(worker_id=1, slug="proxybase-xyz"), {}
                 )
             nothing = (list(ui.calls), await database.list_proxied_copies(pid))
-            real_sign = main._approve_spec
+            real_sign, real_target = main._approve_spec, main._worker_deploy_target
 
             async def sign(*args, **kwargs):
-                # Signed under the copy's lock, so a long wait for it never lets the approval expire.
-                signed_locked.append(main._proxy_copy_lock(pid, 1, "proxybase-xyz").locked())
+                steps.append("sign")
                 return await real_sign(*args, **kwargs)
 
-            with ui.active(), patch.object(main, "require_step_up", checked), patch.object(main, "_approve_spec", sign):
-                await main.api_add_proxied_copy(
-                    _request(),
-                    pid,
-                    main.ProxyCopyRequest(worker_id=1, slug="proxybase-xyz", step_up_password="pw"),
-                    {},
+            async def target(*args, **kwargs):
+                steps.append("target")
+                return await real_target(*args, **kwargs)
+
+            # Another deploy of the service on this worker holds its deploy lock: the
+            # approval must not be minted before that wait, or it could expire in it.
+            deploy_lock = main._worker_deploy_locks.setdefault(asyncio.get_running_loop(), {}).setdefault(
+                (1, "proxybase-xyz"), asyncio.Lock()
+            )
+            await deploy_lock.acquire()
+            with (
+                ui.active(),
+                patch.object(main, "require_step_up", checked),
+                patch.object(main, "_approve_spec", sign),
+                patch.object(main, "_worker_deploy_target", target),
+            ):
+                add = asyncio.ensure_future(
+                    main.api_add_proxied_copy(
+                        _request(),
+                        pid,
+                        main.ProxyCopyRequest(worker_id=1, slug="proxybase-xyz", step_up_password="pw"),
+                        {},
+                    )
                 )
+                for _ in range(50):
+                    await asyncio.sleep(0)
+                steps.append("released")
+                deploy_lock.release()
+                await add
             return refused.value, nothing, pid
 
-        signed_locked = []
+        steps = []
         refused, nothing, pid = _run(go)
-        assert signed_locked == [True]
+        assert steps == ["released", "target", "sign"], steps
         assert refused.status_code == 403 and refused.detail["error"] == "step_up_required"
         assert nothing == ([], []), "a refused copy reaches no worker and leaves no record"
         assert checked.await_count == 2

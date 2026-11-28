@@ -5778,8 +5778,7 @@ async def _deploy_routed(
             # A wallet or node identity on a spec other than the catalog's goes
             # out with the owner's approval, as on the direct path
             # (_step_up_critical); the worker checks it against this exact earner.
-            if approve:
-                earner = await _approve_spec(worker_id, slug, earner)
+            # Signed by _send_worker_deploy, just before the send.
             result = await _send_worker_deploy(
                 worker_id,
                 slug,
@@ -5793,6 +5792,7 @@ async def _deploy_routed(
                 proxy_id=proxy_id,
                 definition=definition,
                 timeout=180,
+                sign_earner=approve,
             )
         except HTTPException as exc:
             if _outcome_unknown(exc) or _worker_error(exc) == "routed_copy_may_exist":
@@ -8291,8 +8291,16 @@ async def _send_worker_deploy(
     definition: dict[str, Any] | None = None,
     timeout: float = 30,
     desktop_json: dict[str, Any] | None = None,
+    sign_earner: bool = False,
 ) -> dict[str, Any]:
-    """Send the exact expectation on every deploy. Serialize the legacy fallback on this dashboard."""
+    """Send the exact expectation on every deploy. Serialize the legacy fallback on this dashboard.
+
+    ``sign_earner``: the owner's password was checked (_step_up_critical), so the
+    proxied ``earner`` goes out with its signed approval (_approve_spec). It is
+    minted here, after this deploy lock and the target lookup, just before the
+    send: another deploy of the service on this worker can hold the lock for
+    minutes, and an approval minted before that wait could expire.
+    """
     if not isinstance(expected, str) or not _DEPLOY_TARGET_ID.fullmatch(expected):
         raise HTTPException(status_code=422, detail=t("api.expected_container_id_none"))
     instance = _copy_number(spec) or 1
@@ -8334,6 +8342,8 @@ async def _send_worker_deploy(
         if not checked and current != "none" and proxy_id is None:
             # The intermediate worker protocol also requires this flag.
             body["replace_existing"] = True
+        if sign_earner:
+            body["earner"] = await _approve_spec(worker_id, slug, body["earner"])
         return await send(checked=checked)
 
 
@@ -8849,9 +8859,6 @@ async def _refresh_proxied_copies(
                 approved = (expected or {}).get(f"p{pid}", "none")
                 if approved == "none":
                     raise ValueError(t("api.current_container_needs_replacement_approval"))
-                if approve:
-                    # Signed under the lock, just before the send, so it never expires waiting.
-                    earner = await _approve_spec(worker_id, slug, earner)
                 await _send_worker_deploy(
                     worker_id,
                     slug,
@@ -8865,6 +8872,8 @@ async def _refresh_proxied_copies(
                     proxy_id=pid,
                     definition=proxy["definition"],
                     timeout=180,
+                    # Signed just before the send, so it never expires waiting.
+                    sign_earner=approve,
                 )
                 # Still under the lock, so no other deploy of this copy lands
                 # between this one and its mark. Cleared only if ``recorded``
@@ -8952,8 +8961,8 @@ async def api_add_proxied_copy(
     # A copy keeps its own wallet or node identity once it has run, so the worker
     # checks it as a direct deploy (_validate_critical_spec): on another image it
     # runs only with the owner's password, asked here before anything is recorded.
-    # The approval itself is signed under the copy's lock, just before the send,
-    # so a long wait for that lock never lets it expire.
+    # The approval itself is signed by _send_worker_deploy, after the copy's lock,
+    # its deploy lock and the target lookup, so no wait can let it expire.
     approve = await _step_up_critical(request, slug, svc, recorded.get("custom_image") or "", body.step_up_password)
     # The record goes in before the worker is asked, under the proxy's lock: a
     # deploy that times out may still finish on the worker, and a copy with no
@@ -9006,8 +9015,6 @@ async def api_add_proxied_copy(
         # An edit made while this waited (a rotated password) is what the copy gets.
         definition = fresh["definition"]
         try:
-            if approve:
-                earner = await _approve_spec(worker_id, slug, earner)
             result = await _send_worker_deploy(
                 worker_id,
                 slug,
@@ -9020,6 +9027,7 @@ async def api_add_proxied_copy(
                 proxy_id=proxy_id,
                 definition=definition,
                 timeout=180,
+                sign_earner=approve,
             )
         except HTTPException as exc:
             # A 504 says the worker may still be deploying: the record stays, so
