@@ -2237,10 +2237,13 @@ async def record_image_update(
     new_digest: str = "",
     detail: str = "",
 ) -> None:
-    db = await _get_db()
-    try:
-        # One transaction: a prune that fails takes the insert back with it, so a
-        # caller that writes the row again later cannot leave two of it.
+    # One transaction: a prune that fails takes the insert back with it, so a
+    # caller that writes the row again later cannot leave two of it. Own
+    # connection: on the shared one, a write cancelled after its BEGIN ran left
+    # the transaction open, and every later write on that connection failed.
+    # Closing this one ends a transaction a cancel left open.
+    DB_DIR.mkdir(parents=True, exist_ok=True)
+    async with aiosqlite.connect(str(DB_PATH), timeout=30) as db:
         await db.execute("BEGIN IMMEDIATE")
         try:
             await db.execute(
@@ -2260,8 +2263,6 @@ async def record_image_update(
         except BaseException:
             await db.rollback()
             raise
-    finally:
-        await db.close()
 
 
 async def image_update_seen(worker_id: int, slug: str, new_image: str, results: tuple[str, ...]) -> bool:

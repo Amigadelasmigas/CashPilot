@@ -184,7 +184,8 @@ def test_a_raw_restart_waits_as_long_as_the_restart_button():
     assert resp.status_code == 504
     # It also waits for a deploy holding the route lock, as a Stop does.
     wait = 30 + main._catalog_stop_timeout("mysterium") + main._deploy_timeout("mysterium")
-    wait += main.image_updates.SETTLE_SECONDS + 30
+    # And for the clean stop of the new container a failed check undoes.
+    wait += main.image_updates.SETTLE_SECONDS + 30 + main._catalog_stop_timeout("mysterium")
     assert f"did not answer within {wait} s" in resp.json()["detail"]
 
 

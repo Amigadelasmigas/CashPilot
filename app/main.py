@@ -1471,8 +1471,11 @@ def _docker_alert_text(name: str, worker: dict[str, Any], since: datetime) -> tu
     )
 
 
-async def _push_alert(kind: str, subject: str, title: str, message: str, alert_id: int) -> None:
+async def _push_alert(kind: str, subject: str, title: str, message: str, alert_id: int) -> bool:
     """Push an alert out-of-band, and make a total delivery failure retryable.
+
+    Returns whether the alert's row still stands: False when nothing took the
+    push and the row was deleted, so the next cycle pushes it again.
 
     The dedupe row is committed BEFORE this runs, so a failed delivery used to
     disarm the alert for the whole cooldown window: ntfy unreachable in the
@@ -1495,7 +1498,7 @@ async def _push_alert(kind: str, subject: str, title: str, message: str, alert_i
         # Nothing is configured: the bell is the only channel, the row must
         # stand (clearing it would re-insert every cycle and churn the bell),
         # and delivery metrics would only count an absence.
-        return
+        return True
     metrics.record_notify_delivery(bool(delivered))
     if not delivered:
         # The worker push floor is armed at spawn time, before the outcome is
@@ -1523,6 +1526,8 @@ async def _push_alert(kind: str, subject: str, title: str, message: str, alert_i
                 kind,
                 subject,
             )
+        return not undeduped
+    return True
 
 
 @i18n.owner_text
@@ -8106,7 +8111,7 @@ async def _proxy_worker_command(
         # The worker stops or restarts every copy under the route lock a redeploy
         # holds (orchestrator.stop_service, restart_service), and an image update
         # holds it through its check period, so one sent during it waits for all of it first.
-        timeout += _deploy_timeout(slug) + image_updates.SETTLE_SECONDS + 30
+        timeout += _deploy_timeout(slug) + _image_update_wait(slug, image_updates.SETTLE_SECONDS)
     if command == "remove":
         return await _proxy_to_worker(
             worker_id, "DELETE", f"/api/containers/{slug}", params=params, timeout=timeout, headers=headers
@@ -8160,6 +8165,16 @@ def _deploy_timeout(slug: str) -> int:
     waited out for up to START_SETTLE_SECONDS (orchestrator._await_start).
     """
     return 60 + _catalog_stop_timeout(slug) + constants.START_SETTLE_SECONDS
+
+
+def _image_update_wait(slug: str, settle_seconds: int) -> int:
+    """What an image update adds to a deploy's wait on the worker.
+
+    Its check period with the 30 s grace, then, when the check fails, the
+    clean stop of the new container before the old one runs again
+    (orchestrator._roll_back; 300 s for storj).
+    """
+    return settle_seconds + 30 + _catalog_stop_timeout(slug)
 
 
 _DEPLOY_TARGET_ID = re.compile(r"none|[0-9a-f]{12,64}")
@@ -8455,7 +8470,7 @@ async def _proxy_worker_deploy(
         slug,
         spec,
         expected=expected_container,
-        timeout=_deploy_timeout(slug) + (settle_seconds + 30 if settle_seconds else 0),
+        timeout=_deploy_timeout(slug) + (_image_update_wait(slug, settle_seconds) if settle_seconds else 0),
         # Desktop gets its runtime settings from its own catalog.
         desktop_json={key: spec[key] for key in _DesktopDeploySpec.model_fields if key in spec},
     )
@@ -14080,6 +14095,8 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
             raise
         detail = exc.detail
         message = str(detail.get("message") or detail) if isinstance(detail, dict) else str(detail)
+        # It goes into the update history: an older worker sends a pull error unredacted.
+        message = log_redaction.redact_urls(message)
         error = _worker_error(exc)
         raise image_updates.DeployRefused(
             message,
@@ -14133,6 +14150,29 @@ def _image_update_alert_text(row: dict[str, Any], worker_name: str) -> str:
     if row["result"] == image_updates.SKIPPED:
         return f"A new build is out, but it was not installed on {worker_name}: {detail}."
     return f"A new build is out for {worker_name}. Redeploy it from the dashboard to install it."
+
+
+@i18n.owner_text
+async def _push_image_update(key: str, row_id: int, title: str, text: str, alert_id: int) -> None:
+    """Push one image update alert, then mark its row pushed if the push stands.
+
+    A push nothing took has its alert row deleted (_push_alert), and the row
+    stays unmarked, so the next bell rebuild records and pushes it again.
+    """
+    if not await _push_alert("image_update", key, title, text, alert_id):
+        return
+    try:
+        async with _image_update_bell_lock:
+            try:
+                pushed = json.loads(await database.get_config(_IMAGE_UPDATE_PUSHED_KEY) or "{}")
+            except ValueError:
+                pushed = {}
+            if not isinstance(pushed, dict):
+                pushed = {}
+            pushed[key] = row_id
+            await database.set_config(_IMAGE_UPDATE_PUSHED_KEY, json.dumps(pushed, sort_keys=True))
+    except Exception as exc:  # noqa: BLE001 - the alert row still dedupes it for the cooldown
+        logger.warning("Could not mark the image update alert for %s pushed: %s", key, exc)
 
 
 @i18n.owner_text
@@ -14205,8 +14245,9 @@ async def _refresh_image_update_bell(outcomes: dict[int, dict[str, str]] | None 
                 bell[key] = entry
                 if row["result"] not in (*image_updates.HOLDS, image_updates.FAILED):
                     continue
-                pushed_now[key] = row["id"]
                 # Pushed once per row, not each time the alert cooldown runs out.
+                # The row is marked pushed only once a push stands
+                # (_push_image_update): one nothing took is pushed again.
                 if pushed.get(key) != row["id"] and (
                     alert_id := await database.record_alert("image_update", key, text)
                 ):
@@ -14214,7 +14255,7 @@ async def _refresh_image_update_bell(outcomes: dict[int, dict[str, str]] | None 
                         image_updates.ROLLED_BACK: "update undone",
                         image_updates.RESTORE_FAILED: "needs you, it did not start again",
                     }.get(row["result"], "update failed")
-                    _spawn(_push_alert("image_update", key, f"{name}: {what}", text, alert_id))
+                    _spawn(_push_image_update(key, row["id"], f"{name}: {what}", text, alert_id))
             if answered != cleared:
                 await database.set_config(_IMAGE_UPDATE_CLEARED_KEY, json.dumps(answered, sort_keys=True))
             if pushed_now != pushed:

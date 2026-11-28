@@ -3018,12 +3018,16 @@ async def _deploy_container(request: Request, slug: str, spec: CheckedDeploySpec
             error = "image_update_unverified"
         else:
             error = "image_update_rolled_back"
-        raise HTTPException(status_code=409, detail={"error": error, "message": str(exc)}) from None
+        # The UI keeps it in the update history: no login or signed query in it.
+        raise HTTPException(
+            status_code=409, detail={"error": error, "message": log_redaction.redact_urls(str(exc))}
+        ) from None
     except orchestrator.ContainerRuntimeError as exc:
         # Same shape as the network setting; 503 when the daemon could not be
         # asked at all. Mostly raised before the old container was touched; a
         # deadline passed after its stop puts it back and starts it again.
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+        # A failed pull quotes the registry's address, which can hold a login.
+        raise HTTPException(status_code=exc.status_code, detail=log_redaction.redact_urls(str(exc))) from None
     except APIError as exc:
         refusal = orchestrator.proxy_refusal(exc)
         if refusal:
@@ -3035,7 +3039,7 @@ async def _deploy_container(request: Request, slug: str, spec: CheckedDeploySpec
         # what the operator needs, so it goes back as a 409 the UI shows, on one
         # line and capped, instead of the bare 500 below.
         logger.warning("Deploy of %s refused by Docker: %s", slug, exc)
-        reason = " ".join(str(exc.explanation or exc).split())[:300]
+        reason = " ".join(log_redaction.redact_urls(str(exc.explanation or exc)).split())[:300]
         raise HTTPException(status_code=409, detail=t("worker.docker_refused_container", reason=reason)) from None
     except HTTPException:
         raise
@@ -3101,7 +3105,7 @@ async def api_image_check(request: Request, slug: str) -> dict[str, Any]:
     except orchestrator.ContainerRuntimeError as exc:
         # A pull error can quote a registry or proxy address with its login, or
         # a signed URL with its credential in the query.
-        detail = re.sub(r"(https?://[^\s?#'\"]+)\?[^\s'\"]*", r"\1?<redacted>", proxy_tunnel.redact(str(exc)))[:400]
+        detail = log_redaction.redact_urls(str(exc))[:400]
         # Structured, so the UI forwards the reason even for a 502 (main._safe_worker_detail).
         raise HTTPException(
             status_code=exc.status_code, detail={"error": "image_check_failed", "message": detail}

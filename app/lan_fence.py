@@ -1634,12 +1634,37 @@ def _started_unattached(container: Any, mode: str | None) -> str | None:
     return None
 
 
+#: Container id -> wall time of the guard's last stop of it, kept for an hour.
+_guard_stops: dict[str, float] = {}
+_guard_stops_lock = threading.Lock()
+_GUARD_STOPS_KEPT_SECONDS = 3600.0
+
+
 def _guard_stop(container: Any, reason: str) -> None:
     from app.constants import LABEL_SERVICE
 
     slug = str((container.labels or {}).get(LABEL_SERVICE) or "")
     logger.warning("Stopping %s: %s", container.name, reason)
+    now = time.time()
+    with _guard_stops_lock:
+        # Before the stop: an image update's check that sees the container
+        # stopped must find the guard's mark (guard_stopped_since).
+        for cid, at in list(_guard_stops.items()):
+            if at < now - _GUARD_STOPS_KEPT_SECONDS:
+                del _guard_stops[cid]
+        _guard_stops[str(getattr(container, "id", "") or "")] = now
     container.stop(timeout=_orchestrator()._get_stop_timeout(slug))
+
+
+def guard_stopped_since(container_id: str, since: float) -> bool:
+    """Whether the guard stopped the container ``container_id`` at or after wall time ``since``.
+
+    An image update asks this when its new container stopped: the fence may
+    be complete again by then, and the stop is still the fence's, not the build's.
+    """
+    with _guard_stops_lock:
+        at = _guard_stops.get(str(container_id or ""))
+    return bool(container_id) and at is not None and at >= since
 
 
 def effective_network(client: Any) -> tuple[str, str]:

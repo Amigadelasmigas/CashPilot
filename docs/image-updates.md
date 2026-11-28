@@ -51,6 +51,8 @@ to turn the updates on. CashPilot never turns them on for you.
    check, or logs one of the app's known failure lines, the worker stops it
    and removes it. A failure line that the old container logged too, in its
    last hour, does not count: it comes from the box, not from the new build.
+   If the worker could not read that log, such a line counts as **Failed**
+   below, and the next daily check tries the build again.
    A health check that has still not passed 30 seconds after the period counts
    as a failure too.
    Then it starts the old container again, with its old image. The table and
@@ -62,6 +64,11 @@ to turn the updates on. CashPilot never turns them on for you.
    it had set the old container aside. The app is down on that box until you
    start it from the dashboard. A Redeploy would install the build that
    failed, because the tag still names it.
+   Sometimes the old container also keeps the name `<name>-replaced`, and the
+   bell says so. The dashboard finds the app by its name, so give the name back
+   first. If a new container still holds the name, remove it with
+   `docker rm -f <name>`. Then run `docker rename <name>-replaced <name>`, and
+   start the app from the dashboard.
    Sometimes Docker cannot show how the new container did. Then the worker
    undoes it the same way, but the table shows **Failed**. The next daily
    check tries that build again. The same goes for a new container that a
@@ -127,11 +134,14 @@ These are known limits of this release:
   of its check. The old one stays stopped as `<name>-replaced`. Remove that
   container when the new build works. To go back to the old build, the old
   container must get the app's name back, because the dashboard finds the app
-  by that name. Remove the new container first, because it holds the name and
-  the app's ports: `docker rm -f <name>`. Then give the old one its name with
+  by that name. Keep the new container until the old one runs. Stop it, so
+  that it frees the app's ports, and move it aside: `docker stop <name>`, then
+  `docker rename <name> <name>-new`. Give the old one its name with
   `docker rename <name>-replaced <name>`, and start it with
-  `docker start <name>`. The build you went back from is not held, so set the
-  app to **Notify only** or **Off** until a newer build is out.
+  `docker start <name>`. When it runs, remove the new one with
+  `docker rm <name>-new`. If the old one does not start, you can still go
+  back to the new one the same way. The build you went back from is not held,
+  so set the app to **Notify only** or **Off** until a newer build is out.
 - **A hold stops automatic updates only.** While the tag still names a held
   build, a Redeploy from the dashboard installs it. That deploy has no check
   period.

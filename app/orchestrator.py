@@ -1497,7 +1497,7 @@ def deploy_raw(
     # one goes back as it was (_roll_back).
     replaced = None
     replaced_running = False
-    already: frozenset[str] = frozenset()
+    already: frozenset[str] | None = frozenset()
     identity_before = _identity_snapshot(name)
     held_before = _MISMATCH_HELD.get(name)
     stopped_before = name in user_stopped()
@@ -2211,12 +2211,13 @@ def _settle_state(container: Any, *, final: bool) -> str | None:
     return None
 
 
-def _signals_already(container: Any, slug: str) -> frozenset[str]:
+def _signals_already(container: Any, slug: str) -> frozenset[str] | None:
     """The patterns of the catalog's failing signals the running ``container`` already logs.
 
     Read before an update stops it, over the last hour: a fault of the box,
     such as a node no satellite can dial back, shows in every build, so it is
-    not held against the new one. Nothing read is nothing already seen.
+    not held against the new one. None when the log could not be read: then a
+    failure line in the new build's log is not proof against it (_settle).
     """
     signals = ((get_service(slug) or {}).get("docker") or {}).get("health_signals") if get_service else None
     if not isinstance(signals, list) or not signals:
@@ -2225,7 +2226,7 @@ def _signals_already(container: Any, slug: str) -> frozenset[str]:
         raw = container.logs(since=int(time.time()) - _SIGNALS_ALREADY_SECONDS, tail=_SIGNALS_ALREADY_LINES)
     except Exception as exc:  # noqa: BLE001 - nothing read, nothing excused
         logger.warning("Could not read the log of %s before its update: %s", slug, exc)
-        return frozenset()
+        return None
     text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw or "")
     return frozenset(
         str(signal.get("pattern"))
@@ -2242,7 +2243,7 @@ _SIGNALS_ALREADY_LINES = 5000
 
 
 def _settle_problem(
-    container: Any, slug: str, since: float, *, logs: bool = True, already: frozenset[str] = frozenset()
+    container: Any, slug: str, since: float, *, logs: bool = True, already: frozenset[str] | None = frozenset()
 ) -> str | None:
     """Why a replacement is not healthy now, or None while it looks well.
 
@@ -2271,7 +2272,7 @@ def _settle_problem(
     for signal in signals:
         if not isinstance(signal, dict) or str(signal.get("state") or "failing").lower() == "idle":
             continue
-        if str(signal.get("pattern")) in already:
+        if str(signal.get("pattern")) in (already or ()):
             # The build it replaced logged it too (_signals_already).
             continue
         if _signal_hit(text, signal):
@@ -2281,11 +2282,18 @@ def _settle_problem(
 
 
 def _settle(
-    container: Any, slug: str, seconds: float, since: float, name: str, *, already: frozenset[str] = frozenset()
+    container: Any,
+    slug: str,
+    seconds: float,
+    since: float,
+    name: str,
+    *,
+    already: frozenset[str] | None = frozenset(),
 ) -> None:
     """Watch a replacement for ``seconds``; raise ImageUpdateFailed as soon as it is not healthy.
 
     ``already`` names the signals the replaced build logged too: they do not fail this one.
+    None means the replaced build's log could not be read.
     """
     logger.info("Watching %s for %d s before the previous container is removed", name, int(seconds))
     end = time.monotonic() + seconds
@@ -2309,12 +2317,20 @@ def _settle(
             problem, seen, unreadable = None, False, exc
         if problem:
             logger.warning("%s failed its check after the update: it %s", name, problem)
-            if fence := _fence_broken(slug):
+            if fence := _fence_broken(slug, container, since):
                 # The guard stops every gated node while the LAN fence is broken:
                 # the fence's fault, not the build's. Undone, and tried again.
                 raise ImageUpdateFailed(
                     f"The new {name} {problem} within its {int(seconds)} s check while the LAN fence was "
                     f"not complete ({fence}), so it was undone.",
+                    verified=False,
+                )
+            if already is None and problem.startswith("logged a known failure"):
+                # The old build's log could not be read first: it may log the
+                # same line, a fault of the box. Undone, and tried again.
+                raise ImageUpdateFailed(
+                    f"The new {name} {problem} within its {int(seconds)} s check, so it was undone. The log "
+                    "of the build it replaced could not be read to compare, so it is tried again.",
                     verified=False,
                 )
             raise ImageUpdateFailed(f"The new {name} {problem} within its {int(seconds)} s check, so it was undone.")
@@ -2342,12 +2358,18 @@ def _settle(
         time.sleep(min(_SETTLE_POLL_SECONDS, cutoff - now))
 
 
-def _fence_broken(slug: str) -> str:
-    """Why the LAN fence of a fence-gated ``slug`` is not complete now, or "" (also when it cannot be read)."""
+def _fence_broken(slug: str, container: Any = None, since: float = 0.0) -> str:
+    """Why the LAN fence of a fence-gated ``slug`` is not complete now, or "" (also when it cannot be read).
+
+    A guard stop of ``container`` since wall time ``since`` counts too: the
+    fence can be complete again by the time the check looks.
+    """
     if not fence_gated(slug):
         return ""
     from app import lan_fence
 
+    if container is not None and lan_fence.guard_stopped_since(str(getattr(container, "id", "") or ""), since):
+        return "its guard stopped the container"
     try:
         return str(lan_fence.fence_problem(_get_client()) or "")
     except Exception:  # noqa: BLE001 - unknown is not broken
@@ -2877,10 +2899,12 @@ _IMAGE_UPDATE_SETTLE_SECONDS = 120
 def _stop_wait_seconds(slug: str) -> float:
     """How long a Stop waits for a deploy of ``slug``: one that stops, starts and checks its container.
 
+    A check that fails stops the new container cleanly too before the old one
+    runs again (_roll_back), so the catalog's stop timeout counts twice.
     The dashboard gives a Stop this much and more (app/main.py
     _proxy_worker_command), so a Stop it gave up on is never carried out later.
     """
-    return 60 + _get_stop_timeout(slug) + START_SETTLE_SECONDS + _IMAGE_UPDATE_SETTLE_SECONDS
+    return 60 + 2 * _get_stop_timeout(slug) + START_SETTLE_SECONDS + _IMAGE_UPDATE_SETTLE_SECONDS
 
 
 def stop_service(slug: str, instance: int = 1) -> None:
@@ -3804,11 +3828,18 @@ def read_critical_state(slug: str) -> tuple[bytes, list[str], str | None]:
     _refuse_mid_restore(slug, "backup")
     # A deploy holds the route lock, an image update through its check period: a
     # backup would pause the new container there, which reads as a failed build.
+    # Held to the unpause, so a deploy cannot start while the container is paused.
     route = route_gate.deploying(slug)
     if not route.acquire(blocking=False):
         raise ContainerRuntimeError(t("err.orchestrator.backup_waits_for_deploy", slug=slug), 409)
-    route.release()
+    try:
+        return _read_critical_state(slug, targets)
+    finally:
+        route.release()
 
+
+def _read_critical_state(slug: str, targets: Any) -> tuple[bytes, list[str], str | None]:
+    """read_critical_state's read, under the route lock of ``slug``."""
     container = _find_container(slug)
     was_running = container.status == "running"
     chunks: list[bytes] = []
