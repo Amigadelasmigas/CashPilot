@@ -9,15 +9,19 @@ remove. A phone, a Desktop and a Secure VM itself are not hosts for one.
 
 from __future__ import annotations
 
+import fnmatch
 import json
+import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import yaml
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -249,3 +253,49 @@ class TestAnOfflineSecureVm:
     def test_an_offline_vm_shows_its_fence_as_unknown(self):
         out = self._flag("offline")
         assert "flag-ok" not in out and "layers.vm.fence_unknown" in out
+
+
+class TestAHostHelperFixShips:
+    """The UI image carries the host helpers, and the Fleet page pins its command
+    to the image's copy. A fix to a helper alone must still cut a release and
+    build a new UI image, or the page keeps offering the old helper."""
+
+    RELEASE = ROOT / ".github" / "workflows" / "release.yml"
+    DOCKERFILE = ROOT / "Dockerfile"
+
+    def _helpers(self):
+        line = next(ln for ln in self.DOCKERFILE.read_text().splitlines() if ln.startswith("COPY scripts/"))
+        return line.split()[1:-1]
+
+    def _build_ui(self, changed: str) -> str:
+        doc = yaml.safe_load(self.RELEASE.read_text())
+        step = next(s["run"] for s in doc["jobs"]["release"]["steps"] if s.get("name") == "Detect what changed")
+        lines = step.splitlines()
+        start = next(i for i, ln in enumerate(lines) if "grep -qE '^(Dockerfile|entrypoint" in ln)
+        end = next(i for i, ln in enumerate(lines) if 'echo "Build UI:' in ln)
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            env = {
+                **os.environ,
+                "CHANGED": changed,
+                "BUILD_UI": "false",
+                "BUILD_WORKER": "false",
+                "RUNTIME_CHANGED": "false",
+                "GITHUB_OUTPUT": str(out),
+            }
+            subprocess.run(["bash", "-c", "\n".join(lines[start : end + 1])], env=env, check=True, capture_output=True)
+            return dict(ln.split("=", 1) for ln in out.read_text().split())["ui"]
+
+    def test_the_image_carries_both_helpers(self):
+        assert self._helpers() == ["scripts/cashpilot-gvisor", "scripts/cashpilot-vm"]
+
+    def test_a_helper_change_counts_as_something_to_release(self):
+        paths = yaml.safe_load(self.RELEASE.read_text())["jobs"]["pending"]["env"]["RELEASE_PATHS"].split()
+        for helper in self._helpers():
+            assert any(fnmatch.fnmatch(helper, p) for p in paths), helper
+
+    def test_a_helper_change_builds_the_ui_image(self):
+        for helper in self._helpers():
+            assert self._build_ui(helper) == "true", helper
+        # The control: the extracted block can answer false.
+        assert self._build_ui("scripts/generate_readme_tables.py") == "false"
