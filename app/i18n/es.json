@@ -2063,6 +2063,10 @@
     "text": " — desaparecido de un equipo",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — actualización de imagen",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — desaparecido",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "esta copia de seguridad contiene {have}, pero {slug} guarda {want}. No es una copia de seguridad de {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "Hay un despliegue de {slug} en curso, así que no se ha leído para una copia de seguridad. Vuelve a intentarlo cuando termine el despliegue.",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "Tanto {outer} como {inner} están en {bind_mounts_env}, y un contenedor que enlace {outer} podría poner un enlace donde está {inner}. Deja solo una de las dos en {bind_mounts_env} en el .env junto a tu archivo compose y luego ejecuta docker compose up -d",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "Hay una eliminación de {slug} en curso en este equipo, así que {action, select, start {no se inició} backup {no se leyó para una copia de seguridad} other {no se desplegó nada}}. Vuelve a intentarlo cuando termine.",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "Todavía hay un despliegue de {slug} en curso, así que no se ha reiniciado. Reinícialo cuando termine el despliegue.",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "Una restauración de {slug} no terminó, así que sus datos pueden estar escritos a medias y {action, select, start {no se inició} backup {no se leyó para una copia de seguridad} other {no se desplegó}}. Elimina el servicio junto con sus datos (lo ofrece Eliminar de este equipo, en la ficha del servicio en el panel) y vuelve a restaurar la copia de seguridad.",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "{name} se inició antes de que terminara la restauración, así que se deshizo",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "Todavía se está ejecutando un despliegue de {slug}, así que no se ha detenido. Vuelve a detenerlo cuando termine el despliegue.",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "Ya hay una actualización en curso.",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "{hidden, plural, one {# contenedor} other {# contenedores}} en {w, plural, one {# worker inaccesible} other {# workers inaccesibles}} no {hidden, plural, =1 {se cuenta} one {se cuenta} other {se cuentan}} arriba. Siguen ejecutándose y generando ingresos mientras su worker está sin conexión. Simplemente, CashPilot no puede verlos ahora mismo.",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "Actualizaciones de imagen para {name}",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "Actualizaciones de imagen en {name}",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop actualiza sus propias apps.",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "Docker no está accesible ahora en este equipo, así que no se comprueban sus apps.",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "Sin conexión ahora.",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "Actualiza este worker para recibir actualizaciones de imagen.",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "App",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "Actualizaciones",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "De",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "Resultado",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "A",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "Cuándo",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "El contenedor de una app solo cambia cuando su registro de imágenes tiene una versión nueva. El contenedor nuevo debe funcionar durante {seconds, plural, one {# segundo} many {# segundos} other {# segundos}} sin fallar; si no, CashPilot vuelve a poner el anterior. Una versión que no supera esta comprobación no se vuelve a probar en ese equipo.",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "Todas las apps en todos los equipos",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "Lo que hicieron las actualizaciones",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "Comprobación diaria a las",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "Cómo funciona",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "Última comprobación diaria: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "No se pudieron cargar las actualizaciones: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "Cargando actualizaciones",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "Instala las compilaciones nuevas de las imágenes de tus apps, una app a la vez en cada equipo.",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "Actualizar automáticamente",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "Heredar",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "Solo notificar",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "Desactivado",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "Aún no se ha hecho ninguna comprobación diaria.",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "Aún no hay apps desplegadas.",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "Aún no hay equipos.",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "Nada todavía.",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "Las actualizaciones automáticas están desactivadas en esta instalación. Actívalas para recibir la compilación nueva de cada app una vez al día.",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "Activar actualizaciones automáticas",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "Opciones por equipo y por app",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "La opción propia de una app prevalece sobre la de su equipo, y la de un equipo prevalece sobre la de la flota.",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "Compilación nueva",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "Fallida",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "Requiere tu acción",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "Revertida",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "No instalada",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "Actualizada",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "Comprobar ahora",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "No se pudo iniciar la comprobación: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "Comprobando…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "No se pudo guardar: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "Ajustes de actualización guardados",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "Comprobación iniciada. Los resultados aparecen aquí a medida que responde cada equipo.",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "Actualizaciones de imagen de las apps",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "Este teléfono tiene una versión de CashPilot Android más antigua que la última publicada ({ref}). Instala el APK más reciente desde la página de versiones de GitHub.",

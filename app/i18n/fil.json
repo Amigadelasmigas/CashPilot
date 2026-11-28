@@ -2063,6 +2063,10 @@
     "text": " — nawala sa isang makina",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — update ng image",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — nawawala",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "{have} ang laman ng backup na ito, pero {want} ang iniingatan ng {slug}. Hindi ito backup ng {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "May tumatakbong pag-deploy ng {slug}, kaya hindi ito binasa para sa backup. Subukan ulit kapag tapos na ang pag-deploy.",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "parehong nasa {bind_mounts_env} ang {outer} at {inner}, at ang container na nagba-bind ng {outer} ay maaaring maglagay ng link kung nasaan ang {inner}. Isa lang sa mga ito ang itira sa {bind_mounts_env} sa .env sa tabi ng compose file mo, saka patakbuhin ang docker compose up -d",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "May tumatakbong pag-aalis ng {slug} sa makinang ito, kaya {action, select, start {hindi ito sinimulan} backup {hindi ito binasa para sa backup} other {walang na-deploy}}. Subukang muli kapag natapos na ito.",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "Tumatakbo pa ang pag-deploy ng {slug}, kaya hindi ito na-restart. I-restart ito kapag tapos na ang pag-deploy.",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "Hindi natapos ang isang restore ng {slug}, kaya maaaring kalahati lang ang naisulat sa data nito at {action, select, start {hindi ito sinimulan} backup {hindi ito binasa para sa backup} other {hindi ito na-deploy}}. Alisin ang serbisyo kasama ang data nito (iniaalok ito ng Alisin sa makinang ito, sa panel ng serbisyo sa dashboard), saka i-restore muli ang backup.",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "Nagsimula ang {name} bago natapos ang restore, kaya ibinalik ito",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "Tumatakbo pa ang isang deploy ng {slug}, kaya hindi ito nahinto. Ihinto itong muli kapag tapos na ang deploy.",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "May update nang tumatakbo.",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "Hindi kasama sa bilang sa itaas ang {hidden, plural, one {# container} other {# container}} sa {w, plural, one {# worker na hindi maabot} other {# worker na hindi maabot}}. Patuloy na tumatakbo at kumikita ang mga ito habang offline ang worker nila. Hindi lang makita ng CashPilot ang mga ito sa ngayon.",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "Mga update ng image para sa {name}",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "Mga update ng image sa {name}",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "Ang CashPilot Desktop mismo ang nag-a-update ng sarili nitong mga app.",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "Hindi maabot ang Docker sa makinang ito ngayon, kaya hindi sinusuri ang mga app nito.",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "Offline ngayon.",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "I-update ang worker na ito para makatanggap ng mga update ng image.",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "App",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "Mga update",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "Mula",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "Resulta",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "Papunta",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "Kailan",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "Nagbabago lang ang container ng isang app kapag may bagong build sa registry nito. Dapat tumakbo nang walang pagkabigo ang bagong container sa loob ng {seconds, plural, one {# segundo} other {# segundo}}, o ibabalik ng CashPilot ang dati. Ang build na hindi pumasa sa pagsusuring ito ay hindi na susubukan ulit sa makinang iyon.",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "Bawat app sa bawat makina",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "Ang ginawa ng mga update",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "Pang-araw-araw na pagsusuri sa",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "Paano ito gumagana",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "Huling pang-araw-araw na pagsusuri: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "Hindi ma-load ang mga update: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "Nilo-load ang mga update",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "Ini-install ang mga bagong build ng mga image ng iyong mga app, isang app sa bawat pagkakataon sa bawat makina.",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "Awtomatikong mag-update",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "Manahin",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "Abisuhan lang",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "Naka-off",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "Wala pang pang-araw-araw na pagsusuri.",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "Wala pang naka-deploy na app.",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "Wala pang makina.",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "Wala pa.",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "Naka-off ang mga awtomatikong update sa installation na ito. I-on ang mga ito para makuha ang bagong build ng bawat app minsan sa isang araw.",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "I-on ang mga awtomatikong update",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "Mga pagpili kada makina at kada app",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "Ang sariling pagpili ng isang app ang nananaig sa pagpili ng makina nito, at ang pagpili ng isang makina ang nananaig sa pagpili ng fleet.",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "Bagong build",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "Nabigo",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "Kailangan ka",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "Binawi",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "Hindi na-install",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "Na-update",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "Suriin ngayon",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "Hindi masimulan ang pagsusuri: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "Sinusuri…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "Hindi ma-save: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "Na-save ang mga setting ng update",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "Nagsimula ang pagsusuri. Lalabas dito ang mga resulta habang sumasagot ang bawat makina.",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "Mga update ng image ng app",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "Nasa mas lumang release ng CashPilot Android ang phone na ito kaysa sa pinakabagong na-publish ({ref}). I-install ang mas bagong APK mula sa page ng GitHub releases.",

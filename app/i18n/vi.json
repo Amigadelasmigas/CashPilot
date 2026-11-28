@@ -2063,6 +2063,10 @@
     "text": " — biến mất khỏi một máy",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — cập nhật image",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — bị thiếu",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "bản sao lưu này chứa {have}, nhưng {slug} lưu {want}. Đây không phải là bản sao lưu của {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "Một lượt triển khai {slug} đang chạy, nên dịch vụ này chưa được đọc để tạo bản sao lưu. Hãy thử lại sau khi lượt triển khai hoàn tất.",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "{outer} và {inner} đều có trong {bind_mounts_env}, và một container bind {outer} có thể đặt một liên kết tại vị trí của {inner}. Hãy chỉ giữ lại một trong hai mục đó trong {bind_mounts_env} ở file .env cạnh file compose của bạn, rồi chạy docker compose up -d",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "Một lần gỡ {slug} đang chạy trên máy này, nên {action, select, start {nó chưa được khởi động} backup {nó chưa được đọc để sao lưu} other {chưa có gì được triển khai}}. Hãy thử lại khi việc gỡ kết thúc.",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "Một lượt triển khai {slug} vẫn đang chạy, nên dịch vụ này chưa được khởi động lại. Hãy khởi động lại sau khi lượt triển khai hoàn tất.",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "Một lần khôi phục {slug} chưa hoàn tất, nên dữ liệu của nó có thể chỉ được ghi một nửa và {action, select, start {nó chưa được khởi động} backup {nó chưa được đọc để sao lưu} other {nó chưa được triển khai}}. Hãy gỡ dịch vụ cùng dữ liệu của nó (nút Gỡ khỏi máy này, trong bảng của dịch vụ trên bảng điều khiển, có lựa chọn đó), rồi khôi phục lại bản sao lưu.",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "{name} đã khởi động trước khi việc khôi phục hoàn tất, nên việc đó đã được hoàn tác",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "Một lượt triển khai {slug} vẫn đang chạy, nên nó chưa được dừng. Hãy dừng lại lần nữa khi lượt triển khai đã xong.",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "Một lần cập nhật đang chạy.",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "{hidden, plural, one {# container} other {# container}} trên {w, plural, one {# worker không truy cập được} other {# worker không truy cập được}} không được tính ở trên. Chúng vẫn tiếp tục chạy và kiếm tiền khi worker của chúng ngoại tuyến. Chỉ là CashPilot hiện không thấy được chúng.",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "Cập nhật image cho {name}",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "Cập nhật image trên {name}",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop tự cập nhật các ứng dụng của mình.",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "Hiện không kết nối được tới Docker trên máy này, nên các ứng dụng của máy không được kiểm tra.",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "Hiện đang ngoại tuyến.",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "Hãy cập nhật worker này để nhận các bản cập nhật image.",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "Ứng dụng",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "Cập nhật",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "Từ",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "Kết quả",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "Đến",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "Thời điểm",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "Container của một ứng dụng chỉ thay đổi khi registry của nó có bản build mới. Container mới phải chạy {seconds, plural, one {# giây} other {# giây}} mà không gặp lỗi, nếu không CashPilot sẽ đưa container cũ trở lại. Bản build nào không vượt qua bước kiểm tra này sẽ không được thử lại trên máy đó.",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "Mọi ứng dụng trên mọi máy",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "Những gì các bản cập nhật đã làm",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "Kiểm tra hằng ngày lúc",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "Cách hoạt động",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "Lần kiểm tra hằng ngày gần nhất: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "Không thể tải các bản cập nhật: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "Đang tải các bản cập nhật",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "Cài đặt các bản build mới của image ứng dụng, mỗi lần một ứng dụng trên mỗi máy.",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "Cập nhật tự động",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "Kế thừa",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "Chỉ thông báo",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "Tắt",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "Chưa có lần kiểm tra hằng ngày nào.",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "Chưa có ứng dụng nào được triển khai.",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "Chưa có máy nào.",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "Chưa có gì.",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "Cập nhật tự động đang tắt trên bản cài đặt này. Hãy bật lên để nhận bản build mới của từng ứng dụng mỗi ngày một lần.",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "Bật cập nhật tự động",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "Lựa chọn theo từng máy và từng ứng dụng",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "Lựa chọn riêng của một ứng dụng được ưu tiên hơn lựa chọn của máy chứa nó, và lựa chọn của máy được ưu tiên hơn lựa chọn của đội máy.",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "Có bản build mới",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "Thất bại",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "Cần bạn xử lý",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "Đã hoàn tác",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "Không cài đặt",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "Đã cập nhật",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "Kiểm tra ngay",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "Không thể bắt đầu kiểm tra: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "Đang kiểm tra…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "Không thể lưu: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "Đã lưu cài đặt cập nhật",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "Đã bắt đầu kiểm tra. Kết quả sẽ hiện ở đây khi từng máy phản hồi.",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "Cập nhật image ứng dụng",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "Điện thoại này đang dùng bản phát hành CashPilot Android cũ hơn bản mới nhất đã công bố ({ref}). Hãy cài APK mới hơn từ trang phát hành trên GitHub.",

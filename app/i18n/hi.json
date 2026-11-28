@@ -2063,6 +2063,10 @@
     "text": " — एक मशीन से ग़ायब",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — इमेज अपडेट",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — ग़ायब",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "इस बैकअप में {have} है, लेकिन {slug} {want} रखता है। यह {slug} का बैकअप नहीं है।",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "{slug} का एक डिप्लॉय चल रहा है, इसलिए बैकअप के लिए इसे पढ़ा नहीं गया। डिप्लॉय पूरा होने के बाद फिर से कोशिश करें।",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "{outer} और {inner} दोनों {bind_mounts_env} में हैं, और जो कंटेनर {outer} को बाइंड करता है, वह वहाँ एक लिंक रख सकता है जहाँ {inner} है। अपनी compose फ़ाइल के पास वाली .env में {bind_mounts_env} में इनमें से सिर्फ़ एक रखें, फिर docker compose up -d चलाएँ",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "इस मशीन पर {slug} को हटाने का काम चल रहा है, इसलिए {action, select, start {इसे शुरू नहीं किया गया} backup {इसे बैकअप के लिए नहीं पढ़ा गया} other {कुछ भी डिप्लॉय नहीं किया गया}}। उसके ख़त्म होने पर फिर से कोशिश करें।",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "{slug} का एक डिप्लॉय अभी भी चल रहा है, इसलिए इसे रीस्टार्ट नहीं किया गया। डिप्लॉय पूरा होने के बाद इसे रीस्टार्ट करें।",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "{slug} की एक पुनर्स्थापना पूरी नहीं हुई, इसलिए उसका डेटा आधा लिखा हो सकता है और {action, select, start {इसे शुरू नहीं किया गया} backup {इसे बैकअप के लिए नहीं पढ़ा गया} other {इसे डिप्लॉय नहीं किया गया}}। सेवा को उसके डेटा के साथ हटाएँ (सेवा के डैशबोर्ड पैनल में 'इस मशीन से हटाएँ' यह विकल्प देता है), फिर बैकअप को फिर से पुनर्स्थापित करें।",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "{name} पुनर्स्थापना पूरी होने से पहले शुरू हो गया, इसलिए पुनर्स्थापना वापस ले ली गई",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "{slug} का डिप्लॉय अभी चल रहा है, इसलिए इसे रोका नहीं गया। डिप्लॉय पूरा होने के बाद इसे फिर से रोकें।",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "एक अपडेट पहले से चल रहा है।",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "{w, plural, one {# पहुँच से बाहर वर्कर} other {# पहुँच से बाहर वर्करों}} पर {hidden, plural, one {# कंटेनर} other {# कंटेनर}} ऊपर नहीं {hidden, plural, =1 {गिना गया है} one {गिने गए हैं} other {गिने गए हैं}}। जब तक उनका वर्कर ऑफ़लाइन है, वे चलते और कमाते रहते हैं। CashPilot बस अभी उन्हें देख नहीं सकता।",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "{name} के लिए इमेज अपडेट",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "{name} पर इमेज अपडेट",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop अपने ऐप खुद अपडेट करता है।",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "इस मशीन पर अभी Docker तक पहुँचा नहीं जा सकता, इसलिए इसके ऐप्स की जाँच नहीं की जाती।",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "अभी ऑफ़लाइन है।",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "इमेज अपडेट पाने के लिए इस वर्कर को अपडेट करें।",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "ऐप",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "अपडेट",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "से",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "परिणाम",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "तक",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "कब",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "किसी ऐप का कंटेनर तभी बदलता है जब उसकी रजिस्ट्री में नया बिल्ड आता है। नए कंटेनर को बिना किसी विफलता के {seconds, plural, one {# सेकंड} other {# सेकंड}} तक चलना होगा, नहीं तो CashPilot पुराना कंटेनर वापस लगा देता है। जो बिल्ड इस जाँच में विफल होता है, उसे उस मशीन पर फिर से नहीं आज़माया जाता।",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "हर मशीन पर हर ऐप",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "अपडेट ने क्या किया",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "रोज़ाना जाँच का समय",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "यह कैसे काम करता है",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "पिछली रोज़ाना जाँच: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "अपडेट लोड नहीं हो सके: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "अपडेट लोड हो रहे हैं",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "आपके ऐप की इमेज के नए बिल्ड इंस्टॉल करता है, हर मशीन पर एक बार में एक ऐप।",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "स्वचालित रूप से अपडेट करें",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "इनहेरिट करें",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "केवल सूचना दें",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "बंद",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "अभी तक कोई दैनिक जाँच नहीं हुई।",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "अभी तक कोई ऐप डिप्लॉय नहीं किया गया।",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "अभी तक कोई मशीन नहीं।",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "अभी तक कुछ नहीं।",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "इस इंस्टॉल पर स्वचालित अपडेट बंद हैं। हर ऐप का नया बिल्ड दिन में एक बार पाने के लिए इन्हें चालू करें।",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "स्वचालित अपडेट चालू करें",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "हर मशीन और हर ऐप के लिए विकल्प",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "किसी ऐप का अपना विकल्प उसकी मशीन के विकल्प से ऊपर होता है, और मशीन का विकल्प फ़्लीट के विकल्प से ऊपर होता है।",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "नया बिल्ड",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "विफल",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "आपकी ज़रूरत है",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "पूर्ववत किया गया",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "इंस्टॉल नहीं किया गया",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "अपडेट किया गया",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "अभी जाँचें",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "जाँच शुरू नहीं हो सकी: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "जाँच हो रही है…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "सहेजा नहीं जा सका: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "अपडेट सेटिंग सहेजी गईं",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "जाँच शुरू हो गई। हर मशीन के जवाब देने पर परिणाम यहाँ दिखेंगे।",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "ऐप इमेज अपडेट",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "यह फ़ोन CashPilot Android की सबसे नई प्रकाशित रिलीज़ ({ref}) से पुरानी रिलीज़ पर है। GitHub releases पेज से नया APK इंस्टॉल करें।",

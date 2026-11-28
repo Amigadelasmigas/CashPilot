@@ -40,7 +40,7 @@ from docker.errors import APIError, DockerException
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel, SecretStr, StrictBool, ValidationError
+from pydantic import BaseModel, Field, SecretStr, StrictBool, ValidationError
 
 from app import (
     activity,
@@ -844,6 +844,10 @@ async def _send_heartbeat() -> None:
     # Every deploy this worker runs ends by DEPLOY_DEADLINE_SECONDS, so the UI
     # may let go of the ids of one it got no answer for (main._settle_pending_identities).
     features.extend(("deploy_deadline", "expected_container"))
+    if docker_ok:
+        # Takes POST /api/containers/{slug}/image-check and settle_seconds on a
+        # deploy, so the UI can update an earner's image (app/image_updates.py).
+        features.append("image_updates")
     # Keeps a catalog seed_file wallet in the node's own volume, never in its
     # env, and makes or takes one on deploy (app/wallet_seed.py). The UI sends
     # a new seed-file deploy to no other worker.
@@ -1712,6 +1716,13 @@ class DeploySpec(BaseModel):
     # wallet this deploy wants. The phrase rides only here, never in env, and
     # this worker writes it into the node's own volume (app/wallet_seed.py).
     wallet_seed: WalletSeedSpec | None = None
+    # An image update from the UI (app/image_updates.py): the replacement must
+    # stay healthy this long before the previous container goes, or it is
+    # undone (orchestrator.deploy_raw). 0 is a plain deploy.
+    settle_seconds: int = Field(default=0, ge=0, le=600)
+    # With settle_seconds: the build the UI's check found. A tag that moved
+    # again since is refused, so the build undone and held is the one checked.
+    expect_image: str = Field(default="", pattern=r"^(sha256:[0-9a-f]{64})?$")
 
 
 class CheckedDeploySpec(DeploySpec):
@@ -2919,6 +2930,7 @@ async def _deploy_container(request: Request, slug: str, spec: CheckedDeploySpec
     kept_mounts: list[dict[str, str]] = []
     replaced: dict[str, str] = {}
     wallet: dict[str, Any] = {}
+    image_update: dict[str, str] = {}
     try:
         container_id = await asyncio.to_thread(
             _deploy_direct,
@@ -2948,9 +2960,14 @@ async def _deploy_container(request: Request, slug: str, spec: CheckedDeploySpec
             deadline=deadline,
             wallet_seed=spec.wallet_seed.model_dump() if spec.wallet_seed else None,
             wallet=wallet,
+            settle_seconds=spec.settle_seconds,
+            image_update=image_update,
+            expect_image=spec.expect_image if spec.settle_seconds else "",
         )
         await asyncio.to_thread(lan_fence.refresh_outside)
         response: dict[str, Any] = {"status": "deployed", "container_id": container_id}
+        if image_update:
+            response["image_update"] = image_update
         if wallet:
             # The phrase only when this deploy made the wallet: the UI shows it
             # once and keeps nothing (app/wallet_seed.py).
@@ -2990,11 +3007,27 @@ async def _deploy_container(request: Request, slug: str, spec: CheckedDeploySpec
         # offer the way out; the message never holds a phrase.
         logger.warning("Deploy of %s refused: %s", slug, exc.code)
         raise HTTPException(status_code=exc.status_code, detail={"error": exc.code, "message": str(exc)}) from None
+    except orchestrator.ImageUpdateFailed as exc:
+        # The new image did not stay healthy and was undone. The UI holds that
+        # build back (app/image_updates.py), unless Docker never described it.
+        # A previous container that is not back as it was needs the owner.
+        if not exc.restored:
+            # Held only when the build was judged bad (image_updates.update_service).
+            error = "image_update_restore_failed" if exc.verified else "image_update_restore_failed_unverified"
+        elif not exc.verified:
+            error = "image_update_unverified"
+        else:
+            error = "image_update_rolled_back"
+        # The UI keeps it in the update history: no login or signed query in it.
+        raise HTTPException(
+            status_code=409, detail={"error": error, "message": log_redaction.redact_urls(str(exc))}
+        ) from None
     except orchestrator.ContainerRuntimeError as exc:
         # Same shape as the network setting; 503 when the daemon could not be
         # asked at all. Mostly raised before the old container was touched; a
         # deadline passed after its stop puts it back and starts it again.
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
+        # A failed pull quotes the registry's address, which can hold a login.
+        raise HTTPException(status_code=exc.status_code, detail=log_redaction.redact_urls(str(exc))) from None
     except APIError as exc:
         refusal = orchestrator.proxy_refusal(exc)
         if refusal:
@@ -3006,7 +3039,7 @@ async def _deploy_container(request: Request, slug: str, spec: CheckedDeploySpec
         # what the operator needs, so it goes back as a 409 the UI shows, on one
         # line and capped, instead of the bare 500 below.
         logger.warning("Deploy of %s refused by Docker: %s", slug, exc)
-        reason = " ".join(str(exc.explanation or exc).split())[:300]
+        reason = " ".join(log_redaction.redact_urls(str(exc.explanation or exc)).split())[:300]
         raise HTTPException(status_code=409, detail=t("worker.docker_refused_container", reason=reason)) from None
     except HTTPException:
         raise
@@ -3057,6 +3090,30 @@ async def api_wallet_seed(request: Request, slug: str) -> JSONResponse:
     return JSONResponse({"phrase": phrase}, headers={"Cache-Control": "no-store"})
 
 
+@app.post("/api/containers/{slug}/image-check")
+async def api_image_check(request: Request, slug: str) -> dict[str, Any]:
+    """Pull the tag this service's copies run and say whether it moved (orchestrator.check_image).
+
+    POST because it pulls. It changes no container: the UI decides whether to
+    update (app/image_updates.py) and does it with a deploy.
+    """
+    _verify_api_key(request)
+    try:
+        return await asyncio.to_thread(orchestrator.check_image, slug)
+    except orchestrator.ContainerNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from None
+    except orchestrator.ContainerRuntimeError as exc:
+        # A pull error can quote a registry or proxy address with its login, or
+        # a signed URL with its credential in the query.
+        detail = log_redaction.redact_urls(str(exc))[:400]
+        # Structured, so the UI forwards the reason even for a 502 (main._safe_worker_detail).
+        raise HTTPException(
+            status_code=exc.status_code, detail={"error": "image_check_failed", "message": detail}
+        ) from None
+    except (DockerException, requests.exceptions.RequestException):
+        raise HTTPException(status_code=503, detail="The worker's Docker daemon did not answer.") from None
+
+
 @app.post("/api/containers/{slug}/restart")
 async def api_restart_container(request: Request, slug: str, instance: int = 1) -> dict[str, str]:
     _verify_api_key(request)
@@ -3086,6 +3143,9 @@ async def api_stop_container(request: Request, slug: str, instance: int = 1) -> 
         return {"status": "stopped"}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    except orchestrator.ContainerRuntimeError as exc:
+        # A deploy of it held the route lock too long (orchestrator.stop_service).
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
