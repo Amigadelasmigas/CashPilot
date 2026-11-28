@@ -32,15 +32,25 @@ function makePage() {
       if (sel === '[data-updates-load-error]') return html.includes('data-updates-load-error') ? root.errorLine : null;
       if (sel === 'details.add-worker') return html.includes('add-worker') ? root.details : null;
       if (sel === '[data-updates-service="honeygain"]') return html ? root.select : null;
+      if (sel === '#updates-overrides') return html.includes('id="updates-overrides"') ? root.summary : null;
+      if (sel === '[data-updates-action="run"]') return html ? root.runBtn : null;
+      if (sel === '[data-updates-action="save"]') return html ? root.saveBtn : null;
       return null;
     },
   };
   // Count each time the controls are drawn.
   let html = '';
+  const control = (attrs, extra = {}) => {
+    const el = {focused: false, getAttribute: (a) => (a in attrs ? attrs[a] : null), ...extra};
+    el.focus = () => { if (!el.disabled) { el.focused = true; doc.activeElement = el; } };
+    return el;
+  };
   const fresh = () => {
     root.details = {open: false};
-    root.select = {focused: false, getAttribute: (a) => (a === 'data-updates-service' ? 'honeygain' : null)};
-    root.select.focus = () => { root.select.focused = true; doc.activeElement = root.select; };
+    root.select = control({'data-updates-service': 'honeygain'});
+    root.summary = control({}, {id: 'updates-overrides'});
+    root.runBtn = control({'data-updates-action': 'run'}, {disabled: html.includes('data-updates-action="run" disabled')});
+    root.saveBtn = control({'data-updates-action': 'save'});
   };
   Object.defineProperty(root, 'innerHTML', {
     get: () => html,
@@ -91,6 +101,8 @@ function makePage() {
     open: () => pending.length,
     // The owner opens the overrides and puts the focus on an app's select, changing nothing.
     browse: () => { root.details.open = true; doc.activeElement = root.select; },
+    // The keyboard is on this control, as the owner left it.
+    focusOn: (el) => { doc.activeElement = el; },
     data,
   };
 }
@@ -129,15 +141,23 @@ await p.answer({});
 await p.answer();
 check('once every change is saved, the reload draws the controls', p.root.renders === 2, `drawn ${p.root.renders} times`);
 
-// 4. Check now keeps a change that is not saved.
+// 4. Check now runs the saved choices, so it saves what the page shows first.
 p = makePage();
 await p.answer();
 p.change();
 p.click('run');
-check('Check now posts the run', p.calls.at(-1).url === '/api/image-updates/run', `sent ${p.calls.at(-1).url}`);
-await p.answer({status: 'started'});
+check('Check now saves a change first', p.calls.at(-1).method === 'PUT', `sent ${p.calls.at(-1).method} ${p.calls.at(-1).url}`);
+await p.answer({});
 await p.answer();
-check('Check now keeps a change that is not saved', p.root.renders === 1, `drawn ${p.root.renders} times`);
+check('Check now posts the run once the save is done', p.calls.at(-1).url === '/api/image-updates/run', `sent ${p.calls.at(-1).url}`);
+// A save that fails runs nothing: the run would not do what the page shows.
+p = makePage();
+await p.answer();
+p.change();
+p.click('run');
+await p.fail('the dashboard did not answer');
+await p.answer().catch(() => {});
+check('Check now after a failed save runs nothing', !p.calls.some((c) => c.url === '/api/image-updates/run'), JSON.stringify(p.calls));
 
 // 5. A positive control: with no change, Check now's reload draws again.
 p = makePage();
@@ -207,8 +227,8 @@ check('a change made after a queued save stays unsaved', p.root.renders === 1, `
 // 7. A reload that fails keeps the controls and a change not saved, and says so.
 p = makePage();
 await p.answer();
-p.change();
 p.click('run');
+p.change();
 await p.answer({status: 'started'});
 await p.fail('the dashboard did not answer');
 check('a failed reload keeps the controls', p.root.renders === 1, `drawn ${p.root.renders} times`);
@@ -222,6 +242,18 @@ await p.answer();
 check('a refresh draws the controls again', p.root.renders === 2, `drawn ${p.root.renders} times`);
 check('a refresh keeps the overrides open', p.root.details.open === true, JSON.stringify(p.root.details));
 check('a refresh keeps the focus on the same control', p.root.select.focused === true, JSON.stringify(p.root.select));
+p = makePage();
+await p.answer();
+p.focusOn(p.root.summary);
+p.tick();
+await p.answer();
+check('a refresh keeps the focus on the overrides summary', p.root.summary.focused === true, JSON.stringify(p.root.summary));
+p = makePage();
+await p.answer();
+p.focusOn(p.root.runBtn);
+p.tick();
+await p.answer({...p.data, running: true});
+check('focus on Check now drawn disabled goes to Save', p.root.saveBtn.focused === true, JSON.stringify(p.root.saveBtn));
 // 5b. Enable sets the fleet choice on the page too: a change made while its
 // save waits, saved after it, sends auto, never the off the page showed.
 p = makePage();
@@ -234,6 +266,16 @@ await p.answer({});
 await p.answer({...p.data, settings: {...p.data.settings, mode: 'auto'}});
 p.click('save');
 check('a save after Enable keeps auto', p.calls.at(-1).body.mode === 'auto', JSON.stringify(p.calls.at(-1).body));
+// 5c. Each box note names its own reason: offline, no Docker, or too old.
+p = makePage();
+await p.answer({...p.data, workers: [
+  {id: 1, name: 'off', online: false, desktop: false, supported: true, docker: true},
+  {id: 2, name: 'nodock', online: true, desktop: false, supported: false, docker: false},
+  {id: 3, name: 'old', online: true, desktop: false, supported: false, docker: true},
+]});
+check('an offline box that would be skipped says so', p.root.innerHTML.includes(t('fleet.updates.box.offline')), p.root.innerHTML);
+check('a box without Docker is not told to update', p.root.innerHTML.includes(t('fleet.updates.box.no_docker')), p.root.innerHTML);
+check('an old worker is told to update', p.root.innerHTML.split(t('fleet.updates.box.too_old')).length === 2, p.root.innerHTML);
 p = makePage();
 await p.fail('the dashboard did not answer');
 check('a first load that fails says so in place of the controls', p.root.innerHTML.includes('did not answer'), p.root.innerHTML);

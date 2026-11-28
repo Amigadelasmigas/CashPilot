@@ -55,7 +55,11 @@
 
   function boxNote(w) {
     if (w.desktop) return t('fleet.updates.box.desktop');
-    if (!w.supported) return w.online ? t('fleet.updates.box.too_old') : t('fleet.updates.box.offline');
+    // Each reason on its own: an offline box is skipped whatever it runs, and a
+    // box without Docker drops the image update feature from its heartbeat.
+    if (!w.online) return t('fleet.updates.box.offline');
+    if (w.docker === false) return t('fleet.updates.box.no_docker');
+    if (!w.supported) return t('fleet.updates.box.too_old');
     return '';
   }
 
@@ -76,7 +80,9 @@
     return () => {
       const again = open && root.querySelector('details.add-worker');
       if (again) again.open = true;
-      const el = focus && root.querySelector(focus);
+      let el = focus && root.querySelector(focus);
+      // A button drawn disabled (Check now while the run goes) takes no focus: Save does.
+      if (el && el.disabled) el = root.querySelector('[data-updates-action="save"]');
       if (el && el.focus) el.focus();
     };
   }
@@ -123,7 +129,7 @@
       </div>
       <p class="muted">${esc(t('fleet.updates.explain', { seconds: state.settle_seconds }))}</p>
       <details class="add-worker">
-        <summary>${esc(t('fleet.updates.overrides'))}</summary>
+        <summary id="updates-overrides">${esc(t('fleet.updates.overrides'))}</summary>
         <div class="add-worker-body">
           <div class="table-scroll"><table class="fleet-table">
             <thead><tr><th>${esc(t('fleet.col.box'))}</th><th>${esc(t('fleet.updates.col.choice'))}</th><th></th></tr></thead>
@@ -221,6 +227,12 @@
   }
 
   async function runNow() {
+    // The run reads the saved choices: what the page shows is saved first, so
+    // the run never does what the page says it will not.
+    if (unsaved()) {
+      await save();
+      if (unsaved()) return;
+    }
     try {
       await CP.api('/api/image-updates/run', { method: 'POST' });
       CP.toast(t('fleet.updates.started'), 'success');

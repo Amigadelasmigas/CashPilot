@@ -12196,11 +12196,13 @@ async def api_collector_alerts(request: Request) -> dict[str, Any]:
     """
     user = _require_auth_api(request)
     # Activity alerts name a box's LAN probing; the Activity page is owner
-    # only, so its alerts are too.
+    # only, so its alerts are too. So are image updates: the Fleet page shows
+    # them to the owner only, and only the owner can act on one.
     owner = auth.require_role(user, "owner")
     sanitized: list[dict[str, Any]] = []
     for alert in _collector_alerts:
-        if not owner and str(alert.get("kind", "")).startswith("activity_"):
+        kind = str(alert.get("kind", ""))
+        if not owner and (kind.startswith("activity_") or kind == "image_update"):
             continue
         error_msg = alert.get("error", "")
         clean = error_msg[:_MAX_ALERT_ERROR_LEN]
@@ -13877,6 +13879,8 @@ _image_update_unanswered: dict[int, dict[str, str]] = {}
 #: Config key of the bell rows a later check answered: "<worker id>|<slug>" ->
 #: the row id. It keeps a cleared row out of the bell after a restart too.
 _IMAGE_UPDATE_CLEARED_KEY = "image_updates_cleared"
+#: The row each bell entry last pushed, by "worker|slug", so a row is pushed once, not once a day.
+_IMAGE_UPDATE_PUSHED_KEY = "image_updates_pushed"
 #: The bell's entries, keyed "<worker id>|<slug>": a build that failed and was
 #: undone, a deploy that failed, or a new build waiting for the owner.
 _image_update_bell: dict[str, dict[str, Any]] = {}
@@ -14113,9 +14117,14 @@ async def _image_update_mode_now(worker_id: int, slug: str) -> str:
 def _image_update_alert_text(row: dict[str, Any], worker_name: str) -> str:
     detail = str(row.get("detail") or "").strip()
     if row["result"] == image_updates.RESTORE_FAILED:
+        if not row.get("new_image"):
+            # Nobody judged the new build (image_update_restore_failed_unverified).
+            return (
+                f"An update on {worker_name} left the old container stopped. Start it from the dashboard. {detail}"
+            ).strip()
         return (
             f"A new build failed on {worker_name}, and the old container did not start again. "
-            f"Start it from the Fleet page. {detail}"
+            f"Start it from the dashboard. {detail}"
         ).strip()
     if row["result"] == image_updates.ROLLED_BACK:
         return f"On {worker_name}: {detail}" if detail else f"A new build failed on {worker_name} and was undone."
@@ -14123,7 +14132,7 @@ def _image_update_alert_text(row: dict[str, Any], worker_name: str) -> str:
         return f"The update on {worker_name} did not go through. {detail}".strip()
     if row["result"] == image_updates.SKIPPED:
         return f"A new build is out, but it was not installed on {worker_name}: {detail}."
-    return f"A new build is out for {worker_name}. Update it from the Fleet page."
+    return f"A new build is out for {worker_name}. Redeploy it from the dashboard to install it."
 
 
 @i18n.owner_text
@@ -14148,12 +14157,24 @@ async def _refresh_image_update_bell(outcomes: dict[int, dict[str, str]] | None 
                 cleared = {}
             if not isinstance(cleared, dict):
                 cleared = {}
+            try:
+                pushed = json.loads(await database.get_config(_IMAGE_UPDATE_PUSHED_KEY) or "{}")
+            except ValueError:
+                pushed = {}
+            if not isinstance(pushed, dict):
+                pushed = {}
             names = {w["id"]: str(w.get("name") or w["id"]) for w in await database.list_workers()}
             custom_names = {row["slug"]: row["definition"].get("name") for row in await database.list_custom_services()}
             settings = await _image_update_settings()
             newest: dict[tuple[int, str], dict[str, Any]] = {}
             for row in rows:
                 newest.setdefault((row["worker_id"], row["slug"]), row)
+            # A row stays pushed while it is the newest, even while Off hides it.
+            pushed_now: dict[str, int] = {
+                f"{wid}|{slug}": row["id"]
+                for (wid, slug), row in newest.items()
+                if pushed.get(f"{wid}|{slug}") == row["id"]
+            }
             bell: dict[str, dict[str, Any]] = {}
             answered: dict[str, int] = {}
             for (wid, slug), row in newest.items():
@@ -14162,7 +14183,11 @@ async def _refresh_image_update_bell(outcomes: dict[int, dict[str, str]] | None 
                 # A check that found the box up to date (or updated it) answers the older row,
                 # and it stays answered across a restart. A check that sees the build
                 # again (the tag went back and forth) opens it again.
-                if outcome in ("current", "updated", "pinned", "off") or (
+                # A held build answers its own undo: the check saw the old build back.
+                # A restore failure is held only once every copy runs again
+                # (image_updates.update_service answers needs_owner before that).
+                # Off is no answer: the Off filter below hides the entry while it lasts.
+                if outcome in ("current", "updated", "pinned", "held") or (
                     cleared.get(key) == row["id"] and outcome not in ("available", "skipped")
                 ):
                     answered[key] = row["id"]
@@ -14178,7 +14203,11 @@ async def _refresh_image_update_bell(outcomes: dict[int, dict[str, str]] | None 
                 if row["result"] in (image_updates.AVAILABLE, image_updates.SKIPPED):
                     entry["category"] = "notice"
                 bell[key] = entry
-                if row["result"] in (*image_updates.HOLDS, image_updates.FAILED) and (
+                if row["result"] not in (*image_updates.HOLDS, image_updates.FAILED):
+                    continue
+                pushed_now[key] = row["id"]
+                # Pushed once per row, not each time the alert cooldown runs out.
+                if pushed.get(key) != row["id"] and (
                     alert_id := await database.record_alert("image_update", key, text)
                 ):
                     what = {
@@ -14188,6 +14217,8 @@ async def _refresh_image_update_bell(outcomes: dict[int, dict[str, str]] | None 
                     _spawn(_push_alert("image_update", key, f"{name}: {what}", text, alert_id))
             if answered != cleared:
                 await database.set_config(_IMAGE_UPDATE_CLEARED_KEY, json.dumps(answered, sort_keys=True))
+            if pushed_now != pushed:
+                await database.set_config(_IMAGE_UPDATE_PUSHED_KEY, json.dumps(pushed_now, sort_keys=True))
             _image_update_bell.clear()
             _image_update_bell.update(bell)
             _image_update_bell_loaded = True
@@ -14286,6 +14317,9 @@ async def api_image_updates(response: Response, _auth: dict[str, Any] = Depends(
                 "online": w.get("status") == "online",
                 "desktop": placement.is_desktop(info),
                 "supported": targets is not None,
+                # A current worker drops the feature while it cannot reach Docker:
+                # that box needs Docker back, not a newer worker.
+                "docker": info.get("docker_available") is not False,
             }
         )
         for slug in targets or []:

@@ -687,6 +687,87 @@ class TestCheckPeriod:
         assert restart_wait == stop_wait
         assert restart_wait > orchestrator._stop_wait_seconds("honeygain") + orchestrator._get_stop_timeout("honeygain")
 
+    def test_a_failure_line_the_old_build_logged_too_does_not_fail_the_new_one(self, markers, fast, monkeypatch):
+        # storj logs a dial-back failure for days when the box's address is wrong:
+        # every build logs it, so the new one is not blamed for it.
+        signal = {"pattern": "failed to dial storage node", "state": "failing", "means": "no dial-back"}
+        monkeypatch.setattr(orchestrator, "get_service", lambda slug: {"docker": {"health_signals": [signal]}})
+        line = b"ping satellite failed to dial storage node\n"
+        old, docker = _docker()
+        old.logs.return_value = line
+        docker.created.logs.return_value = line
+        _deploy(docker, old, settle_seconds=0.01)
+        assert old.removed and docker.get("cashpilot-honeygain") is docker.created
+        assert old.logs.call_args.kwargs["tail"] == orchestrator._SIGNALS_ALREADY_LINES
+        # Control: a line the old build never logged fails the new one.
+        old, docker = _docker()
+        old.logs.return_value = b"all fine\n"
+        docker.created.logs.return_value = line
+        with pytest.raises(orchestrator.ImageUpdateFailed) as failed:
+            _deploy(docker, old, settle_seconds=0.01)
+        assert failed.value.verified is True and docker.get("cashpilot-honeygain") is old
+
+    def test_an_undone_replacement_gets_a_clean_stop_before_it_is_removed(self, markers, fast, monkeypatch):
+        signal = {"pattern": "fatal", "state": "failing"}
+        monkeypatch.setattr(orchestrator, "get_service", lambda slug: {"docker": {"health_signals": [signal]}})
+        old, docker = _docker()
+        docker.created.logs.return_value = b"fatal\n"
+        with pytest.raises(orchestrator.ImageUpdateFailed):
+            _deploy(docker, old, settle_seconds=0.01)
+        steps = [(name, kwargs) for name, _, kwargs in docker.created.mock_calls if name in ("stop", "remove")]
+        assert steps == [
+            ("stop", {"timeout": orchestrator._get_stop_timeout("honeygain")}),
+            ("remove", {"force": True}),
+        ]
+        assert docker.created.removed and docker.get("cashpilot-honeygain") is old
+
+    def test_a_replacement_a_backup_paused_is_undone_unjudged(self, markers, fast, monkeypatch):
+        # A backup pauses the container while it reads its volumes: not a stop of the build.
+        monkeypatch.setattr(orchestrator, "_SETTLE_GRACE_SECONDS", 0.05)
+        old, docker = _docker("paused", State={"Status": "paused", "Paused": True})
+        with pytest.raises(orchestrator.ImageUpdateFailed) as failed:
+            _deploy(docker, old, settle_seconds=0.01)
+        assert failed.value.verified is False and docker.get("cashpilot-honeygain") is old
+
+    def test_a_stop_while_the_lan_fence_is_broken_is_not_held(self, monkeypatch):
+        # The fence guard stops every gated node while the fence is broken.
+        container = MagicMock(status="exited")
+        container.attrs = {"State": {"Status": "exited", "ExitCode": 0}}
+        monkeypatch.setattr(orchestrator, "fence_gated", lambda slug: True)
+        monkeypatch.setattr(orchestrator, "_get_client", lambda: MagicMock())
+        for problem, verified in (("the host firewall dropped the rules", False), (None, True)):
+            with (
+                patch("app.lan_fence.fence_problem", return_value=problem),
+                pytest.raises(orchestrator.ImageUpdateFailed) as failed,
+            ):
+                orchestrator._settle(container, "mysterium", 0.01, 0, "cashpilot-mysterium")
+            assert failed.value.verified is verified, problem
+
+    def test_a_backup_during_a_deploy_is_refused_and_pauses_nothing(self, monkeypatch):
+        import threading
+
+        container = MagicMock(status="running")
+        monkeypatch.setattr(orchestrator, "_critical_volume_targets", lambda slug: ["/data"])
+        monkeypatch.setattr(orchestrator, "_find_container", lambda slug, instance=1: container)
+        holding, release = threading.Event(), threading.Event()
+
+        def deploy():
+            with orchestrator.route_gate.deploying("storj"):
+                holding.set()
+                release.wait(5)
+
+        deployer = threading.Thread(target=deploy)
+        deployer.start()
+        assert holding.wait(5)
+        try:
+            with pytest.raises(orchestrator.ContainerRuntimeError) as refused:
+                orchestrator.read_critical_state("storj")
+        finally:
+            release.set()
+            deployer.join()
+        assert refused.value.status_code == 409 and "not read for a backup" in str(refused.value)
+        container.pause.assert_not_called()
+
 
 class TestRepoDigest:
     def test_only_the_checked_repository_s_digest_is_named(self):
@@ -1147,6 +1228,24 @@ class TestDecisions:
         assert await image_updates.flush_all(hooks) == 2
         assert [r[0] for r in state.rows] == [image_updates.RESTORE_FAILED, image_updates.UPDATED]
 
+    @pytest.mark.parametrize("mode", [image_updates.NOTIFY, image_updates.AUTO])
+    async def test_an_app_an_update_left_down_keeps_its_needs_you_row(self, mode):
+        # Nobody judged the build, so it is not held; the app is still down the next day.
+        state = _Hooks(_answer(status="exited"))
+        state.rows.append((image_updates.RESTORE_FAILED, {"new_image": ""}))
+        assert await _run(state, mode) == "needs_owner"
+        assert [r for r, _ in state.rows] == [image_updates.RESTORE_FAILED] and not state.deploys
+        # Waiting to be saved counts the same.
+        state = _Hooks(_answer(status="exited"))
+        image_updates._unsaved_rows[(1, "honeygain", "", image_updates.RESTORE_FAILED, 0)] = {"new_image": ""}
+        hooks = state.hooks()
+        hooks.record = AsyncMock(side_effect=RuntimeError("database is locked"))
+        assert await image_updates.update_service(hooks, 1, "honeygain", mode) == "needs_owner"
+        # Control: once the owner started it, the check goes on.
+        state = _Hooks(_answer())
+        state.rows.append((image_updates.RESTORE_FAILED, {"new_image": ""}))
+        assert await _run(state, mode) in ("available", "updated")
+
     async def test_an_app_turned_off_during_the_run_is_not_checked(self):
         state = _Hooks(_answer(running="sha256:new"))
         hooks = state.hooks()
@@ -1497,9 +1596,11 @@ class TestTheDashboardSide:
 
         old = {"id": 1, "status": "online", "system_info": json.dumps({"features": []}), "containers": "[]"}
         new = {**old, "id": 2, "system_info": json.dumps({"features": [image_updates.FEATURE]})}
+        # A current worker that cannot reach Docker sends no features either.
+        nodock = {**old, "id": 3, "system_info": json.dumps({"features": [], "docker_available": False})}
         assert main._image_update_targets(old) is None and main._image_update_targets(new) == []
         with (
-            patch.object(main.database, "list_workers", AsyncMock(return_value=[old, new])),
+            patch.object(main.database, "list_workers", AsyncMock(return_value=[old, new, nodock])),
             patch.object(main.database, "list_custom_services", AsyncMock(return_value=[])),
             patch.object(main.database, "list_image_updates", AsyncMock(return_value=[])),
             patch.object(main, "_image_update_settings", AsyncMock(return_value=image_updates.parse_settings({}))),
@@ -1507,7 +1608,12 @@ class TestTheDashboardSide:
             response = main.Response()
             page = await main.api_image_updates(response, _auth={"r": "owner"})
         assert response.headers["Cache-Control"] == "no-store"
-        assert [(w["id"], w["supported"], w["online"]) for w in page["workers"]] == [(1, False, True), (2, True, True)]
+        assert [(w["id"], w["supported"], w["online"]) for w in page["workers"]] == [
+            (1, False, True),
+            (2, True, True),
+            (3, False, True),
+        ]
+        assert [w["docker"] for w in page["workers"]] == [True, True, False]
         # The Fleet page names the reason for that box.
         from pathlib import Path
 
@@ -1841,6 +1947,78 @@ class TestTheDashboardSide:
         assert pushed and "needs you" in push.call_args.args[2]
         # Held like an undone build, and never pruned.
         assert await database.image_update_seen(1, "honeygain", "sha256:b", image_updates.HOLDS)
+
+    async def test_a_held_build_answers_its_undo_and_off_does_not(self, db):
+        from app import main
+
+        await database.init_db()
+        await database.record_image_update(1, "honeygain", "rolled_back", new_image="sha256:b", detail="undone")
+        workers = AsyncMock(return_value=[{"id": 1, "name": "alpha"}])
+        with (
+            patch.object(main.database, "list_workers", workers),
+            patch.object(main, "_collector_alerts", []),
+            patch.object(main, "_spawn", lambda coro: coro.close()),
+            patch.object(main, "_push_alert", MagicMock(side_effect=lambda *a: asyncio.sleep(0))),
+        ):
+            # Off for a run does not answer it: the entry comes back with the app.
+            await main._refresh_image_update_bell({1: {"honeygain": "off"}})
+            await main._refresh_image_update_bell()
+            assert "1|honeygain" in main._image_update_bell
+            # The next check saw the old build back and the new one held: answered.
+            await main._refresh_image_update_bell({1: {"honeygain": "held"}})
+            assert "1|honeygain" not in main._image_update_bell
+            await main._refresh_image_update_bell()
+            assert "1|honeygain" not in main._image_update_bell
+
+    async def test_a_held_row_is_pushed_once_not_once_a_day(self, db):
+        from app import main
+
+        await database.init_db()
+        await database.record_image_update(1, "honeygain", "restore_failed", new_image="sha256:b", detail="x")
+        workers = AsyncMock(return_value=[{"id": 1, "name": "alpha"}])
+        alert = AsyncMock(return_value=7)
+        with (
+            patch.object(main.database, "list_workers", workers),
+            patch.object(main.database, "record_alert", alert),
+            patch.object(main, "_collector_alerts", []),
+            patch.object(main, "_spawn", lambda coro: coro.close()),
+            patch.object(main, "_push_alert", MagicMock(side_effect=lambda *a: asyncio.sleep(0))),
+        ):
+            for _ in range(3):
+                await main._refresh_image_update_bell()
+            assert alert.await_count == 1
+            # A newer row of the same app is pushed in its turn.
+            await database.record_image_update(1, "honeygain", "rolled_back", new_image="sha256:c", detail="y")
+            await main._refresh_image_update_bell()
+            assert alert.await_count == 2
+
+    def test_the_bell_texts_name_the_dashboard_and_what_happened(self):
+        from app import main
+
+        unjudged = main._image_update_alert_text({"result": "restore_failed", "new_image": "", "detail": ""}, "alpha")
+        judged = main._image_update_alert_text({"result": "restore_failed", "new_image": "sha256:b"}, "alpha")
+        notice = main._image_update_alert_text({"result": "available", "new_image": "sha256:b"}, "alpha")
+        assert unjudged.startswith("An update on alpha left the old container stopped")
+        assert judged.startswith("A new build failed on alpha")
+        assert all("dashboard" in text and "Fleet page" not in text for text in (unjudged, judged, notice))
+
+    def test_viewers_get_no_image_update_entry(self):
+        from app import main
+
+        alerts = [
+            {"kind": "collector", "platform": "honeygain", "error": "login failed"},
+            {"kind": "image_update", "platform": "Honeygain", "error": "A new build is out"},
+        ]
+
+        async def call(role):
+            with (
+                patch.object(main, "_collector_alerts", alerts),
+                patch("app.auth.get_current_user", return_value={"uid": 1, "u": "x", "r": role}),
+            ):
+                return await main.api_collector_alerts(MagicMock())
+
+        assert [a["kind"] for a in asyncio.run(call("viewer"))["alerts"]] == ["collector"]
+        assert [a["kind"] for a in asyncio.run(call("owner"))["alerts"]] == ["collector", "image_update"]
 
     async def test_a_needs_you_row_stays_in_the_bell_under_long_newer_history(self, db):
         import sqlite3

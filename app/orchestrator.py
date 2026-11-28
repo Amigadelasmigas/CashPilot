@@ -1497,6 +1497,7 @@ def deploy_raw(
     # one goes back as it was (_roll_back).
     replaced = None
     replaced_running = False
+    already: frozenset[str] = frozenset()
     identity_before = _identity_snapshot(name)
     held_before = _MISMATCH_HELD.get(name)
     stopped_before = name in user_stopped()
@@ -1591,6 +1592,9 @@ def deploy_raw(
                 raise ContainerRuntimeError(t("err.orchestrator.not_replaced_identity_could_not", name=name))
             _remember_identity(name, identity)
         replaced_running = getattr(old, "status", "") == "running"
+        if settle_seconds > 0 and replaced_running:
+            # What the running build already logs is the box's, not the new build's.
+            already = _signals_already(old, slug)
         try:
             old.stop(timeout=_get_stop_timeout(slug))
         except NotFound:
@@ -1821,7 +1825,7 @@ def deploy_raw(
             if problem := lan_fence._started_unattached(container, gated_mode):
                 raise ContainerRuntimeError(t("err.orchestrator.did_not_come_up_network", name=name, problem=problem))
         if settle_seconds > 0 and replaced is not None and start and not joined:
-            _settle(container, slug, settle_seconds, began_wall, name)
+            _settle(container, slug, settle_seconds, began_wall, name, already=already)
     except ContainerNetworkError as exc:
         if not (settle_seconds > 0 and replaced is not None):
             # The fence went between the checks above and the start: the new node is
@@ -2076,6 +2080,14 @@ def _roll_back(
         else:
             ours = getattr(current, "status", "") != "running"
         if ours:
+            if getattr(current, "status", "") == "running":
+                # A replacement undone after its check period ran has been writing
+                # to the app's volumes: it gets the catalog's clean stop first,
+                # as the container it replaced did (storj needs 300 s).
+                try:
+                    current.stop(timeout=_get_stop_timeout(slug))
+                except Exception as exc:  # noqa: BLE001 - the forced removal below still runs
+                    logger.warning("Could not stop %s cleanly before removing it: %s", name, exc)
             _remove_container(current, slug)
         else:
             leftover_gone, taken = False, True
@@ -2182,6 +2194,10 @@ def _settle_state(container: Any, *, final: bool) -> str | None:
     attrs = container.attrs if isinstance(getattr(container, "attrs", None), dict) else {}
     state = attrs.get("State") if isinstance(attrs.get("State"), dict) else {}
     status = getattr(container, "status", "") or str(state.get("Status") or "")
+    if status == "paused" or state.get("Paused") is True:
+        # A backup pauses a container while it reads its volumes: not a stop of
+        # the build. Not a pass either, so a pause that lasts undoes it unjudged.
+        raise _SettleUnreadable("it is paused")
     if status != "running":
         why = state.get("Error") or (f"exit code {state['ExitCode']}" if isinstance(state.get("ExitCode"), int) else "")
         return f"stopped ({why})" if why else f"is {status or 'not running'}"
@@ -2195,7 +2211,39 @@ def _settle_state(container: Any, *, final: bool) -> str | None:
     return None
 
 
-def _settle_problem(container: Any, slug: str, since: float, *, logs: bool = True) -> str | None:
+def _signals_already(container: Any, slug: str) -> frozenset[str]:
+    """The patterns of the catalog's failing signals the running ``container`` already logs.
+
+    Read before an update stops it, over the last hour: a fault of the box,
+    such as a node no satellite can dial back, shows in every build, so it is
+    not held against the new one. Nothing read is nothing already seen.
+    """
+    signals = ((get_service(slug) or {}).get("docker") or {}).get("health_signals") if get_service else None
+    if not isinstance(signals, list) or not signals:
+        return frozenset()
+    try:
+        raw = container.logs(since=int(time.time()) - _SIGNALS_ALREADY_SECONDS, tail=_SIGNALS_ALREADY_LINES)
+    except Exception as exc:  # noqa: BLE001 - nothing read, nothing excused
+        logger.warning("Could not read the log of %s before its update: %s", slug, exc)
+        return frozenset()
+    text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw or "")
+    return frozenset(
+        str(signal.get("pattern"))
+        for signal in signals
+        if isinstance(signal, dict)
+        and str(signal.get("state") or "failing").lower() != "idle"
+        and _signal_hit(text, signal)
+    )
+
+
+#: How far back, and how many lines, of the running container's log an update reads first.
+_SIGNALS_ALREADY_SECONDS = 3600
+_SIGNALS_ALREADY_LINES = 5000
+
+
+def _settle_problem(
+    container: Any, slug: str, since: float, *, logs: bool = True, already: frozenset[str] = frozenset()
+) -> str | None:
     """Why a replacement is not healthy now, or None while it looks well.
 
     It must run, must not have been restarted by Docker, must not report an
@@ -2223,14 +2271,22 @@ def _settle_problem(container: Any, slug: str, since: float, *, logs: bool = Tru
     for signal in signals:
         if not isinstance(signal, dict) or str(signal.get("state") or "failing").lower() == "idle":
             continue
+        if str(signal.get("pattern")) in already:
+            # The build it replaced logged it too (_signals_already).
+            continue
         if _signal_hit(text, signal):
             means = " ".join(str(signal.get("means") or "").split())
             return f"logged a known failure ({means})" if means else "logged a known failure"
     return _settle_state(container, final=True)
 
 
-def _settle(container: Any, slug: str, seconds: float, since: float, name: str) -> None:
-    """Watch a replacement for ``seconds``; raise ImageUpdateFailed as soon as it is not healthy."""
+def _settle(
+    container: Any, slug: str, seconds: float, since: float, name: str, *, already: frozenset[str] = frozenset()
+) -> None:
+    """Watch a replacement for ``seconds``; raise ImageUpdateFailed as soon as it is not healthy.
+
+    ``already`` names the signals the replaced build logged too: they do not fail this one.
+    """
     logger.info("Watching %s for %d s before the previous container is removed", name, int(seconds))
     end = time.monotonic() + seconds
     cutoff = end + _SETTLE_GRACE_SECONDS
@@ -2245,13 +2301,22 @@ def _settle(container: Any, slug: str, seconds: float, since: float, name: str) 
         # on a look after the period, so an unless line written later still counts.
         final = started >= end
         try:
-            problem, seen, unreadable = _settle_problem(container, slug, since, logs=final), True, None
+            problem, seen = _settle_problem(container, slug, since, logs=final, already=already), True
+            unreadable = None
         except _SettleUnreadable as exc:
             # Passing needs a look that worked: the last one must have read the
             # container and, when it has signals to look for, its log.
             problem, seen, unreadable = None, False, exc
         if problem:
             logger.warning("%s failed its check after the update: it %s", name, problem)
+            if fence := _fence_broken(slug):
+                # The guard stops every gated node while the LAN fence is broken:
+                # the fence's fault, not the build's. Undone, and tried again.
+                raise ImageUpdateFailed(
+                    f"The new {name} {problem} within its {int(seconds)} s check while the LAN fence was "
+                    f"not complete ({fence}), so it was undone.",
+                    verified=False,
+                )
             raise ImageUpdateFailed(f"The new {name} {problem} within its {int(seconds)} s check, so it was undone.")
         now = time.monotonic()
         # The look must also end within the grace: Docker can take long to answer one.
@@ -2275,6 +2340,18 @@ def _settle(container: Any, slug: str, seconds: float, since: float, name: str) 
             )
         # Never past the grace: the last look starts at its end at the latest.
         time.sleep(min(_SETTLE_POLL_SECONDS, cutoff - now))
+
+
+def _fence_broken(slug: str) -> str:
+    """Why the LAN fence of a fence-gated ``slug`` is not complete now, or "" (also when it cannot be read)."""
+    if not fence_gated(slug):
+        return ""
+    from app import lan_fence
+
+    try:
+        return str(lan_fence.fence_problem(_get_client()) or "")
+    except Exception:  # noqa: BLE001 - unknown is not broken
+        return ""
 
 
 def _remove_old_image(client: Any, image_id: str) -> str | None:
@@ -3725,6 +3802,12 @@ def read_critical_state(slug: str) -> tuple[bytes, list[str], str | None]:
     if not targets:
         raise ValueError(t("err.orchestrator.declares_no_critical_volumes_there", slug=slug))
     _refuse_mid_restore(slug, "backup")
+    # A deploy holds the route lock, an image update through its check period: a
+    # backup would pause the new container there, which reads as a failed build.
+    route = route_gate.deploying(slug)
+    if not route.acquire(blocking=False):
+        raise ContainerRuntimeError(t("err.orchestrator.backup_waits_for_deploy", slug=slug), 409)
+    route.release()
 
     container = _find_container(slug)
     was_running = container.status == "running"

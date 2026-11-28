@@ -48,7 +48,9 @@ to turn the updates on. CashPilot never turns them on for you.
 3. The worker watches the new container for 2 minutes. During that time the
    old container stays on the box, stopped.
 4. If the new container stops, restarts, shows an unhealthy Docker health
-   check, or logs one of the app's known failure lines, the worker removes it.
+   check, or logs one of the app's known failure lines, the worker stops it
+   and removes it. A failure line that the old container logged too, in its
+   last hour, does not count: it comes from the box, not from the new build.
    A health check that has still not passed 30 seconds after the period counts
    as a failure too.
    Then it starts the old container again, with its old image. The table and
@@ -57,11 +59,14 @@ to turn the updates on. CashPilot never turns them on for you.
    build wrote there stays.
    If the old container does not start again either, the table and the bell
    show **Needs you**. The same goes for an update that Docker refused after
-   it had set the old container aside. The app is down on that box until you start or
-   redeploy it from the dashboard.
+   it had set the old container aside. The app is down on that box until you
+   start it from the dashboard. A Redeploy would install the build that
+   failed, because the tag still names it.
    Sometimes Docker cannot show how the new container did. Then the worker
    undoes it the same way, but the table shows **Failed**. The next daily
-   check tries that build again.
+   check tries that build again. The same goes for a new container that a
+   backup paused, or that the LAN fence guard stopped, during the 2 minutes.
+   A backup asked for while a deploy runs is refused, so try it again after.
 5. If the new container passes, the worker removes the old container and its
    image.
 
@@ -122,10 +127,14 @@ These are known limits of this release:
   of its check. The old one stays stopped as `<name>-replaced`. Remove that
   container when the new build works. To go back to the old build, the old
   container must get the app's name back, because the dashboard finds the app
-  by that name. Stop the new container first, because it still holds the
-  app's ports. Rename it, for example with
-  `docker rename <name> <name>-new`. Then give the old one its name with
-  `docker rename <name>-replaced <name>`, and start it.
+  by that name. Remove the new container first, because it holds the name and
+  the app's ports: `docker rm -f <name>`. Then give the old one its name with
+  `docker rename <name>-replaced <name>`, and start it with
+  `docker start <name>`. The build you went back from is not held, so set the
+  app to **Notify only** or **Off** until a newer build is out.
+- **A hold stops automatic updates only.** While the tag still names a held
+  build, a Redeploy from the dashboard installs it. That deploy has no check
+  period.
 - **A dashboard that restarts before it can save an undo.** The database
   can fail to save the row of an undone update. Then the dashboard keeps the
   hold in memory and saves it on a later check. If the dashboard restarts

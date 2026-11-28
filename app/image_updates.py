@@ -229,6 +229,17 @@ async def _announced(hooks: Hooks, worker_id: int, slug: str, new_id: str, resul
     return bool(row) and row.get("result") == result and row.get("new_image") == new_id
 
 
+async def _needs_owner(hooks: Hooks, worker_id: int, slug: str) -> bool:
+    """Whether this service's latest result on this box is a restore failure: an update left it down."""
+    keys = [k for k in _unsaved_rows if k[:2] == (worker_id, slug)]
+    if keys:
+        return max(keys, key=lambda k: k[4])[3] == RESTORE_FAILED
+    if hooks.latest is None:
+        return False
+    row = await hooks.latest(worker_id, slug)
+    return bool(row) and row.get("result") == RESTORE_FAILED
+
+
 def _short(digest: str) -> str:
     return digest.split(":", 1)[-1][:12] if digest else ""
 
@@ -246,6 +257,10 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
     copies = [c for c in answer.get("containers") or [] if isinstance(c, dict)]
     if not new_id or not copies:
         return "unknown"
+    if any(c.get("status") != "running" for c in copies) and await _needs_owner(hooks, worker_id, slug):
+        # An update left it down and the owner has not started it yet: its
+        # "Needs you" row stays the latest, and nothing is announced over it.
+        return "needs_owner"
     stale = [c for c in copies if c.get("image_id") != new_id]
     if not stale:
         return "current"
