@@ -9563,6 +9563,102 @@
     "text": "Kontainer bernama {name} yang tidak dibuat oleh CashPilot memegang nama yang diperlukan terowongan baru.",
     "source": "713d0d61b762"
   },
+  "secure_vm.add_intro": {
+    "text": "Menjalankan aplikasi penghasil di dalam VM berpagar di host ini. Jalankan perintah ini di host sebagai root. Perintah ini meminta kunci armada Anda dan terlebih dahulu menampilkan apa yang akan dilakukannya.",
+    "source": "feb047d466da"
+  },
+  "secure_vm.cmd.bad_host_name": {
+    "text": "Nama worker {name} tidak dapat dipakai untuk menamai host Secure VM. Ganti nama worker menjadi paling banyak 64 karakter berupa huruf, angka, spasi, titik, tanda hubung, dan garis bawah.",
+    "source": "07b126d20986"
+  },
+  "secure_vm.cmd.bad_ui_url": {
+    "text": "Alamat UI harus berupa alamat http:// atau https:// biasa.",
+    "source": "d930d5f46015"
+  },
+  "secure_vm.cmd.ipv6_ui": {
+    "text": "Secure VM menjangkau UI melalui IPv4. Buka halaman ini melalui alamat IPv4 atau nama, bukan alamat IPv6.",
+    "source": "554cf6fb0b55"
+  },
+  "secure_vm.cmd.not_a_host": {
+    "text": "Worker ini tidak dapat menjadi host Secure VM.",
+    "source": "8bf56cbfbaf6"
+  },
+  "secure_vm.cmd.public_http": {
+    "text": "Halaman ini dibuka melalui http biasa di alamat publik. Worker Secure VM tidak pernah mengirim kuncinya dengan cara itu, sehingga worker tersebut tidak dapat mendaftarkan diri. Buka UI melalui https, atau dari alamat privat, lalu coba lagi.",
+    "source": "79a13dc39212"
+  },
+  "secure_vm.cmd.same_name": {
+    "text": "Ada dua worker bernama {name}. Ganti nama salah satunya, agar Secure VM dapat mengetahui komputer mana yang menjadi host-nya.",
+    "source": "34e8f02bdb7d"
+  },
+  "secure_vm.docs": {
+    "text": "Cara kerja Secure VM",
+    "source": "32dc3fc87f22"
+  },
+  "secure_vm.flag": {
+    "text": "Secure VM di {host}",
+    "source": "86c424a38212"
+  },
+  "secure_vm.flag_tip": {
+    "text": "Worker ini berjalan di dalam Secure VM di {host}. Aplikasi penghasilnya tidak dapat menjangkau host tersebut, LAN-nya, atau tailnet Anda.",
+    "source": "0c13c3bf76a5"
+  },
+  "secure_vm.install": {
+    "text": "Tambah Secure VM",
+    "source": "08ca6684aa69"
+  },
+  "secure_vm.no_kvm": {
+    "text": "Host ini tidak memiliki KVM, sehingga tidak dapat menjalankan Secure VM. gVisor dan pagar LAN tetap berfungsi di sini.",
+    "source": "858c23823fbd"
+  },
+  "secure_vm.remove": {
+    "text": "Hapus Secure VM",
+    "source": "83e2231c8d0e"
+  },
+  "secure_vm.remove_note": {
+    "text": "Menghapus VM, disknya, pagarnya, dan semua yang ditambahkannya, memeriksa bahwa tidak ada yang tersisa, dan membuat halaman ini melupakan worker-nya.",
+    "source": "887619c0e750"
+  },
+  "secure_vm.selftest.asked": {
+    "text": "Sudah diminta. Host menjalankan uji mandiri dalam satu menit, dan hasilnya muncul di sini tidak lama kemudian.",
+    "source": "e7b2cd319154"
+  },
+  "secure_vm.selftest.button": {
+    "text": "Jalankan uji mandiri",
+    "source": "565661c7c5fa"
+  },
+  "secure_vm.selftest.green": {
+    "text": "Uji mandiri hijau: VM menjangkau UI dan internet, dan tidak menjangkau apa pun selain itu.",
+    "source": "95ce5bf92a05"
+  },
+  "secure_vm.selftest.never": {
+    "text": "Belum ada hasil uji mandiri.",
+    "source": "169875028cab"
+  },
+  "secure_vm.selftest.recent": {
+    "text": "Uji mandiri sudah dijalankan dalam 5 menit terakhir. Host menjalankan paling banyak satu uji mandiri setiap 5 menit.",
+    "source": "7973755f9113"
+  },
+  "secure_vm.selftest.red": {
+    "text": "Uji mandiri MERAH: VM menjangkau sesuatu di luar dirinya.",
+    "source": "388a4db850b1"
+  },
+  "secure_vm.selftest.tip": {
+    "text": "Dari dalam VM, host mencoba menjangkau alamatnya sendiri, LAN Anda, dan tailnet Anda. Hasilnya tiba dalam dua menit.",
+    "source": "76052e027532"
+  },
+  "secure_vm.status": {
+    "text": "Status",
+    "source": "920e413c7d41"
+  },
+  "secure_vm.title": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "secure_vm.verify": {
+    "text": "Uji mandiri di host",
+    "source": "ee157fbe84f4"
+  },
   "settings.about.desc_html": {
     "text": "CashPilot memeriksa GitHub untuk rilis terbaru. Tombol pembaruan di bawah (<strong>{update_to}</strong>, <strong>{pull}</strong> atau <strong>{repull}</strong>) menjalankan perintah terdokumentasi <code>docker compose pull &amp;&amp; docker compose up -d</code> untuk Anda, dari kontainer helper sekali jalan — perintah itu memasang patch terbaru dari seri image yang dipatok file compose Anda. Pindah ke seri yang lebih baru tetap berarti mengedit tag image: baca dulu <a href=\"https://github.com/GeiserX/CashPilot/blob/main/UPGRADING.md\" target=\"_blank\" rel=\"noopener noreferrer\">UPGRADING.md</a>, lalu perbarui host UI terlebih dahulu dan setiap worker sesudahnya. Instalasi yang tidak dikelola Compose mendapat perintah manual sebagai gantinya.",
     "source": "353851ce9241"

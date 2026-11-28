@@ -9563,6 +9563,102 @@
     "text": "Een container met de naam {name} die CashPilot niet heeft aangemaakt, gebruikt de naam die de nieuwe tunnel nodig heeft.",
     "source": "713d0d61b762"
   },
+  "secure_vm.add_intro": {
+    "text": "Draait verdien-apps in een afgeschermde VM op deze host. Voer deze opdracht als root uit op de host. Die vraagt om je vlootsleutel en laat eerst zien wat hij gaat doen.",
+    "source": "feb047d466da"
+  },
+  "secure_vm.cmd.bad_host_name": {
+    "text": "De workernaam {name} kan niet worden gebruikt als naam van de host van een Secure VM. Hernoem de worker naar maximaal 64 letters, cijfers, spaties, punten, streepjes en underscores.",
+    "source": "07b126d20986"
+  },
+  "secure_vm.cmd.bad_ui_url": {
+    "text": "Het UI-adres moet een gewoon adres met http:// of https:// zijn.",
+    "source": "d930d5f46015"
+  },
+  "secure_vm.cmd.ipv6_ui": {
+    "text": "Een Secure VM bereikt de UI via IPv4. Open deze pagina via een IPv4-adres of een naam, niet via een IPv6-adres.",
+    "source": "554cf6fb0b55"
+  },
+  "secure_vm.cmd.not_a_host": {
+    "text": "Deze worker kan geen Secure VM hosten.",
+    "source": "8bf56cbfbaf6"
+  },
+  "secure_vm.cmd.public_http": {
+    "text": "Deze pagina is geopend via gewone http op een openbaar adres. De worker van een Secure VM verstuurt zijn sleutel nooit op die manier, dus hij zou zich niet kunnen inschrijven. Open de UI via https of vanaf een privéadres, en probeer het opnieuw.",
+    "source": "79a13dc39212"
+  },
+  "secure_vm.cmd.same_name": {
+    "text": "Twee workers heten {name}. Hernoem er een, zodat een Secure VM kan zien welke computer zijn host is.",
+    "source": "34e8f02bdb7d"
+  },
+  "secure_vm.docs": {
+    "text": "Hoe de Secure VM werkt",
+    "source": "32dc3fc87f22"
+  },
+  "secure_vm.flag": {
+    "text": "Secure VM op {host}",
+    "source": "86c424a38212"
+  },
+  "secure_vm.flag_tip": {
+    "text": "Deze worker draait in een Secure VM op {host}. Zijn verdien-apps kunnen die host, het LAN van die host en je tailnet niet bereiken.",
+    "source": "0c13c3bf76a5"
+  },
+  "secure_vm.install": {
+    "text": "Een Secure VM toevoegen",
+    "source": "08ca6684aa69"
+  },
+  "secure_vm.no_kvm": {
+    "text": "Deze host heeft geen KVM, dus hij kan geen Secure VM draaien. gVisor en de LAN-afscherming werken hier wel.",
+    "source": "858c23823fbd"
+  },
+  "secure_vm.remove": {
+    "text": "De Secure VM verwijderen",
+    "source": "83e2231c8d0e"
+  },
+  "secure_vm.remove_note": {
+    "text": "Verwijdert de VM met de bijbehorende schijf, de afscherming en alles wat de VM heeft toegevoegd, controleert dat er niets achterblijft en zorgt dat deze pagina de bijbehorende worker vergeet.",
+    "source": "887619c0e750"
+  },
+  "secure_vm.selftest.asked": {
+    "text": "Aangevraagd. De host voert de zelftest binnen een minuut uit, en het resultaat verschijnt hier kort daarna.",
+    "source": "e7b2cd319154"
+  },
+  "secure_vm.selftest.button": {
+    "text": "Zelftest uitvoeren",
+    "source": "565661c7c5fa"
+  },
+  "secure_vm.selftest.green": {
+    "text": "Zelftest groen: de VM bereikt de UI en het internet, en verder niets.",
+    "source": "95ce5bf92a05"
+  },
+  "secure_vm.selftest.never": {
+    "text": "Nog geen resultaat van de zelftest.",
+    "source": "169875028cab"
+  },
+  "secure_vm.selftest.recent": {
+    "text": "Er is in de afgelopen 5 minuten een zelftest uitgevoerd. De host voert er hooguit één per 5 minuten uit.",
+    "source": "7973755f9113"
+  },
+  "secure_vm.selftest.red": {
+    "text": "Zelftest ROOD: de VM heeft iets buiten zichzelf bereikt.",
+    "source": "388a4db850b1"
+  },
+  "secure_vm.selftest.tip": {
+    "text": "De host probeert vanuit de VM zijn eigen adressen, je LAN en je tailnet te bereiken. Het resultaat komt binnen twee minuten.",
+    "source": "76052e027532"
+  },
+  "secure_vm.status": {
+    "text": "Status",
+    "source": "920e413c7d41"
+  },
+  "secure_vm.title": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "secure_vm.verify": {
+    "text": "Zelftest op de host",
+    "source": "ee157fbe84f4"
+  },
   "settings.about.desc_html": {
     "text": "CashPilot zoekt op GitHub naar de nieuwste release. De updateknop hieronder (<strong>{update_to}</strong>, <strong>{pull}</strong> of <strong>{repull}</strong>) voert voor je de gedocumenteerde <code>docker compose pull &amp;&amp; docker compose up -d</code> uit, vanuit een eenmalige hulpcontainer — die installeert de nieuwste patch van de imagereeks die je compose-bestand vastlegt. Overstappen naar een nieuwere reeks betekent nog steeds dat je de image-tags moet bewerken: lees eerst <a href=\"https://github.com/GeiserX/CashPilot/blob/main/UPGRADING.md\" target=\"_blank\" rel=\"noopener noreferrer\">UPGRADING.md</a>, werk daarna eerst de UI-host bij en pas daarna elke worker. Installaties die niet door Compose worden beheerd, krijgen in plaats daarvan de handmatige opdrachten.",
     "source": "353851ce9241"
