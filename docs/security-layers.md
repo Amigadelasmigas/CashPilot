@@ -58,7 +58,13 @@ gives you one command to run on the host.
 4. **Undo.** Switch every earner back to Standard, then run the remove command.
    It restores `daemon.json`, deletes gVisor and its backup, reloads Docker and
    checks that nothing is left. It refuses while an earner still runs under
-   gVisor.
+   gVisor. After the remove, an earner still set to gVisor is not redeployed,
+   and while the worker's default still says gVisor no new earner is deployed.
+   The page says why, and nothing is stopped or removed.
+
+A copy routed through one of your proxies runs under Standard: it shares the
+proxy's network, and gVisor is not offered there yet. An earner you set to
+gVisor is therefore not routed. Set it back to Standard first.
 
 If an install stops halfway, for example because the connection dropped, run
 the remove command before you install again. It puts `daemon.json` back from
