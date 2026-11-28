@@ -55,19 +55,17 @@ def commands(host_name: str, ui_url: str, has_vm: bool) -> dict[str, str]:
     """``install`` for a host without a Secure VM; ``status``, ``verify`` and ``remove`` for one with it."""
     if not has_vm and not _HOST_NAME.fullmatch(host_name):
         return {"error": i18n.t("secure_vm.cmd.bad_host_name", name=host_name)}
-    try:
-        if has_vm:
-            return {action: layer_scripts.command(SCRIPT, action) for action in ("status", "verify", "remove")}
-        # --ref: the guest takes its compose file from the same release as the
-        # script, which checks it against its own pin.
-        ref = "v" + version.current().removeprefix("v")
-        return {
-            "install": layer_scripts.command(
-                SCRIPT, "install", ["--ui", ui_url, "--host-worker", host_name, "--ref", ref]
-            )
-        }
-    except layer_scripts.Unavailable as exc:
-        return {"error": str(exc)}
+    # The reason is one of our own messages (a dev build, a missing file).
+    if (why := layer_scripts.problem(SCRIPT)) is not None:
+        return {"error": why}
+    if has_vm:
+        return {action: layer_scripts.command(SCRIPT, action) for action in ("status", "verify", "remove")}
+    # --ref: the guest takes its compose file from the same release as the
+    # script, which checks it against its own pin.
+    ref = "v" + version.current().removeprefix("v")
+    return {
+        "install": layer_scripts.command(SCRIPT, "install", ["--ui", ui_url, "--host-worker", host_name, "--ref", ref])
+    }
 
 
 def vm_host(vm_info: dict[str, Any], workers: list[dict[str, Any]]) -> dict[str, Any] | None:

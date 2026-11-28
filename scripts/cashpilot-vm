@@ -1774,7 +1774,7 @@ cmd_verify() {
   local rc=0
   selftest_once loud || rc=1
   save_selftest "$rc"
-  if [ $rc = 0 ]; then say "GREEN: nothing outside the guest is reachable except the UI, and the internet works."; else say "RED: see the FAIL lines above."; fi
+  if [ $rc = 0 ]; then say "GREEN: the UI and the internet answered, and every address it probed on the host, the LAN and the tailnet stayed blocked."; else say "RED: see the FAIL lines above."; fi
   if [ "$red_failed" = 1 ]; then
     say "FAILED: the red run did not prove that the probes see an open fence."
     rc=1

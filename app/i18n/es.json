@@ -9568,8 +9568,8 @@
     "source": "feb047d466da"
   },
   "secure_vm.cmd.bad_host_name": {
-    "text": "El nombre del worker {name} no sirve como nombre del host de una Secure VM. Cambia el nombre del worker a un máximo de 64 letras, dígitos, espacios, puntos, guiones y guiones bajos.",
-    "source": "07b126d20986"
+    "text": "The worker name {name} cannot name a Secure VM's host. Rename the worker to at most 64 characters, each a letter from A to Z, a digit, a space, a dot, a dash or an underscore.",
+    "source": "000000000000"
   },
   "secure_vm.cmd.bad_ui_url": {
     "text": "La dirección de la UI debe ser una dirección http:// o https:// simple.",
@@ -9628,8 +9628,8 @@
     "source": "565661c7c5fa"
   },
   "secure_vm.selftest.green": {
-    "text": "Autoprueba en verde: la VM llega a la UI y a internet, y a nada más.",
-    "source": "95ce5bf92a05"
+    "text": "Self-test green: the VM reaches the UI and the internet, and every address it probed on the host, your LAN and your tailnet stayed blocked.",
+    "source": "000000000000"
   },
   "secure_vm.selftest.never": {
     "text": "Todavía no hay resultado de la autoprueba.",

@@ -9568,8 +9568,8 @@
     "source": "feb047d466da"
   },
   "secure_vm.cmd.bad_host_name": {
-    "text": "Le nom de worker {name} ne peut pas servir de nom d'hôte à une Secure VM. Renommez le worker avec au plus 64 lettres, chiffres, espaces, points, tirets et traits de soulignement.",
-    "source": "07b126d20986"
+    "text": "The worker name {name} cannot name a Secure VM's host. Rename the worker to at most 64 characters, each a letter from A to Z, a digit, a space, a dot, a dash or an underscore.",
+    "source": "000000000000"
   },
   "secure_vm.cmd.bad_ui_url": {
     "text": "Seule une simple adresse http:// ou https:// est acceptée comme adresse de l'interface.",
@@ -9628,8 +9628,8 @@
     "source": "565661c7c5fa"
   },
   "secure_vm.selftest.green": {
-    "text": "Autotest au vert : la VM atteint l'interface et internet, et rien d'autre.",
-    "source": "95ce5bf92a05"
+    "text": "Self-test green: the VM reaches the UI and the internet, and every address it probed on the host, your LAN and your tailnet stayed blocked.",
+    "source": "000000000000"
   },
   "secure_vm.selftest.never": {
     "text": "Pas encore de résultat d'autotest.",

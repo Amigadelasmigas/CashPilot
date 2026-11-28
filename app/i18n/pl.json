@@ -9568,8 +9568,8 @@
     "source": "feb047d466da"
   },
   "secure_vm.cmd.bad_host_name": {
-    "text": "Nazwa workera {name} nie może być nazwą hosta Secure VM. Zmień nazwę workera tak, by miała najwyżej 64 znaki: litery, cyfry, spacje, kropki, myślniki i podkreślenia.",
-    "source": "07b126d20986"
+    "text": "The worker name {name} cannot name a Secure VM's host. Rename the worker to at most 64 characters, each a letter from A to Z, a digit, a space, a dot, a dash or an underscore.",
+    "source": "000000000000"
   },
   "secure_vm.cmd.bad_ui_url": {
     "text": "Adres UI musi zaczynać się od http:// lub https:// i być zwykłym adresem.",
@@ -9628,8 +9628,8 @@
     "source": "565661c7c5fa"
   },
   "secure_vm.selftest.green": {
-    "text": "Autotest zielony: maszyna wirtualna ma dostęp do UI i internetu, i do niczego więcej.",
-    "source": "95ce5bf92a05"
+    "text": "Self-test green: the VM reaches the UI and the internet, and every address it probed on the host, your LAN and your tailnet stayed blocked.",
+    "source": "000000000000"
   },
   "secure_vm.selftest.never": {
     "text": "Brak jeszcze wyniku autotestu.",

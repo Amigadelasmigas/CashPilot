@@ -9568,8 +9568,8 @@
     "source": "feb047d466da"
   },
   "secure_vm.cmd.bad_host_name": {
-    "text": "Tên worker {name} không dùng được làm tên máy chủ của một Secure VM. Hãy đổi tên worker thành tối đa 64 ký tự gồm chữ cái, chữ số, dấu cách, dấu chấm, dấu gạch ngang và dấu gạch dưới.",
-    "source": "07b126d20986"
+    "text": "The worker name {name} cannot name a Secure VM's host. Rename the worker to at most 64 characters, each a letter from A to Z, a digit, a space, a dot, a dash or an underscore.",
+    "source": "000000000000"
   },
   "secure_vm.cmd.bad_ui_url": {
     "text": "Địa chỉ UI phải là một địa chỉ http:// hoặc https:// thông thường.",
@@ -9628,8 +9628,8 @@
     "source": "565661c7c5fa"
   },
   "secure_vm.selftest.green": {
-    "text": "Tự kiểm tra XANH: VM truy cập được UI và internet, ngoài ra không truy cập được gì khác.",
-    "source": "95ce5bf92a05"
+    "text": "Self-test green: the VM reaches the UI and the internet, and every address it probed on the host, your LAN and your tailnet stayed blocked.",
+    "source": "000000000000"
   },
   "secure_vm.selftest.never": {
     "text": "Chưa có kết quả tự kiểm tra.",

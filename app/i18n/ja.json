@@ -9568,8 +9568,8 @@
     "source": "feb047d466da"
   },
   "secure_vm.cmd.bad_host_name": {
-    "text": "ワーカー名 {name} は Secure VM のホスト名に使えません。ワーカー名を、英字、数字、スペース、ドット、ダッシュ、アンダースコアだけの 64 文字以内に変更してください。",
-    "source": "07b126d20986"
+    "text": "The worker name {name} cannot name a Secure VM's host. Rename the worker to at most 64 characters, each a letter from A to Z, a digit, a space, a dot, a dash or an underscore.",
+    "source": "000000000000"
   },
   "secure_vm.cmd.bad_ui_url": {
     "text": "UI のアドレスは、通常の http:// または https:// のアドレスである必要があります。",
@@ -9628,8 +9628,8 @@
     "source": "565661c7c5fa"
   },
   "secure_vm.selftest.green": {
-    "text": "セルフテスト合格（グリーン）：VM が到達できるのは UI とインターネットだけで、それ以外には到達できません。",
-    "source": "95ce5bf92a05"
+    "text": "Self-test green: the VM reaches the UI and the internet, and every address it probed on the host, your LAN and your tailnet stayed blocked.",
+    "source": "000000000000"
   },
   "secure_vm.selftest.never": {
     "text": "セルフテストの結果はまだありません。",
