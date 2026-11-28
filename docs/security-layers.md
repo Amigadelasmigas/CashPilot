@@ -61,8 +61,9 @@ gives you one command to run on the host.
 3. **Choose.** Set **Runtime for earners you deploy here from now on**, or press
    **Run under gVisor** on one earner. A running earner is redeployed at once, and
    the page asks first.
-4. **Undo.** Switch every earner back to Standard, then run the remove command.
-   It restores `daemon.json`, deletes gVisor and its backup, reloads Docker and
+4. **Undo.** Switch every earner back to Standard. If **Runtime for earners you
+   deploy here from now on** says gVisor, set it to Standard too. Then run the
+   remove command. It restores `daemon.json`, deletes gVisor and its backup, reloads Docker and
    checks that nothing is left. It refuses while any container, running or
    stopped, still uses a gVisor runtime. Switching a stopped earner saves the
    choice only, so redeploy or remove each stopped one first. If a worker
