@@ -1440,7 +1440,7 @@
     "source": "d98dc7800c4c"
   },
   "api.role_must_viewer_writer_owner": {
-    "text": "Роль должна быть одной из: наблюдатель, редактор или владелец",
+    "text": "Роль должна быть одной из: viewer, writer или owner",
     "source": "ad8bea04738b"
   },
   "api.route_proxy_id_0_worker": {

@@ -1440,7 +1440,7 @@
     "source": "d98dc7800c4c"
   },
   "api.role_must_viewer_writer_owner": {
-    "text": "บทบาทต้องเป็นผู้ดู ผู้แก้ไข หรือเจ้าของ",
+    "text": "บทบาทต้องเป็น viewer, writer หรือ owner",
     "source": "ad8bea04738b"
   },
   "api.route_proxy_id_0_worker": {
