@@ -133,7 +133,8 @@ def redact(text: str) -> str:
     return _SECRET_PARAM_RE.sub(rf"\1{_REDACTED}", text)
 
 
-_URL_QUERY_RE = re.compile(r"(https?://[^\s?#'\"]+)\?[^\s'\"]*")
+# A URL scheme is case-insensitive, and Docker may quote one as written.
+_URL_QUERY_RE = re.compile(r"(https?://[^\s?#'\"]+)\?[^\s'\"]*", re.IGNORECASE)
 
 
 def redact_urls(text: str) -> str:

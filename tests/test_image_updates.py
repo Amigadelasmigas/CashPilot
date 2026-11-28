@@ -2451,6 +2451,14 @@ class TestImageCheckEndpoint:
         assert "hunter2" not in detail and "registry.example" in detail
         assert "s3cr3t" not in detail and "Credential=key" not in detail and "cdn.example/b" in detail
 
+    def test_a_url_query_goes_whatever_the_case_of_its_scheme(self):
+        from app import log_redaction
+
+        out = log_redaction.redact_urls("blob at HTTPS://cdn.example/blob?credential=s3cr3t failed")
+        assert "s3cr3t" not in out and "cdn.example/blob" in out
+        out = log_redaction.redact_urls("pull from Http://ME:hunter2@registry.example/x?X=1 failed")
+        assert "hunter2" not in out and "X=1" not in out and "registry.example/x" in out
+
     def test_an_older_workers_pull_error_reaches_the_history_without_its_login(self):
         from fastapi import HTTPException
 
