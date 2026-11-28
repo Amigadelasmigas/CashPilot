@@ -5791,6 +5791,26 @@
     "text": "deze back-up bevat {have}, maar {slug} bewaart {want}. Het is geen back-up van {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} en {inner} staan allebei in {bind_mounts_env}, en een container die {outer} koppelt, kan een link plaatsen waar {inner} staat. Houd er maar één van in {bind_mounts_env} in het .env-bestand naast je compose-bestand en voer daarna docker compose up -d uit",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "containers koppelen alleen de exacte paden in {bind_mounts_env}, geen map daaronder. Om deze toe te staan, voeg je {path} toe aan {bind_mounts_env} in het .env-bestand naast je compose-bestand (kommagescheiden) en voer je daarna docker compose up -d uit",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "containers koppelen alleen de exacte paden in {bind_mounts_env}, geen map daaronder. Om deze toe te staan, voeg je {path} toe aan {bind_mounts_env} in het .env-bestand naast je compose-bestand (kommagescheiden) en haal je {outer} eruit, tenzij een dienst {n, plural, =1 {het} one {het} other {een ervan}} koppelt: een map en een map daarbinnen kunnen niet allebei in de lijst staan. Voer daarna docker compose up -d uit",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "het pad bevat '//', '.' of '..', en een koppeling moet precies overeenkomen met een vermelding in {bind_mounts_env} zoals die daar geschreven staat. Schrijf het als {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "Kan de runtime {runtime} niet controleren: de Docker-daemon antwoordt niet.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "Instantie {instance} van {slug} niet gevonden",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} bewaart zijn gegevens in {refused}, en de worker staat niet toe dat containers dat koppelen, dus de vervangende container kon niet worden gemaakt. De draaiende container is niet aangeraakt. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} bewaart zijn gegevens in een map op de host, of bewaart er geen, dus hij kan niet vanaf het dashboard worden hersteld. Gebruik de stappen voor de opdrachtregel in de back-uphandleiding.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker heeft de container geweigerd: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "De worker staat niet toe dat containers {source} koppelen: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Een JSON-object verwacht",

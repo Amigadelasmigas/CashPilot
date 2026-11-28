@@ -5791,6 +5791,26 @@
     "text": "इस बैकअप में {have} है, लेकिन {slug} {want} रखता है। यह {slug} का बैकअप नहीं है।",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} और {inner} दोनों {bind_mounts_env} में हैं, और जो कंटेनर {outer} को बाइंड करता है, वह वहाँ एक लिंक रख सकता है जहाँ {inner} है। अपनी compose फ़ाइल के पास वाली .env में {bind_mounts_env} में इनमें से सिर्फ़ एक रखें, फिर docker compose up -d चलाएँ",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "कंटेनर सिर्फ़ {bind_mounts_env} में दिए गए सटीक पाथ बाइंड करते हैं, उनमें से किसी के अंदर का फ़ोल्डर नहीं। इसकी अनुमति देने के लिए, अपनी compose फ़ाइल के पास वाली .env में {bind_mounts_env} में {path} जोड़ें (कॉमा से अलग करके), फिर docker compose up -d चलाएँ",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "कंटेनर सिर्फ़ {bind_mounts_env} में दिए गए सटीक पाथ बाइंड करते हैं, उनमें से किसी के अंदर का फ़ोल्डर नहीं। इसकी अनुमति देने के लिए, अपनी compose फ़ाइल के पास वाली .env में {bind_mounts_env} में {path} जोड़ें (कॉमा से अलग करके) और {outer} को हटा दें, जब तक कि कोई सेवा {n, plural, =1 {उसे} one {उन # में से किसी एक को} other {उनमें से किसी एक को}} बाइंड न करती हो: एक फ़ोल्डर और उसके अंदर का फ़ोल्डर, दोनों सूची में नहीं हो सकते, फिर docker compose up -d चलाएँ",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "पाथ में '//', '.' या '..' है, और बाइंड को {bind_mounts_env} की किसी प्रविष्टि से ठीक वैसे ही मेल खाना चाहिए जैसे वह लिखी गई है। इसे {plain} के रूप में लिखें",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "{runtime} रनटाइम जाँचा नहीं जा सकता: Docker डेमन जवाब नहीं दे रहा।",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "{slug} का इंस्टेंस {instance} नहीं मिला",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} अपना डेटा {refused} में रखता है, जिसे वर्कर कंटेनरों को बाइंड नहीं करने देता, इसलिए बदले में नया कंटेनर नहीं बनाया जा सका। चल रहे कंटेनर को छुआ नहीं गया। {reasons}।",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} अपना डेटा होस्ट के किसी फ़ोल्डर में रखता है, या कोई डेटा नहीं रखता, इसलिए इसे डैशबोर्ड से पुनर्स्थापित नहीं किया जा सकता। बैकअप गाइड में दिए गए कमांड लाइन चरणों का इस्तेमाल करें।",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker ने कंटेनर अस्वीकार कर दिया: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "वर्कर कंटेनरों को {source} बाइंड नहीं करने देता: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "एक JSON ऑब्जेक्ट अपेक्षित था",

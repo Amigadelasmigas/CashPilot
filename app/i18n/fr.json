@@ -5791,6 +5791,26 @@
     "text": "cette sauvegarde contient {have}, mais {slug} conserve {want}. Ce n'est pas une sauvegarde de {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} et {inner} figurent tous les deux dans {bind_mounts_env}, et un conteneur qui monte {outer} pourrait placer un lien à l'emplacement de {inner}. N'en gardez qu'un seul dans {bind_mounts_env} dans le fichier .env à côté de votre fichier Compose, puis lancez docker compose up -d",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "les conteneurs ne montent que les chemins exacts de {bind_mounts_env}, pas un dossier situé sous l'un d'eux. Pour autoriser celui-ci, ajoutez {path} à {bind_mounts_env} dans le fichier .env à côté de votre fichier Compose (séparés par des virgules), puis lancez docker compose up -d",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "les conteneurs ne montent que les chemins exacts de {bind_mounts_env}, pas un dossier situé sous l'un d'eux. Pour autoriser celui-ci, ajoutez {path} à {bind_mounts_env} dans le fichier .env à côté de votre fichier Compose (séparés par des virgules) et retirez {outer}, sauf si un service {n, plural, =1 {le monte} one {monte l'un de ces # chemins} other {monte l'un d'eux}} : un dossier et un dossier qu'il contient ne peuvent pas figurer tous les deux dans la liste. Lancez ensuite docker compose up -d",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source} : {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "le chemin contient '//', '.' ou '..', et un montage doit correspondre à une entrée de {bind_mounts_env} telle qu'elle est écrite. Écrivez-le sous la forme {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "Impossible de vérifier le runtime {runtime} : le démon Docker ne répond pas.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "Instance {instance} de {slug} introuvable",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} conserve ses données dans {refused}, que le worker ne laisse pas les conteneurs monter : le remplacement n'a donc pas pu être créé. Le conteneur en marche n'a pas été touché. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} conserve ses données dans un dossier de l'hôte, ou n'en conserve aucune : il ne peut donc pas être restauré depuis le tableau de bord. Suivez les étapes en ligne de commande du guide de sauvegarde.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker a refusé le conteneur : {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "Le worker ne laisse pas les conteneurs monter {source} : {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Un objet JSON était attendu",

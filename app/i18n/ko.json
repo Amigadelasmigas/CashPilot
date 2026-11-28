@@ -5791,6 +5791,26 @@
     "text": "이 백업에는 {have}이(가) 들어 있지만 {slug}은(는) {want}을(를) 보관합니다. {slug}의 백업이 아닙니다.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer}과(와) {inner}이(가) 모두 {bind_mounts_env}에 있으며, {outer}을(를) 바인딩하는 컨테이너는 {inner} 위치에 링크를 둘 수 있습니다. compose 파일 옆의 .env 파일에서 {bind_mounts_env}에 둘 중 하나만 남긴 다음 docker compose up -d를 실행하십시오",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "컨테이너는 {bind_mounts_env}에 있는 정확한 경로만 바인딩하며, 그 아래의 폴더는 바인딩하지 않습니다. 이 경로를 허용하려면 compose 파일 옆의 .env 파일에서 {bind_mounts_env}에 {path}을(를) 추가한 다음(쉼표로 구분) docker compose up -d를 실행하십시오",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "컨테이너는 {bind_mounts_env}에 있는 정확한 경로만 바인딩하며, 그 아래의 폴더는 바인딩하지 않습니다. 이 경로를 허용하려면 compose 파일 옆의 .env 파일에서 {bind_mounts_env}에 {path}을(를) 추가하고(쉼표로 구분) {outer}을(를) 빼십시오. 단, 서비스가 {n, plural, =1 {그 경로를} other {그중 하나를}} 바인딩하는 경우는 예외입니다. 폴더와 그 안의 폴더를 함께 나열할 수는 없습니다. 그런 다음 docker compose up -d를 실행하십시오",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "경로에 '//', '.' 또는 '..'이(가) 들어 있는데, 바인딩은 작성된 그대로 {bind_mounts_env}의 항목과 일치해야 합니다. {plain}(으)로 작성하십시오",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "{runtime} 런타임을 확인할 수 없습니다: Docker 데몬이 응답하지 않습니다.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "{slug}의 인스턴스 {instance}을(를) 찾을 수 없습니다",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name}은(는) {refused}에 데이터를 보관하는데, 워커가 컨테이너의 해당 경로 바인딩을 허용하지 않아 교체 컨테이너를 만들 수 없습니다. 실행 중인 컨테이너는 건드리지 않았습니다. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug}은(는) 데이터를 호스트 폴더에 보관하거나 보관하지 않으므로 대시보드에서 복원할 수 없습니다. 백업 가이드의 명령줄 단계를 사용하십시오.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker가 컨테이너를 거부했습니다: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "워커가 컨테이너의 {source} 바인딩을 허용하지 않습니다: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "JSON 객체가 필요합니다",

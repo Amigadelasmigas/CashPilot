@@ -5791,6 +5791,26 @@
     "text": "{have} ang laman ng backup na ito, pero {want} ang iniingatan ng {slug}. Hindi ito backup ng {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "parehong nasa {bind_mounts_env} ang {outer} at {inner}, at ang container na nagba-bind ng {outer} ay maaaring maglagay ng link kung nasaan ang {inner}. Isa lang sa mga ito ang itira sa {bind_mounts_env} sa .env sa tabi ng compose file mo, saka patakbuhin ang docker compose up -d",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "ang mga eksaktong path lang sa {bind_mounts_env} ang bina-bind ng mga container, hindi ang isang folder sa ilalim ng isa sa mga ito. Para payagan ito, idagdag ang {path} sa {bind_mounts_env} sa .env sa tabi ng compose file mo (pinaghihiwalay ng kuwit), saka patakbuhin ang docker compose up -d",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "ang mga eksaktong path lang sa {bind_mounts_env} ang bina-bind ng mga container, hindi ang isang folder sa ilalim ng isa sa mga ito. Para payagan ito, idagdag ang {path} sa {bind_mounts_env} sa .env sa tabi ng compose file mo (pinaghihiwalay ng kuwit) at alisin ang {outer}, maliban kung may serbisyong nagba-bind ng {n, plural, =1 {ito} one {isa sa mga ito} other {isa sa mga ito}}: hindi puwedeng parehong nakalista ang isang folder at ang isang folder sa loob nito, saka patakbuhin ang docker compose up -d",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "may '//', '.' o '..' ang path, at dapat tumugma ang isang bind sa isang entry ng {bind_mounts_env} nang eksakto kung paano ito isinulat. Isulat ito bilang {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "Hindi masuri ang runtime na {runtime}: hindi sumasagot ang Docker daemon.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "Hindi nahanap ang instance {instance} ng {slug}",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "Iniingatan ng {name} ang data nito sa {refused}, na hindi pinapayagan ng worker na i-bind ng mga container, kaya hindi magawa ang kapalit. Hindi ginalaw ang tumatakbong container. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "Itinatago ng {slug} ang state nito sa isang host folder, o wala itong itinatago, kaya hindi ito mai-restore mula sa dashboard. Gamitin ang mga hakbang sa command line sa gabay sa backup.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Tinanggihan ng Docker ang container: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "Hindi pinapayagan ng worker ang mga container na mag-bind ng {source}: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "JSON object ang inaasahan",

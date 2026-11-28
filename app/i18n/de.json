@@ -5791,6 +5791,26 @@
     "text": "diese Sicherung enthält {have}, aber {slug} speichert {want}. Es ist keine Sicherung von {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} und {inner} stehen beide in {bind_mounts_env}, und ein Container, der {outer} einbindet, könnte dort einen Link anlegen, wo {inner} liegt. Behalte nur einen der beiden in {bind_mounts_env} in der .env neben deiner Compose-Datei und führe dann docker compose up -d aus",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "Container binden nur genau die Pfade in {bind_mounts_env} ein, keinen Ordner darunter. Um diesen zu erlauben, füge {path} zu {bind_mounts_env} in der .env neben deiner Compose-Datei hinzu (durch Kommas getrennt) und führe dann docker compose up -d aus",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "Container binden nur genau die Pfade in {bind_mounts_env} ein, keinen Ordner darunter. Um diesen zu erlauben, füge {path} zu {bind_mounts_env} in der .env neben deiner Compose-Datei hinzu (durch Kommas getrennt) und nimm {outer} heraus, es sei denn, ein Dienst bindet {n, plural, =1 {ihn} one {ihn} other {einen davon}} ein: Ein Ordner und ein Ordner darin können nicht beide eingetragen sein. Führe dann docker compose up -d aus",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "der Pfad enthält „//“, „.“ oder „..“, und eine Einbindung muss einem Eintrag von {bind_mounts_env} genau so entsprechen, wie er geschrieben ist. Schreibe ihn als {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "Die Laufzeit {runtime} kann nicht geprüft werden: Der Docker-Daemon antwortet nicht.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "Instanz {instance} von {slug} nicht gefunden",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} speichert seine Daten in {refused}, und der Worker lässt Container das nicht einbinden, daher konnte der Ersatz nicht erstellt werden. Der laufende Container wurde nicht angetastet. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} speichert seine Daten in einem Host-Ordner oder gar keine, daher kann er nicht über das Dashboard wiederhergestellt werden. Verwende die Befehlszeilenschritte in der Sicherungsanleitung.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker hat den Container abgelehnt: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "Der Worker lässt Container {source} nicht einbinden: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Ein JSON-Objekt wurde erwartet",

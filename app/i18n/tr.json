@@ -5791,6 +5791,26 @@
     "text": "bu yedek {have} içeriyor, ancak {slug} {want} tutuyor. Bu, {slug} hizmetinin yedeği değil.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} ve {inner} ikisi de {bind_mounts_env} içinde ve {outer} yolunu bağlayan bir konteyner, {inner} yolunun bulunduğu yere bir bağlantı (link) koyabilir. Compose dosyanızın yanındaki .env içinde {bind_mounts_env} değişkeninde bunlardan yalnızca birini bırakın, sonra docker compose up -d çalıştırın",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "konteynerler yalnızca {bind_mounts_env} içindeki tam yolları bağlar, bunlardan birinin altındaki bir klasörü değil. Buna izin vermek için compose dosyanızın yanındaki .env içinde {path} yolunu {bind_mounts_env} değişkenine ekleyin (virgülle ayırarak), sonra docker compose up -d çalıştırın",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "konteynerler yalnızca {bind_mounts_env} içindeki tam yolları bağlar, bunlardan birinin altındaki bir klasörü değil. Buna izin vermek için compose dosyanızın yanındaki .env içinde {path} yolunu {bind_mounts_env} değişkenine ekleyin (virgülle ayırarak) ve hiçbir hizmet {n, plural, =1 {onu} one {onu} other {bunlardan birini}} bağlamıyorsa {outer} yolunu çıkarın (bir klasör ve onun içindeki bir klasör birlikte listelenemez), sonra docker compose up -d çalıştırın",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "yolda '//', '.' veya '..' var ve bağlanan bir yol, {bind_mounts_env} içindeki bir girişle yazıldığı gibi eşleşmelidir. Yolu {plain} olarak yazın",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "{runtime} çalışma zamanı denetlenemiyor: Docker daemon yanıt vermiyor.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "{slug} hizmetinin {instance} örneği bulunamadı",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} verilerini {refused} konumunda tutuyor ve worker konteynerlerin bu konumu bağlamasına izin vermiyor, bu yüzden yerine geçecek konteyner oluşturulamadı. Çalışan konteynere dokunulmadı. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} kalıcı verilerini ana makinedeki bir klasörde tutuyor ya da hiç kalıcı veri tutmuyor, bu yüzden panodan geri yüklenemez. Yedek rehberindeki komut satırı adımlarını kullanın.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker konteyneri reddetti: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "Worker, konteynerlerin {source} yolunu bağlamasına izin vermiyor: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Bir JSON nesnesi bekleniyordu",
