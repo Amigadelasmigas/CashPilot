@@ -2465,15 +2465,18 @@ def check_image(slug: str, timeout: float = 900) -> dict[str, Any]:
         digest = ""
         with contextlib.suppress(Exception):
             digest = _repo_digest(client.images.get(image_id), ref)
-        copies.append(
-            {
-                "instance": _instance_of(c),
-                "container_id": c.id,
-                "status": getattr(c, "status", ""),
-                "image_id": image_id,
-                "digest": digest,
-            }
-        )
+        copy = {
+            "instance": _instance_of(c),
+            "container_id": c.id,
+            "status": getattr(c, "status", ""),
+            "image_id": image_id,
+            "digest": digest,
+        }
+        if str(getattr(c, "name", "") or "") == _container_name(slug, copy["instance"]) + REPLACED_SUFFIX:
+            # Running under its set-aside name: started by hand after an update
+            # could not give it its name back. The app is not restored yet.
+            copy["set_aside"] = True
+        copies.append(copy)
     return {
         "floating": True,
         "ref": ref,

@@ -917,6 +917,9 @@ class TestCheckImage:
             with patch.object(orchestrator, "_get_client", return_value=client):
                 answer = orchestrator.check_image("honeygain")
             assert [c["container_id"] for c in answer["containers"]] == ["c1", "c2"], name
+            # Only one that runs under the exact set-aside name says so.
+            flagged = [c.get("set_aside", False) for c in answer["containers"]]
+            assert flagged == [False, status == "running"], name
 
     def test_a_pull_that_fails_in_its_stream_is_a_failed_check(self):
         # Docker sends progress, then the error, in one answer; the old build is still cached.
@@ -1314,6 +1317,20 @@ class TestDecisions:
         expected = "available" if mode == image_updates.NOTIFY else "updated"
         assert await _run(state, mode) == expected
         assert bool(state.deploys) is (mode == image_updates.AUTO)
+
+    @pytest.mark.parametrize("mode", [image_updates.NOTIFY, image_updates.AUTO])
+    async def test_an_old_container_started_under_its_set_aside_name_keeps_its_needs_you_row(self, mode):
+        # The owner started cashpilot-honeygain-replaced by hand: it runs, but has no name back.
+        answer = _answer()
+        answer["containers"][0]["set_aside"] = True
+        state = _Hooks(answer)
+        state.rows.append((image_updates.RESTORE_FAILED, {"new_image": ""}))
+        assert await _run(state, mode) == "needs_owner"
+        assert [r for r, _ in state.rows] == [image_updates.RESTORE_FAILED] and not state.deploys
+        # With no Needs you row, Auto still never deploys over it.
+        state = _Hooks(answer)
+        assert await _run(state, mode) == ("available" if mode == image_updates.NOTIFY else "skipped")
+        assert not state.deploys
 
     async def test_an_app_turned_off_during_the_run_is_not_checked(self):
         state = _Hooks(_answer(running="sha256:new"))

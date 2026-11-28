@@ -257,7 +257,11 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
     copies = [c for c in answer.get("containers") or [] if isinstance(c, dict)]
     if not new_id or not copies:
         return "unknown"
-    if any(c.get("status") != "running" for c in copies) and await _needs_owner(hooks, worker_id, slug):
+    # A copy that runs under its set-aside name (orchestrator.check_image
+    # "set_aside") has not got its name back. An older worker does not say.
+    if any(c.get("status") != "running" or c.get("set_aside") for c in copies) and await _needs_owner(
+        hooks, worker_id, slug
+    ):
         # An update left it down and the owner has not started it yet: its
         # "Needs you" row stays the latest, and nothing is announced over it.
         return "needs_owner"
@@ -278,6 +282,8 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
     why = await hooks.blocker(worker_id, slug, answer)
     if not why and any(c.get("status") != "running" for c in copies):
         why = "not every copy of it is running, and an update would start it"
+    if not why and any(c.get("set_aside") for c in copies):
+        why = "a copy of it runs under its set-aside name (-replaced), so give it back its name first"
     if not why and len(copies) > 1:
         # Copies are replaced one by one, so a later copy that fails would leave
         # the box running two builds of it under one undone result.
