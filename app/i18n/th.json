@@ -1483,6 +1483,18 @@
     "text": "{name} ทำงานผ่านพร็อกซีบน {box} การรันจาก IP ของ {box} เอง{value} จะเปิดเผยที่อยู่นั้นให้ {name} และทุกปลายทางที่ทราฟฟิกไปถึงเห็น โปรดยืนยันด้วยรหัสผ่าน",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "แอปหารายได้นี้ตั้งค่าให้ทำงานภายใต้ gVisor บน {worker} แต่ทำไม่ได้: {why} โปรดตั้งค่ากลับเป็น “มาตรฐาน” ในหน้ากลุ่มเครื่อง หรือแก้ไขปัญหานั้นก่อน ไม่มีการติดตั้งใช้งานใดๆ",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "แอปหารายได้นี้ตั้งค่าให้ทำงานภายใต้ gVisor บน {worker} แต่สำเนาผ่านพร็อกซีทำงานได้ภายใต้ “มาตรฐาน” เท่านั้น โปรดตั้งค่ากลับเป็น “มาตรฐาน” ในหน้ากลุ่มเครื่องเพื่อส่งผ่านพร็อกซี ไม่มีการติดตั้งใช้งานใดๆ",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "แอปหารายได้นี้ตั้งค่าให้ทำงานภายใต้ {runtime} บน {worker} แต่เวิร์กเกอร์เก่าเกินกว่าจะรับการเลือกรันไทม์ได้ โปรดอัปเดตเวิร์กเกอร์ หรือตั้งค่าแอปหารายได้กลับเป็น “มาตรฐาน” ในหน้ากลุ่มเครื่อง ไม่มีการติดตั้งใช้งานใดๆ",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "บันทึก {name} ไม่สำเร็จ",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "ไม่ได้บันทึกภาษา: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "ชั้นความปลอดภัยที่ครอบสำเนานี้: รั้วกั้น LAN และ “มาตรฐาน” (runc) หรือ gVisor เปลี่ยนได้ในหน้ากลุ่มเครื่อง",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "ตรวจสอบ gVisor",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "สีเขียว",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "ไม่ได้ติดตั้ง",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "สีแดง",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "กำลังตรวจสอบ…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "เริ่มคอนเทนเนอร์ทดสอบสั้นๆ ภายใต้ gVisor บนเครือข่ายของแอปหารายได้ คอนเทนเนอร์นั้นต้องเห็นเคอร์เนลของ gVisor และแปลงชื่อผ่าน DNS ได้",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "CashPilot UI นี้เป็นบิลด์สำหรับการพัฒนา จึงตรึงคำสั่งไว้กับรุ่นที่เผยแพร่ไม่ได้ โปรดใช้อิมเมจรุ่นที่เผยแพร่แล้วเพื่อรับคำสั่งนี้",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "อิมเมจ CashPilot UI นี้ไม่มี {name} จึงตรวจสอบไฟล์ที่ดาวน์โหลดไม่ได้",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} ไม่ใช่ตัวช่วยของ CashPilot",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "คัดลอกแล้ว",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "คัดลอก",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "หน้านี้ไม่ได้ใช้ https จึงถูกบล็อกการเข้าถึงคลิปบอร์ด เลือกคำสั่งไว้แล้ว: โปรดกด Ctrl+C หรือ Cmd+C",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "ค่าเริ่มต้นของ Docker",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "รันไทม์สำหรับแอปหารายได้ที่ติดตั้งใช้งานที่นี่นับจากนี้",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "แอปหารายได้ที่อยู่ที่นี่แล้วจะใช้รันไทม์เดิมต่อไป",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "บันทึกแล้ว มีผลกับแอปหารายได้ที่ติดตั้งใช้งานที่นี่นับจากนี้",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "กำลังบันทึก…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "แต่ละชั้นป้องกันอะไร",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "ให้ {service} ทำงานภายใต้ {runtime} หรือไม่\n\nการดำเนินการนี้จะติดตั้งใช้งาน {service} ใหม่ทันที โดยจะหยุดแล้วเริ่มใหม่ ซึ่งปกติใช้เวลาไม่ถึงหนึ่งนาที วอลุ่มข้อมูลจะยังคงอยู่",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "ไม่ทราบสถานะรั้วกั้น",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "มีรั้วกั้น",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "ล็อกอยู่",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "ไม่มีรั้วกั้น",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "{runtime} ในการติดตั้งใช้งานครั้งถัดไป",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "ติดตั้งใช้งาน {service} ใหม่ภายใต้ {runtime} แล้ว",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "ลองทำงานภายใต้ {runtime} อีกครั้ง",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} จะทำงานภายใต้ {runtime} ตั้งแต่การติดตั้งใช้งานครั้งถัดไป",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "กำลังบันทึกรันไทม์ของ {service}…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "ทำงานภายใต้ gVisor",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "ทำงานภายใต้ “มาตรฐาน”",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "รั้วกั้นของ Secure VM ล้มเหลว",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "อยู่ใน Secure VM",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "ไม่ทราบสถานะรั้วกั้นของ Secure VM",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "รั้วกั้น LAN",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "ติดตั้ง gVisor บนโฮสต์นี้",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor วางเคอร์เนลของตัวเองไว้ระหว่างแอปหารายได้แต่ละตัวกับเคอร์เนลของโฮสต์นี้ โดยลดทรูพุตลงประมาณหนึ่งในห้า และใช้ CPU เป็นหกถึงเก้าเท่า โปรดเรียกใช้คำสั่งนี้บนโฮสต์ คำสั่งจะถามก่อนเปลี่ยนแปลงสิ่งใด และคอนเทนเนอร์ที่กำลังทำงานจะยังคงทำงานต่อไป",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "ติดตั้งแล้ว",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "ไม่ได้ติดตั้ง",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "ลบ gVisor ออกจากโฮสต์นี้",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "โปรดเปลี่ยนแอปหารายได้ทุกตัวบนเวิร์กเกอร์นี้กลับเป็น “มาตรฐาน” ก่อน คำสั่งจะปฏิเสธการทำงานหากยังมีแอปหารายได้ตัวใดทำงานภายใต้ gVisor อยู่",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "ใช้ที่นี่ไม่ได้",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "ปิด",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "เปิด",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "พร็อกซีซ็อกเก็ต",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "เวิร์กเกอร์นี้ถือซ็อกเก็ต Docker โดยตรง ซึ่งเท่ากับสิทธิ์ root บนโฮสต์ ไฟล์ compose ที่ให้มาจะวางพร็อกซีซ็อกเก็ตไว้ด้านหน้าซ็อกเก็ตนั้น",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "มาตรฐาน (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "ชั้นความปลอดภัย",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "ไม่ทราบ",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "รั้วกั้นล้มเหลว",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "รั้วกั้นปกติ",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "ไม่ได้ตรวจสอบรั้วกั้นมาระยะหนึ่ง",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "ไม่ทราบสถานะรั้วกั้น",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "เวิร์กเกอร์นี้ทำงานภายใน Secure VM บน {host}",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "มี KVM",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "ไม่มี KVM",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "มีแผนจะเพิ่มชั้น VM สำหรับแอปหารายได้ ซึ่งต้องใช้ KVM บนโฮสต์",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} ต้องทำงานภายใต้ {runtime}: รายการในแคตตาล็อกกำหนดไว้เช่นนั้น",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} ต้องทำงานภายใต้ {runtime}: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "โปรดติดตั้ง gVisor บนโฮสต์นี้ก่อน",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "ไม่ได้ติดตั้ง gVisor บนโฮสต์นี้",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} ต้องใช้ raw socket แต่เวิร์กเกอร์นี้ไม่มีรันไทม์ gVisor ที่ลงทะเบียนด้วย --net-raw คำสั่งติดตั้งจะลงทะเบียนรันไทม์ดังกล่าวให้",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "เวิร์กเกอร์สอบถาม Docker ไม่ได้ว่ามีรันไทม์ใดบ้าง",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor ทำงานได้บนโฮสต์ Linux เท่านั้น",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "เวิร์กเกอร์นี้เก่ากว่าฟีเจอร์ชั้นความปลอดภัย โปรดอัปเดตเพื่อเลือกรันไทม์ที่นี่",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME บนเวิร์กเกอร์นี้เป็น {runtime} ตัวแปรนี้มีผลเหนือกว่าหน้านี้",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME_OVERRIDES บนเวิร์กเกอร์นี้กำหนด {slug}={runtime} ตัวแปรนี้มีผลเหนือกว่าหน้านี้",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid ใช้ gVisor ไม่ได้: Unraid บูตจากระบบไฟล์บน RAM ซึ่ง gVisor ออกจากระบบไฟล์นั้นไม่ได้ โปรดเรียกใช้แอปหารายได้ใน VM แทน",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "ข้อผิดพลาด: {error}",

@@ -1483,6 +1483,18 @@
     "text": "{name} działa przez proxy na {box}. Uruchomienie jej z własnego IP {box}{value} pokaże ten adres {name} i każdemu, do kogo dociera jej ruch. Potwierdź hasłem.",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "Ta aplikacja zarobkowa ma działać w środowisku gVisor na workerze {worker}, ale nie może: {why} Przywróć Standard na stronie Flota albo najpierw to napraw. Nic nie zostało wdrożone.",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "Ta aplikacja zarobkowa ma działać w środowisku gVisor na workerze {worker}, a kopia kierowana przez proxy działa tylko w środowisku Standard. Przywróć Standard na stronie Flota, aby skierować ją przez proxy. Nic nie zostało wdrożone.",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "Ta aplikacja zarobkowa ma działać w środowisku {runtime} na workerze {worker}, a worker jest za stary, by przyjąć wybór środowiska uruchomieniowego. Zaktualizuj workera albo przywróć dla tej aplikacji zarobkowej Standard na stronie Flota. Nic nie zostało wdrożone.",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "Zapisywanie {name} nie powiodło się.",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "Nie zapisano języka: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "Warstwy, za którymi działa ta kopia: bariera LAN oraz Standard (runc) lub gVisor. Zmienisz je na stronie Flota.",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "Sprawdź gVisor",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "Zielony.",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "Nie zainstalowano.",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "Czerwony.",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "Sprawdzanie…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "Uruchom krótki kontener testowy w środowisku gVisor w sieci aplikacji zarobkowych. Musi on widzieć jądro gVisor i rozwiązać nazwę.",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "Ten CashPilot UI jest wersją deweloperską, więc nie może przypiąć polecenia do wydania. Aby je otrzymać, uruchom wydany obraz.",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "Obraz tego CashPilot UI nie zawiera {name}, więc nie może sprawdzić pobranego pliku.",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} nie jest narzędziem pomocniczym CashPilot.",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "Skopiowano",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "Kopiuj",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "Ta strona nie używa https, więc schowek jest zablokowany. Polecenie jest zaznaczone: naciśnij Ctrl+C lub Cmd+C.",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "Domyślne Dockera",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "Środowisko uruchomieniowe dla aplikacji zarobkowych, które od teraz tu wdrożysz",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "Aplikacje zarobkowe, które już tu są, zachowują swoje środowisko uruchomieniowe.",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "Zapisano. Dotyczy aplikacji zarobkowych, które od teraz tu wdrożysz.",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "Zapisywanie…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "Przed czym chroni każda warstwa",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "Uruchomić {service} w środowisku {runtime}?\n\nTo od razu wdroży ponownie {service}. Usługa zatrzyma się i uruchomi ponownie, zwykle w mniej niż minutę. Jej wolumin danych zostanie zachowany.",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "bariera nieznana",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "za barierą",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "Zablokowane",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "bez bariery",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "{runtime} przy następnym wdrożeniu",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "{service}: wdrożono ponownie w środowisku {runtime}.",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "Ponów uruchomienie w środowisku {runtime}",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} będzie działać w środowisku {runtime} od następnego wdrożenia.",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "Zapisywanie środowiska uruchomieniowego {service}…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "Uruchom w środowisku gVisor",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "Uruchom w środowisku Standard",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Bariera Secure VM nie działa",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "w Secure VM",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Bariera Secure VM nieznana",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "Bariera LAN",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "Zainstaluj gVisor na tym hoście",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor umieszcza własne jądro między każdą aplikacją zarobkową a jądrem tego hosta. Kosztuje to około jednej piątej przepustowości i od sześciu do dziewięciu razy więcej CPU. Uruchom to polecenie na hoście. Zapyta, zanim cokolwiek zmieni, a działające kontenery będą działać dalej.",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "zainstalowany",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "niezainstalowany",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "Usuń gVisor z tego hosta",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "Najpierw przełącz każdą aplikację zarobkową na tym workerze z powrotem na Standard. Polecenie odmawia działania, dopóki któraś nadal działa w środowisku gVisor.",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "tutaj niemożliwe",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "wył.",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "wł.",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "Proxy gniazda",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "Ten worker trzyma surowe gniazdo Dockera, które daje uprawnienia root na hoście. Dostarczane pliki compose stawiają przed nim proxy gniazda.",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "Standard (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "Warstwy bezpieczeństwa",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "nieznane",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "bariera nie działa",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "bariera OK",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "bariera ostatnio niesprawdzana",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "bariera nieznana",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "Ten worker działa wewnątrz Secure VM na {host}.",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM dostępne",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "brak KVM",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "Warstwa VM dla aplikacji zarobkowych jest planowana. Wymaga KVM na hoście.",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} musi działać w środowisku {runtime}: tak stanowi jej wpis w katalogu.",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} musi działać w środowisku {runtime}: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "Najpierw zainstaluj gVisor na tym hoście.",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "gVisor nie jest zainstalowany na tym hoście.",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} potrzebuje surowych gniazd, a ten worker nie ma środowiska gVisor zarejestrowanego z --net-raw. Polecenie instalacji je rejestruje.",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "Worker nie mógł zapytać Dockera, jakie ma środowiska uruchomieniowe.",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor działa tylko na hostach z Linuksem.",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "Ten worker jest starszy niż warstwy bezpieczeństwa. Zaktualizuj go, aby wybrać tutaj środowisko uruchomieniowe.",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME na tym workerze ma wartość {runtime}. Zmienna ma pierwszeństwo przed tą stroną.",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME_OVERRIDES na tym workerze ustawia {slug}={runtime}. Zmienna ma pierwszeństwo przed tą stroną.",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid nie może uruchomić gVisor: startuje z systemu plików w pamięci RAM, którego gVisor nie potrafi opuścić. Zamiast tego uruchom aplikacje zarobkowe w VM.",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "Błąd: {error}",

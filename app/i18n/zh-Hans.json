@@ -1483,6 +1483,18 @@
     "text": "{name} 在 {box} 上通过代理运行。从 {box} 自己的 IP{value} 运行它，会把该地址暴露给 {name} 以及其流量到达的所有人。请用你的密码确认。",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "此收益应用被设置为在 {worker} 上以 gVisor 运行，但它无法这样运行：{why}请在机群页面将其改回标准运行时，或先解决该问题。未部署任何内容。",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "此收益应用被设置为在 {worker} 上以 gVisor 运行，而通过代理路由的副本只能以标准运行时运行。如要路由它，请在机群页面将其改回标准运行时。未部署任何内容。",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "此收益应用被设置为在 {worker} 上以 {runtime} 运行，但该工作节点版本太旧，无法接受运行时选择。请更新工作节点，或在机群页面将该收益应用改回标准运行时。未部署任何内容。",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "保存 {name} 失败。",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "语言未保存：{error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "此副本所处的防护层：局域网隔离墙，以及标准运行时（runc）或 gVisor。可在机群页面更改它们。",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "检查 gVisor",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "通过。",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "未安装。",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "未通过。",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "正在检查…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "在收益应用的网络上以 gVisor 启动一个短时探测容器。它必须能看到 gVisor 的内核并能解析一个域名。",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "此 CashPilot UI 是开发版本，因此无法将命令固定到某个发布版本。请运行已发布的镜像来获取该命令。",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "此 CashPilot UI 镜像不包含 {name}，因此无法校验下载内容。",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} 不是 CashPilot 的辅助工具。",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "已复制",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "复制",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "此页面未使用 https，因此剪贴板被阻止。命令已选中：请按 Ctrl+C 或 Cmd+C。",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "Docker 默认",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "从现在起在此部署的收益应用所用的运行时",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "已在此处的收益应用保留其运行时。",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "已保存。它适用于你从现在起在此部署的收益应用。",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "正在保存…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "每一层防护什么",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "以 {runtime} 运行 {service}？\n\n这会立即重新部署 {service}。它会停止并重新启动，通常不到一分钟。其数据卷会保留。",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "隔离墙情况未知",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "在隔离墙后",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "已锁定",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "不在隔离墙后",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "下次部署时改为 {runtime}",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "{service} 已重新部署，现以 {runtime} 运行。",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "再次以 {runtime} 运行",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} 从下次部署起以 {runtime} 运行。",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "正在保存 {service} 的运行时…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "以 gVisor 运行",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "以标准运行时运行",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Secure VM 隔离墙失败",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "在 Secure VM 中",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Secure VM 隔离墙情况未知",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "局域网隔离墙",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "在此主机上安装 gVisor",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor 会在每个收益应用与此主机的内核之间放入它自己的内核。代价是损失大约五分之一的吞吐量，并占用六到九倍的 CPU。请在主机上运行此命令。它在做任何更改前都会先询问，正在运行的容器会继续运行。",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "已安装",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "未安装",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "从此主机移除 gVisor",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "请先将此工作节点上的每个收益应用切换回标准运行时。只要还有一个在 gVisor 下运行，该命令就会拒绝执行。",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "此处无法使用",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "关",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "开",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "套接字代理",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "此工作节点持有原始 Docker 套接字，这等同于主机上的 root 权限。随附的 compose 文件会在它前面放置一个套接字代理。",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "标准（runc）",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "安全层",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "未知",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "隔离墙失败",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "隔离墙正常",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "隔离墙近期未检查",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "隔离墙情况未知",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "此工作节点运行在 {host} 上的 Secure VM 中。",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM 可用",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "无 KVM",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "面向收益应用的 VM 层已在计划中。它需要主机上有 KVM。",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} 必须以 {runtime} 运行：其目录条目如此要求。",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} 必须以 {runtime} 运行：{reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "请先在此主机上安装 gVisor。",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "此主机上未安装 gVisor。",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} 需要原始套接字，而此工作节点没有以 --net-raw 注册的 gVisor 运行时。安装命令会注册一个。",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "工作节点无法向 Docker 查询它有哪些运行时。",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor 仅在 Linux 主机上运行。",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "此工作节点的版本早于安全层功能。请更新它，以便在此选择运行时。",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "此工作节点上的 CASHPILOT_CONTAINER_RUNTIME 为 {runtime}。该变量优先于此页面。",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "此工作节点上的 CASHPILOT_CONTAINER_RUNTIME_OVERRIDES 设置了 {slug}={runtime}。该变量优先于此页面。",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid 无法运行 gVisor：它从 RAM 文件系统启动，而 gVisor 无法脱离该文件系统。请改为在 VM 中运行收益应用。",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "错误：{error}",

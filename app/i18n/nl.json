@@ -1483,6 +1483,18 @@
     "text": "{name} draait via een proxy op {box}. Als je het vanaf het eigen IP-adres van {box}{value} draait, ziet {name} dat adres, net als iedereen die het verkeer ervan bereikt. Bevestig met je wachtwoord.",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "Deze verdien-app is ingesteld om onder gVisor te draaien op {worker}, en dat kan niet: {why} Zet hem terug op Standaard op de pagina Vloot, of los dat eerst op. Er is niets uitgerold.",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "Deze verdien-app is ingesteld om onder gVisor te draaien op {worker}, en een proxy-kopie draait alleen onder Standaard. Zet hem terug op Standaard op de pagina Vloot om hem via een proxy te laten lopen. Er is niets uitgerold.",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "Deze verdien-app is ingesteld om onder {runtime} te draaien op {worker}, en de worker is te oud voor een runtimekeuze. Werk de worker bij, of zet de verdien-app terug op Standaard op de pagina Vloot. Er is niets uitgerold.",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "Opslaan van {name} mislukt.",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "Taal niet opgeslagen: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "De lagen waarachter deze kopie draait: de LAN-afscherming, en Standaard (runc) of gVisor. Op de pagina Vloot wijzig je ze.",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "gVisor controleren",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "Groen.",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "Niet geïnstalleerd.",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "Rood.",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "Controleren…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "Start een korte testcontainer onder gVisor op het netwerk van de verdien-apps. Die moet de kernel van gVisor zien en een naam kunnen omzetten.",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "Deze CashPilot-UI is een ontwikkelbuild, dus de opdracht kan niet aan een release worden vastgepind. Draai een uitgebrachte image om hem te krijgen.",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "Deze CashPilot-UI-image bevat {name} niet, dus de download kan niet worden gecontroleerd.",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} is geen hulpprogramma van CashPilot.",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "Gekopieerd",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "Kopiëren",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "Deze pagina draait niet via https, dus het klembord is geblokkeerd. De opdracht is geselecteerd: druk op Ctrl+C of Cmd+C.",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "Docker-standaardinstelling",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "Runtime voor verdien-apps die je vanaf nu hier uitrolt",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "Verdien-apps die hier al staan, houden hun runtime.",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "Opgeslagen. Het geldt voor verdien-apps die je vanaf nu hier uitrolt.",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "Opslaan…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "Waartegen elke laag beschermt",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "{service} onder {runtime} draaien?\n\nDit rolt {service} nu opnieuw uit. Hij stopt en start opnieuw, meestal binnen een minuut. Zijn datavolume blijft behouden.",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "afscherming onbekend",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "afgeschermd",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "Vergrendeld",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "niet afgeschermd",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "{runtime} bij de volgende uitrol",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "{service} is opnieuw uitgerold onder {runtime}.",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "Opnieuw onder {runtime} draaien",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} draait onder {runtime} vanaf de volgende uitrol.",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "Runtime van {service} wordt opgeslagen…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "Onder gVisor draaien",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "Onder Standaard draaien",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Afscherming van de Secure VM mislukt",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "in de Secure VM",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Afscherming van de Secure VM onbekend",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "LAN-afscherming",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "gVisor op deze host installeren",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor plaatst een eigen kernel tussen elke verdien-app en de kernel van deze host. Dat kost ongeveer een vijfde van de doorvoer en zes tot negen keer zoveel CPU. Voer deze opdracht uit op de host. De opdracht vraagt om bevestiging voordat er iets verandert, en draaiende containers blijven draaien.",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "geïnstalleerd",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "niet geïnstalleerd",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "gVisor van deze host verwijderen",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "Zet eerst elke verdien-app op deze worker terug op Standaard. De opdracht weigert zolang er nog een onder gVisor draait.",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "hier niet mogelijk",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "uit",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "aan",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "Socket-proxy",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "Deze worker heeft de rechtstreekse Docker-socket, en die staat gelijk aan root op de host. De meegeleverde compose-bestanden zetten er een socket-proxy voor.",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "Standaard (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "Beveiligingslagen",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "onbekend",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "afscherming mislukt",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "afscherming in orde",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "afscherming de laatste tijd niet gecontroleerd",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "afscherming onbekend",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "Deze worker draait in een Secure VM op {host}.",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM beschikbaar",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "geen KVM",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "Een VM-laag voor verdien-apps is gepland. Daarvoor is KVM op de host nodig.",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} moet onder {runtime} draaien: dat staat in de catalogusvermelding.",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} moet onder {runtime} draaien: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "Installeer eerst gVisor op deze host.",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "gVisor is niet geïnstalleerd op deze host.",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} heeft raw sockets nodig, en op deze worker is geen gVisor-runtime geregistreerd met --net-raw. De installatieopdracht registreert er een.",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "De worker kon Docker niet vragen welke runtimes het heeft.",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor draait alleen op Linux-hosts.",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "Deze worker is ouder dan de beveiligingslagen. Werk hem bij om hier een runtime te kiezen.",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME op deze worker is {runtime}. De variabele gaat voor op deze pagina.",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME_OVERRIDES op deze worker stelt {slug}={runtime} in. De variabele gaat voor op deze pagina.",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid kan gVisor niet draaien: het start op vanaf een RAM-bestandssysteem dat gVisor niet kan verlaten. Draai de verdien-apps in plaats daarvan in een VM.",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "Fout: {error}",

@@ -1483,6 +1483,18 @@
     "text": "{name} {box} पर एक प्रॉक्सी के ज़रिए चलता है। इसे {box} के अपने IP{value} से चलाने पर वह पता {name} को और उसका ट्रैफ़िक जहाँ-जहाँ पहुँचता है, सबको दिखता है। अपने पासवर्ड से पुष्टि करें।",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "यह कमाई ऐप {worker} पर gVisor के तहत चलने के लिए सेट है, और यह ऐसा नहीं कर सकता: {why} फ़्लीट पेज पर इसे वापस मानक पर सेट करें, या पहले उसे ठीक करें। कुछ भी डिप्लॉय नहीं हुआ।",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "यह कमाई ऐप {worker} पर gVisor के तहत चलने के लिए सेट है, और प्रॉक्सी के ज़रिए भेजी गई कॉपी सिर्फ़ मानक के तहत चलती है। इसे प्रॉक्सी के ज़रिए भेजने के लिए फ़्लीट पेज पर इसे वापस मानक पर सेट करें। कुछ भी डिप्लॉय नहीं हुआ।",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "यह कमाई ऐप {worker} पर {runtime} के तहत चलने के लिए सेट है, और वर्कर रनटाइम का चुनाव लेने के लिए बहुत पुराना है। वर्कर को अपडेट करें, या फ़्लीट पेज पर कमाई ऐप को वापस मानक पर सेट करें। कुछ भी डिप्लॉय नहीं हुआ।",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "{name} सहेजना विफल रहा।",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "भाषा सहेजी नहीं गई: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "वे परतें जिनके पीछे यह कॉपी चलती है: LAN सुरक्षा घेरा, और मानक (runc) या gVisor। इन्हें फ़्लीट पेज पर बदला जाता है।",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "gVisor जाँचें",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "हरा।",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "इंस्टॉल नहीं है।",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "लाल।",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "जाँच हो रही है…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "कमाई ऐप्स के नेटवर्क पर gVisor के तहत एक छोटा प्रोब कंटेनर शुरू करें। उसे gVisor का कर्नेल दिखना चाहिए और उसे एक नाम रिज़ॉल्व करना चाहिए।",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "यह CashPilot UI एक डेवलपमेंट बिल्ड है, इसलिए यह कमांड को किसी रिलीज़ पर पिन नहीं कर सकता। कमांड पाने के लिए कोई रिलीज़ की गई इमेज चलाएँ।",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "इस CashPilot UI इमेज में {name} नहीं है, इसलिए यह डाउनलोड की जाँच नहीं कर सकती।",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} कोई CashPilot हेल्पर नहीं है।",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "कॉपी हो गया",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "कॉपी करें",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "यह पेज https पर नहीं है, इसलिए क्लिपबोर्ड ब्लॉक है। कमांड चुनी हुई है: Ctrl+C या Cmd+C दबाएँ।",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "Docker का डिफ़ॉल्ट",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "उन कमाई ऐप्स का रनटाइम जिन्हें आप अब से यहाँ डिप्लॉय करेंगे",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "यहाँ पहले से मौजूद कमाई ऐप्स अपना रनटाइम बनाए रखते हैं।",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "सहेजा गया। यह उन कमाई ऐप्स पर लागू होता है जिन्हें आप अब से यहाँ डिप्लॉय करेंगे।",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "सहेजा जा रहा है…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "हर परत किससे बचाती है",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "{service} को {runtime} के तहत चलाएँ?\n\nयह {service} को अभी फिर से डिप्लॉय करता है। यह रुकता है और फिर से शुरू होता है, आमतौर पर एक मिनट से कम में। इसका डेटा वॉल्यूम बना रहता है।",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "सुरक्षा घेरा अज्ञात",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "सुरक्षा घेरे में",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "लॉक है",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "सुरक्षा घेरे में नहीं",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "अगले डिप्लॉय पर {runtime}",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "{service} को {runtime} के तहत फिर से डिप्लॉय किया गया।",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "फिर से {runtime} के तहत चलाएँ",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} अपने अगले डिप्लॉय से {runtime} के तहत चलेगा।",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "{service} का रनटाइम सहेजा जा रहा है…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "gVisor के तहत चलाएँ",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "मानक के तहत चलाएँ",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Secure VM सुरक्षा घेरा विफल",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "Secure VM में",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Secure VM सुरक्षा घेरा अज्ञात",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "LAN सुरक्षा घेरा",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "इस होस्ट पर gVisor इंस्टॉल करें",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor हर कमाई ऐप और इस होस्ट के कर्नेल के बीच अपना कर्नेल रखता है। इससे लगभग पाँचवाँ हिस्सा थ्रूपुट घटता है और CPU छह से नौ गुना लगता है। यह कमांड होस्ट पर चलाएँ। यह कुछ भी बदलने से पहले पूछती है, और चल रहे कंटेनर चलते रहते हैं।",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "इंस्टॉल है",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "इंस्टॉल नहीं है",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "इस होस्ट से gVisor हटाएँ",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "पहले इस वर्कर के हर कमाई ऐप को वापस मानक पर करें। जब तक कोई कमाई ऐप अभी भी gVisor के तहत चल रहा है, कमांड चलने से मना कर देती है।",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "यहाँ संभव नहीं",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "बंद",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "चालू",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "सॉकेट प्रॉक्सी",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "इस वर्कर के पास सीधा Docker सॉकेट है, जो होस्ट पर root के बराबर है। साथ आने वाली compose फ़ाइलें इसके आगे एक सॉकेट प्रॉक्सी लगाती हैं।",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "मानक (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "सुरक्षा परतें",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "अज्ञात",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "सुरक्षा घेरा विफल",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "सुरक्षा घेरा ठीक",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "सुरक्षा घेरा हाल में नहीं जाँचा गया",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "सुरक्षा घेरा अज्ञात",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "यह वर्कर {host} पर एक Secure VM के अंदर चलता है।",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM उपलब्ध",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "KVM नहीं",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "कमाई ऐप्स के लिए एक VM परत की योजना है। इसके लिए होस्ट पर KVM चाहिए।",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} का {runtime} के तहत चलना ज़रूरी है: उसकी कैटलॉग प्रविष्टि ऐसा कहती है।",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} का {runtime} के तहत चलना ज़रूरी है: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "पहले इस होस्ट पर gVisor इंस्टॉल करें।",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "इस होस्ट पर gVisor इंस्टॉल नहीं है।",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} को raw सॉकेट चाहिए, और इस वर्कर में --net-raw के साथ रजिस्टर किया गया कोई gVisor रनटाइम नहीं है। इंस्टॉल कमांड एक रजिस्टर करती है।",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "वर्कर Docker से यह नहीं पूछ सका कि उसके पास कौन-से रनटाइम हैं।",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor सिर्फ़ Linux होस्ट पर चलता है।",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "यह वर्कर सुरक्षा परतों से पुराना है। यहाँ रनटाइम चुनने के लिए इसे अपडेट करें।",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "इस वर्कर पर CASHPILOT_CONTAINER_RUNTIME {runtime} है। इस पेज के बजाय वेरिएबल लागू होता है।",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "इस वर्कर पर CASHPILOT_CONTAINER_RUNTIME_OVERRIDES {slug}={runtime} सेट करता है। इस पेज के बजाय वेरिएबल लागू होता है।",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid पर gVisor नहीं चल सकता: यह एक RAM फ़ाइल सिस्टम से बूट होता है जिससे gVisor बाहर नहीं निकल सकता। इसके बजाय कमाई ऐप्स को किसी VM में चलाएँ।",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "त्रुटि: {error}",

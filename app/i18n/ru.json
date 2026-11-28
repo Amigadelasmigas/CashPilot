@@ -1483,6 +1483,18 @@
     "text": "{name} работает через прокси на {box}. Запуск с собственного IP машины {box}{value} покажет этот адрес {name} и всем, до кого доходит его трафик. Подтвердите паролем.",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "Это приложение для заработка настроено на запуск в gVisor на {worker}, но это невозможно: {why} Верните ему стандартную среду выполнения на странице «Парк» или сначала устраните эту причину. Ничего не развёрнуто.",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "Это приложение для заработка настроено на запуск в gVisor на {worker}, а копия через прокси работает только в стандартной среде выполнения. Чтобы направить его через прокси, верните ему стандартную среду выполнения на странице «Парк». Ничего не развёрнуто.",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "Это приложение для заработка настроено на запуск в среде {runtime} на {worker}, но воркер слишком старый, чтобы принять выбор среды выполнения. Обновите воркер или верните приложению стандартную среду выполнения на странице «Парк». Ничего не развёрнуто.",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "Не удалось сохранить {name}.",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "Язык не сохранён: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "Уровни защиты, за которыми работает эта копия: барьер локальной сети и стандартная среда (runc) или gVisor. Изменить их можно на странице «Парк».",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "Проверить gVisor",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "Зелёный.",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "Не установлен.",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "Красный.",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "Проверка…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "Запустить короткий тестовый контейнер в gVisor в сети приложений для заработка. Он должен увидеть ядро gVisor и разрешить имя.",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "Этот интерфейс CashPilot — сборка для разработки, поэтому он не может привязать команду к релизу. Чтобы получить её, запустите образ из релиза.",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "Образ этого интерфейса CashPilot не содержит {name}, поэтому он не может проверить загрузку.",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} не является вспомогательным скриптом CashPilot.",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "Скопировано",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "Копировать",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "Эта страница открыта не по https, поэтому доступ к буферу обмена заблокирован. Команда выделена: нажмите Ctrl+C или Cmd+C.",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "По умолчанию Docker",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "Среда выполнения для приложений для заработка, которые вы развернёте здесь с этого момента",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "Приложения для заработка, которые уже здесь, сохраняют свою среду выполнения.",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "Сохранено. Это применяется к приложениям для заработка, которые вы развернёте здесь с этого момента.",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "Сохранение…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "Что защищает каждый уровень",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "Запускать {service} в среде {runtime}?\n\nЭто сейчас переразвернёт {service}. Он остановится и запустится снова, обычно меньше чем за минуту. Его том с данными сохранится.",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "барьер: неизвестно",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "за барьером",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "Заблокировано",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "без барьера",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "{runtime} при следующем развёртывании",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "{service} переразвёрнут в среде {runtime}.",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "Снова запустить в среде {runtime}",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} будет работать в среде {runtime}, начиная со следующего развёртывания.",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "Сохранение среды выполнения {service}…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "Запускать в gVisor",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "Запускать в стандартной среде",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Сбой барьера Secure VM",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "в Secure VM",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Барьер Secure VM: неизвестно",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "Барьер локальной сети",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "Установить gVisor на этот хост",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor ставит собственное ядро между каждым приложением для заработка и ядром этого хоста. Это стоит примерно пятой части пропускной способности и в шесть–девять раз больше процессорного времени. Выполните эту команду на хосте. Она спрашивает подтверждение, прежде чем что-либо изменить, а работающие контейнеры продолжают работать.",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "установлен",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "не установлен",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "Удалить gVisor с этого хоста",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "Сначала верните всем приложениям для заработка на этом воркере стандартную среду выполнения. Команда откажется работать, пока хотя бы одно из них ещё работает в gVisor.",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "здесь невозможно",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "выкл.",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "вкл.",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "Прокси сокета",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "Этот воркер держит прямой сокет Docker, что равносильно root-доступу к хосту. Поставляемые файлы compose ставят перед ним прокси сокета.",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "Стандартная (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "Уровни защиты",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "неизвестно",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "сбой барьера",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "барьер в порядке",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "барьер давно не проверялся",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "барьер: неизвестно",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "Этот воркер работает внутри Secure VM на {host}.",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM доступен",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "нет KVM",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "Уровень VM для приложений для заработка запланирован. Для него нужен KVM на хосте.",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} должен работать в среде {runtime}: так указано в его записи каталога.",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} должен работать в среде {runtime}: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "Сначала установите gVisor на этот хост.",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "gVisor не установлен на этом хосте.",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} нужны raw-сокеты, а на этом воркере не зарегистрирована среда выполнения gVisor с --net-raw. Команда установки регистрирует её.",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "Воркеру не удалось узнать у Docker, какие среды выполнения у него есть.",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor работает только на хостах Linux.",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "Этот воркер старше уровней защиты. Обновите его, чтобы выбирать здесь среду выполнения.",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "На этом воркере CASHPILOT_CONTAINER_RUNTIME равно {runtime}. Переменная имеет приоритет над этой страницей.",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME_OVERRIDES на этом воркере задаёт {slug}={runtime}. Переменная имеет приоритет над этой страницей.",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid не может запускать gVisor: он загружается из файловой системы в оперативной памяти, за пределы которой gVisor не может выйти. Вместо этого запускайте приложения для заработка в VM.",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "Ошибка: {error}",
