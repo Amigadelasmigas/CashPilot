@@ -781,7 +781,13 @@ def _ready_with_gate(client: Any, container: Any) -> dict[str, Any]:
     An inner's /run/ready outlives its gate: one that went down during the
     wait leaves a ready file and no way out."""
     exit_info = _wait_ready(container)
-    if is_isolated(container) and not _gate_running(client, container):
+    try:
+        gate_up = not is_isolated(container) or _gate_running(client, container)
+    except APIError as exc:
+        # Unread is down: the callers undo a change on ProxyTunnelError only.
+        logger.warning("Could not read the gate of %s: %s", container.name, redact(str(exc)))
+        gate_up = False
+    if not gate_up:
         raise ProxyTunnelError(t("err.proxy_tunnel.tunnel_did_not_reach_internet", timeout=int(READY_TIMEOUT)))
     return exit_info
 
@@ -1732,6 +1738,17 @@ def _ensure_tunnel(
                     if expected_container is not None and members:
                         raise ProxyTunnelError(t("err.proxy_tunnel.could_not_keep_approved_container"))
                     _move_members(client, current, new, target=move_target)
+                    # A trip of the old tunnel during the move: the copies that
+                    # moved are held before it goes, or nothing would show it.
+                    # One that cannot be read counts as tripped.
+                    try:
+                        current.reload()
+                        trip = not tripped_before and tripped(client, current)
+                    except APIError as exc:
+                        logger.warning("Could not read %s after the move: %s", current.name, redact(str(exc)))
+                        trip = True
+                    if trip:
+                        _hold_others(client, new, keep or starting)
                     _remove_quietly(current, SIDECAR_STOP_SECONDS)
             new.rename(final)
     except Exception:
@@ -2180,12 +2197,16 @@ def _finish_staged(
         # across stopped, for their owner's Start. It is stopped before the
         # read, so no trip can land after it, while a copy starts in the
         # staged tunnel: the stop keeps a trip's exit code, and a stopped run
-        # trips no more. Its copies lose their way out a moment early.
-        with contextlib.suppress(APIError):
+        # trips no more. Its copies lose their way out a moment early. A stop
+        # or a read that fails leaves the trip unknown, so they are held then too.
+        try:
             current.stop(timeout=SIDECAR_STOP_SECONDS)
-        with contextlib.suppress(APIError):
             current.reload()
-        if tripped(client, current):
+            trip = tripped(client, current)
+        except APIError as exc:
+            logger.warning("Could not stop or read %s; its copies move held: %s", current.name, redact(str(exc)))
+            trip = True
+        if trip:
             _hold_others(client, current, chosen)
         members = _members(client, current)
         _check_move_targets(client, members, target)
@@ -2784,18 +2805,24 @@ def _stop(slug: str, proxy_id: int) -> dict[str, Any]:
         # error: the cap would read it as "could not stop" and never mark the
         # copy, and a second stop finds it held (was_running False), so its
         # reset would never start it again.
-        ran, half_failure = _halt(client, slug, earner, tunnel, tunnel_live, was_running, halves)
+        ran, half_failure, gate_failure = _halt(client, slug, earner, tunnel, tunnel_live, was_running, halves)
         warning = (
             f"{name} was stopped, but the stop may not survive a power cut. {exc}. Stop it again once the disk "
             "is healthy."
         )
-        return _stopped(name, ran, half_failure, warning, durable=False)
-    ran, half_failure = _halt(client, slug, earner, tunnel, tunnel_live, was_running, halves)
-    return _stopped(name, ran, half_failure)
+        return _stopped(name, ran, half_failure, warning, durable=False, gate_failure=gate_failure)
+    ran, half_failure, gate_failure = _halt(client, slug, earner, tunnel, tunnel_live, was_running, halves)
+    return _stopped(name, ran, half_failure, gate_failure=gate_failure)
 
 
 def _stopped(
-    name: str, was_running: bool, half_failure: Exception | None, warning: str | None = None, *, durable: bool = True
+    name: str,
+    was_running: bool,
+    half_failure: Exception | None,
+    warning: str | None = None,
+    *,
+    durable: bool = True,
+    gate_failure: Exception | None = None,
 ) -> dict[str, Any]:
     """The answer of a stop that stopped the copy: ``was_running``, and ``durable`` False and a ``warning`` when due.
 
@@ -2803,12 +2830,17 @@ def _stopped(
     an error: the copy and its tunnel are down and the stop is in the marker, so
     an error would make the cap read "could not stop" and never mark the copy,
     and a second stop finds it held (was_running False), so its reset would
-    never start it again."""
+    never start it again. A gate that could not stop (``gate_failure``) is a warning for the same reason."""
     out: dict[str, Any] = {"was_running": was_running}
     notes = [warning] if warning else []
     if half_failure is not None:
         notes.append(
             f"{name} was stopped, but what an interrupted move or redeploy left of it could not be stopped ({half_failure}). "
+            "Stop it again."
+        )
+    if gate_failure is not None:
+        notes.append(
+            f"{name} was stopped, but the gate of its tunnel could not be stopped ({redact(str(gate_failure))}). "
             "Stop it again."
         )
     if not durable:
@@ -2820,7 +2852,7 @@ def _stopped(
 
 def _halt(
     client: Any, slug: str, earner: Any, tunnel: Any, tunnel_live: bool, was_running: bool, halves: tuple[Any, ...] = ()
-) -> tuple[bool, Exception | None]:
+) -> tuple[bool, Exception | None, Exception | None]:
     """_stop's work once the stop is in the marker: the earner down, and its tunnel when no copy in it should run.
 
     ``halves`` are what a move a worker died in, or a failed redeploy, left of the copy (_stop): down too.
@@ -2829,8 +2861,13 @@ def _halt(
     is not started) never makes the stop an error: its first failure is
     returned with ``was_running``, for the answer's warning (_stopped). One
     that still runs is raised once the earner and the tunnel are down, as a
-    failure to stop the earner is: the copy still runs, so the cap must retry."""
+    failure to stop the earner is: the copy still runs, so the cap must retry.
+
+    A gate that cannot stop is returned third, for a warning, never raised: the
+    copy and its tunnel are down, and an error would make the cap's retry find
+    the copy down and never mark it for its reset."""
     half_failure = None
+    gate_failure = None
     live_failure = None
     for half in halves:
         was_live = getattr(half, "status", "") in _LIVE
@@ -2845,12 +2882,15 @@ def _halt(
                 half_failure = half_failure or exc
     if tunnel is not None and not _is_shared(tunnel):
         tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
-        _stop_gate(client, tunnel)
+        try:
+            _stop_gate(client, tunnel, strict=True)
+        except Exception as exc:  # noqa: BLE001 - a warning; the earner still stops
+            gate_failure = exc
         if earner is not None:
             earner.stop(timeout=orchestrator._get_stop_timeout(slug))
         if live_failure is not None:
             raise live_failure
-        return was_running, half_failure
+        return was_running, half_failure, gate_failure
     failure = live_failure
     if earner is not None:
         try:
@@ -2869,12 +2909,12 @@ def _halt(
             if tunnel_live:
                 tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
             try:
-                _stop_gate(client, tunnel)
-            except Exception as exc:  # noqa: BLE001 - raised below; the earner's failure comes first
-                failure = failure or exc
+                _stop_gate(client, tunnel, strict=True)
+            except Exception as exc:  # noqa: BLE001 - a warning, as above
+                gate_failure = exc
     if failure is not None:
         raise failure
-    return was_running, half_failure
+    return was_running, half_failure, gate_failure
 
 
 def start(
@@ -4171,18 +4211,19 @@ def _hold_tripped(tunnel: Any, earner: Any | None, proxy_id: str) -> bool:
         lock.release()
 
 
-def _stop_gate(client: Any, tunnel: Any) -> None:
+def _stop_gate(client: Any, tunnel: Any, *, strict: bool = False) -> None:
     """Stop the gate of an isolated ``tunnel``, so it holds no proxy session while the tunnel is down.
 
-    Its network stays: the next start makes a new gate on it (_gate_up)."""
+    Its network stays: the next start makes a new gate on it (_gate_up). A gate
+    that does not stop is logged, and raised when ``strict`` (a Stop, which says so)."""
     gate = _gate_of(client, tunnel) if is_isolated(tunnel) else None
     if gate is not None and getattr(gate, "status", "") in _LIVE:
         try:
             gate.stop(timeout=SIDECAR_STOP_SECONDS)
         except Exception as exc:
-            # Raised: a Stop that leaves the gate up says so, and is tried again.
             logger.warning("Could not stop the gate of %s: %s", tunnel.name, redact(str(exc)))
-            raise
+            if strict:
+                raise
 
 
 def _stop_gateless(tunnel: Any, proxy_id: str) -> None:

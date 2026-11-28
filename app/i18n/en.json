@@ -361,7 +361,7 @@
   "api.restore_runs_one_copy_catalog": "A restore runs one copy of the catalog's image",
   "api.restoring_puts_node_identity_wallet": "Restoring {service} on {name} puts a node identity or wallet there. Enter your password to continue.",
   "api.role_must_viewer_writer_owner": "Role must be viewer, writer, or owner",
-  "api.route_kept_needs_tick": "{name} runs through a proxy that now needs your tick first. On its page, leave the Route box on Keep, tick each line under it, and deploy again.",
+  "api.route_kept_needs_tick": "{name} runs through a proxy that now needs your tick first. On its page, leave the Route box on Keep, tick each line under it and the box it runs on, then deploy again.",
   "api.route_proxy_id_0_worker": "route is a proxy id, or 0 for the worker's own IP",
   "api.running_another_image_device_id": "{name} runs with a device id the provider pays by, so running another image than the catalog's needs your password.",
   "api.running_another_image_identity": "{name} keeps a wallet or node identity, so running another image than the catalog's needs your password.",

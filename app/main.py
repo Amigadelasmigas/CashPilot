@@ -4337,6 +4337,7 @@ async def api_services_available(request: Request) -> list[dict[str, Any]]:
             worker_node_counts[slug].add(node)
 
     recorded_routes = await _recorded_routes()
+    worker_specs = await database.list_worker_specs()
     locale = i18n.current()
     available = []
     for svc in services:
@@ -4361,6 +4362,7 @@ async def api_services_available(request: Request) -> list[dict[str, Any]]:
         svc["route_refusal"] = proxies.refusal(svc, routed=True)
         svc["route_needs"] = proxies.acknowledgements(svc)
         svc["routes"] = recorded_routes.get(slug, {})
+        svc["route_acks_missing"] = _route_acks_missing(svc, slug, worker_specs)
         available.append(svc)
     return available
 
@@ -4410,11 +4412,17 @@ async def api_get_service(request: Request, slug: str) -> dict[str, Any]:
     svc["route_needs"] = proxies.acknowledgements(svc)
     svc["route_udp"] = bool((svc.get("docker") or {}).get("udp_port_range"))
     svc["routes"] = (await _recorded_routes(slug)).get(slug, {})
-    # Worker id -> the ticks its recorded route lacks (one recorded before its
-    # service needed them): the Route box asks for them under "Keep" too.
-    svc["route_acks_missing"] = {
+    svc["route_acks_missing"] = _route_acks_missing(svc, slug, await database.list_worker_specs(slug))
+    return svc
+
+
+def _route_acks_missing(svc: dict[str, Any], slug: str, rows: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Worker id -> the ticks its recorded route of ``slug`` lacks (one recorded
+    before its service needed them): the Route box asks for them under "Keep" too,
+    and frees that box to send them. ``rows`` are list_worker_specs rows."""
+    return {
         str(row["worker_id"]): missing
-        for row in await database.list_worker_specs(slug)
+        for row in rows
         if row["slug"] == slug
         and proxies.route_of(row["spec"]) is not None
         and (
@@ -4423,7 +4431,6 @@ async def api_get_service(request: Request, slug: str) -> dict[str, Any]:
             )
         )
     }
-    return svc
 
 
 async def _recorded_routes(slug: str | None = None) -> dict[str, dict[str, int]]:

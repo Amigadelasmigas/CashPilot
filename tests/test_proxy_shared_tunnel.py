@@ -2260,6 +2260,36 @@ class TestAStuckTunnelChangeIsReported:
         assert "cashpilot-m2-p3" in proxy_tunnel.held()
         assert docker.named("cashpilot-m2-p3").status != "running"
 
+    def test_a_working_tunnel_that_does_not_stop_moves_its_copies_across_held(self, docker):
+        """Its stop failed, so it still runs and a trip could still land: the copies move held."""
+        current, staged = self._half_done(docker)
+
+        def refuses(timeout=None):
+            raise APIError("500 Server Error: stop failed")
+
+        current.stop = refuses
+        assert proxy_tunnel._finish_staged(docker, staged, current, "cashpilot-tunnel-p3") is staged
+        assert _member_ids(docker, staged) == ["cashpilot-m1-p3", "cashpilot-m2-p3"]
+        assert "cashpilot-m2-p3" in proxy_tunnel.held()
+        assert docker.named("cashpilot-m2-p3").status != "running"
+
+    def test_a_working_tunnel_whose_state_cannot_be_read_moves_its_copies_across_held(self, docker):
+        """It tripped as it stopped, and the read that would show it failed: the copies move held."""
+        current, staged = self._half_done(docker)
+        stale = copy.copy(current)  # docker-py's model: status cached until a reload
+
+        def tripping_stop(timeout=None):
+            _tripped(current)
+
+        def unreadable():
+            raise APIError("500 Server Error: inspect failed")
+
+        stale.stop, stale.reload = tripping_stop, unreadable
+        assert proxy_tunnel._finish_staged(docker, staged, stale, "cashpilot-tunnel-p3") is staged
+        assert _member_ids(docker, staged) == ["cashpilot-m1-p3", "cashpilot-m2-p3"]
+        assert "cashpilot-m2-p3" in proxy_tunnel.held()
+        assert docker.named("cashpilot-m2-p3").status != "running"
+
     def test_a_staged_tunnel_that_trips_while_it_is_proven_moves_its_copies_back_held(self, docker):
         current, staged = self._half_done(docker)
         staged.start()
@@ -6540,6 +6570,28 @@ class TestIsolatedTunnel:
         assert docker.named("cashpilot-honeygain-p3").status != "running"
         assert "cashpilot-earnfm-p3" not in proxy_tunnel.held()
 
+    def test_a_trip_of_the_old_tunnel_during_the_move_holds_the_copies_that_moved(self, docker):
+        """The old tunnel trips once the first copy has moved, before the others: they move, then are held."""
+        _deploy("earnfm")
+        _deploy("honeygain")
+        old = docker.named("cashpilot-tunnel-p3")
+        real = proxy_tunnel._clone_into
+
+        def clone_into(*args, **kwargs):
+            moved = real(*args, **kwargs)
+            if old.status == "running":
+                _tripped(old)
+            return moved
+
+        _made_by_an_older_worker(old)
+        with patch.object(proxy_tunnel, "_clone_into", clone_into):
+            _deploy("earnfm")
+        (new,) = docker.tunnels()
+        assert new.id != old.id, "replaced"
+        assert "cashpilot-honeygain-p3" in proxy_tunnel.held()
+        assert docker.named("cashpilot-honeygain-p3").status != "running"
+        assert "cashpilot-earnfm-p3" not in proxy_tunnel.held()
+
     def test_control_a_replacement_with_no_trip_holds_no_copy(self, docker):
         _deploy("earnfm")
         _deploy("honeygain")
@@ -6660,10 +6712,27 @@ class TestIsolatedTunnel:
             raise APIError("500 Server Error: stop failed")
 
         gate.stop = refuses
-        with pytest.raises(APIError):
-            proxy_tunnel.stop("bitping", 3)
+        out = proxy_tunnel.stop("bitping", 3)
+        # A warning, not an error: the cap reads was_running and marks the copy
+        # for its reset; a retry would find it down and never mark it.
+        assert out["was_running"] is True
+        assert "gate" in out["warning"]
         assert docker.named("cashpilot-bitping-p3").status == "exited"
         assert docker.named(OWN_TUNNEL).status == "exited"
+        del gate.stop  # the fake's own stop again
+        proxy_tunnel.stop("bitping", 3)
+        assert gate.status != "running", "a second Stop stops the gate"
+
+    def test_a_gate_that_cannot_be_read_after_the_ready_wait_fails_as_a_tunnel_error(self, docker):
+        """Callers undo a change on ProxyTunnelError only: a Docker error here would skip the undo."""
+        _deploy_isolated()
+        tunnel = docker.named(OWN_TUNNEL)
+        with (
+            patch.object(proxy_tunnel, "_wait_ready", return_value={}),
+            patch.object(proxy_tunnel, "_gate_running", side_effect=APIError("500 Server Error: inspect failed")),
+            pytest.raises(proxy_tunnel.ProxyTunnelError),
+        ):
+            proxy_tunnel._ready_with_gate(docker, tunnel)
 
     def test_a_tripped_inner_has_its_gate_stopped_too(self, docker):
         _deploy_isolated()

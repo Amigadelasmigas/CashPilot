@@ -2291,8 +2291,10 @@ const CP = (() => {
     const acks = select.closest && select.closest('.route-choice') && select.closest('.route-choice').querySelector('.route-acks');
     if (acks) acks.style.display = parseInt(select.value, 10) > 0 || (select.value === '' && acks.dataset.keep === '1') ? '' : 'none';
     for (const cb of scope.querySelectorAll(`input[data-routed="1"][data-slug="${select.dataset.slug}"]`)) {
-      cb.disabled = !switching;
-      cb.checked = !switching;
+      // A box whose recorded route lacks a tick is free under "Keep" too, to send it.
+      const free = switching || (select.value === '' && cb.dataset.keepNeeds === '1');
+      cb.disabled = !free;
+      cb.checked = !free;
     }
   }
 
@@ -2330,6 +2332,9 @@ const CP = (() => {
       const proxiedOnly = (w.system_info || {}).proxied_only === true;
       // It can still leave its route here (_routeSwitchBoxes), so the form stays.
       const routed = deployed && Boolean((svc.routes || {})[w.id]);
+      // Its recorded route lacks a tick: under "Keep" it is free, unticked, so the
+      // owner can tick it and send the ticks (_routeSwitchBoxes).
+      const keepNeeds = routed && ((svc.route_acks_missing || {})[w.id] || []).length > 0;
       if (!deployed || routed) allDeployed = false;
       let instancesBox = '';
       if (maxInstances) {
@@ -2346,7 +2351,7 @@ const CP = (() => {
       }
       rows += `
       <label class="worker-pick">
-        <input type="checkbox" class="${checkboxClass}" data-slug="${svc.slug}" data-wid="${w.id}"${routed ? ' data-routed="1"' : ''} ${deployed ? 'disabled checked' : (onlyChoice ? 'checked' : '')}>
+        <input type="checkbox" class="${checkboxClass}" data-slug="${svc.slug}" data-wid="${w.id}"${routed ? ' data-routed="1"' : ''}${keepNeeds ? ' data-keep-needs="1"' : ''} ${deployed && !keepNeeds ? 'disabled checked' : (onlyChoice && !deployed ? 'checked' : '')}>
         <span class="worker-pick-name${deployed ? ' is-deployed' : ''}">${escapeHtml(w.name)}</span>
         ${isDesktopWorker(w) ? `<span class="badge" title="${t('app.dep.desktop_title')}">Desktop</span>` : ''}
         ${proxiedOnly ? `<span class="badge" title="${t('app.dep.proxy_only_title')}">${t('app.dep.proxy_only')}</span>` : ''}

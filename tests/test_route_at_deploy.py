@@ -1535,6 +1535,8 @@ class TestTheUiDeploysARoute:
                 patch.object(main, "_get_all_worker_containers", AsyncMock(return_value=[])),
             ):
                 page = await main.api_get_service(MagicMock(), "honeygain")
+                # The setup wizard's list: its Route box asks the same under "Keep".
+                listed = {svc["slug"]: svc for svc in await main.api_services_available(MagicMock())}
             ui.calls.clear()
             with pytest.raises(HTTPException) as exc:
                 await ui.deploy(main.DeployRequest(env={}))  # "Keep", as an identity change or restore sends
@@ -1542,10 +1544,12 @@ class TestTheUiDeploysARoute:
             assert ui.calls == []
             await ui.deploy(main.DeployRequest(env={}, route_acknowledged=["account_risk"]))  # ticked under "Keep"
             sent = ui.calls[-1][2]
-            return pid, page, refused, sent, await database.get_deployment_spec("honeygain", worker_id=1)
+            return pid, page, listed, refused, sent, await database.get_deployment_spec("honeygain", worker_id=1)
 
-        pid, page, refused, sent, record = _run(go)
+        pid, page, listed, refused, sent, record = _run(go)
         assert page["route_acks_missing"] == {"1": ["account_risk"]}
+        assert listed["honeygain"]["route_acks_missing"] == {"1": ["account_risk"]}
+        assert not any(svc["route_acks_missing"] for slug, svc in listed.items() if slug != "honeygain")
         assert refused.status_code == 400 and refused.detail["needs"] == ["account_risk"]
         assert "Keep" in refused.detail["message"]
         assert sent["routed"] is True and sent["acknowledged"] == ["account_risk"]
