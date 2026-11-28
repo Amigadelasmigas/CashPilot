@@ -51,6 +51,7 @@ jobs:
         uv.lock
         app/**
         services/**
+        scripts/cashpilot-*
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -210,6 +211,12 @@ jobs:
           echo "Runtime dependencies changed: $RUNTIME_CHANGED"
 
           if echo "$CHANGED" | grep -qE '^(Dockerfile|entrypoint\.sh|app/)'; then
+            BUILD_UI=true
+          fi
+          # The UI image carries the host helpers that the Fleet page offers as
+          # one pinned command (app/layer_scripts.py), so a fix to one ships
+          # only in a new UI image.
+          if echo "$CHANGED" | grep -qE '^scripts/cashpilot-'; then
             BUILD_UI=true
           fi
           if [ "$RUNTIME_CHANGED" = true ]; then

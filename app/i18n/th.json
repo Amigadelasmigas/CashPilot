@@ -9563,6 +9563,102 @@
     "text": "คอนเทนเนอร์ชื่อ {name} ที่ CashPilot ไม่ได้สร้าง ใช้ชื่อที่ทันเนลใหม่ต้องการอยู่",
     "source": "713d0d61b762"
   },
+  "secure_vm.add_intro": {
+    "text": "เรียกใช้แอปหารายได้ภายใน VM ที่มีรั้วกั้นบนโฮสต์นี้ ให้รันคำสั่งนี้บนโฮสต์ในฐานะ root คำสั่งจะขอคีย์กลุ่มเครื่อง และแสดงสิ่งที่จะทำให้ดูก่อน",
+    "source": "feb047d466da"
+  },
+  "secure_vm.cmd.bad_host_name": {
+    "text": "ชื่อเวิร์กเกอร์ {name} ใช้เป็นชื่อโฮสต์ของ Secure VM ไม่ได้ เปลี่ยนชื่อเวิร์กเกอร์ให้ยาวไม่เกิน 64 อักขระ โดยใช้ได้เฉพาะตัวอักษร ตัวเลข ช่องว่าง จุด ขีดกลาง และขีดล่าง",
+    "source": "07b126d20986"
+  },
+  "secure_vm.cmd.bad_ui_url": {
+    "text": "ที่อยู่ UI ต้องเป็นที่อยู่ http:// หรือ https:// แบบธรรมดา",
+    "source": "d930d5f46015"
+  },
+  "secure_vm.cmd.ipv6_ui": {
+    "text": "Secure VM เชื่อมต่อกับ UI ผ่าน IPv4 ให้เปิดหน้านี้ผ่านที่อยู่ IPv4 หรือชื่อ ไม่ใช่ที่อยู่ IPv6",
+    "source": "554cf6fb0b55"
+  },
+  "secure_vm.cmd.not_a_host": {
+    "text": "เวิร์กเกอร์นี้เป็นโฮสต์ของ Secure VM ไม่ได้",
+    "source": "8bf56cbfbaf6"
+  },
+  "secure_vm.cmd.public_http": {
+    "text": "หน้านี้เปิดผ่าน http ธรรมดาบนที่อยู่สาธารณะ เวิร์กเกอร์ของ Secure VM จะไม่ส่งคีย์ผ่านช่องทางแบบนี้เด็ดขาด จึงลงทะเบียนไม่ได้ ให้เปิด UI ผ่าน https หรือจากที่อยู่ส่วนตัว แล้วลองอีกครั้ง",
+    "source": "79a13dc39212"
+  },
+  "secure_vm.cmd.same_name": {
+    "text": "มีเวิร์กเกอร์สองตัวที่ชื่อ {name} เปลี่ยนชื่อตัวใดตัวหนึ่ง เพื่อให้ Secure VM แยกได้ว่าคอมพิวเตอร์เครื่องใดเป็นโฮสต์ของตน",
+    "source": "34e8f02bdb7d"
+  },
+  "secure_vm.docs": {
+    "text": "Secure VM ทำงานอย่างไร",
+    "source": "32dc3fc87f22"
+  },
+  "secure_vm.flag": {
+    "text": "Secure VM บน {host}",
+    "source": "86c424a38212"
+  },
+  "secure_vm.flag_tip": {
+    "text": "เวิร์กเกอร์นี้ทำงานภายใน Secure VM บน {host} แอปหารายได้ของเวิร์กเกอร์นี้เข้าถึงโฮสต์นั้น LAN ของโฮสต์นั้น หรือ tailnet ของคุณไม่ได้",
+    "source": "0c13c3bf76a5"
+  },
+  "secure_vm.install": {
+    "text": "เพิ่ม Secure VM",
+    "source": "08ca6684aa69"
+  },
+  "secure_vm.no_kvm": {
+    "text": "โฮสต์นี้ไม่มี KVM จึงเรียกใช้ Secure VM ไม่ได้ แต่ gVisor และรั้วกั้น LAN ยังใช้งานได้ที่นี่",
+    "source": "858c23823fbd"
+  },
+  "secure_vm.remove": {
+    "text": "ลบ Secure VM",
+    "source": "83e2231c8d0e"
+  },
+  "secure_vm.remove_note": {
+    "text": "ลบ VM รวมถึงดิสก์ รั้วกั้น และทุกอย่างที่ VM เพิ่มไว้ ตรวจสอบว่าไม่มีสิ่งใดหลงเหลือ แล้วทำให้หน้านี้ลืมเวิร์กเกอร์ของ VM นั้น",
+    "source": "887619c0e750"
+  },
+  "secure_vm.selftest.asked": {
+    "text": "ส่งคำขอแล้ว โฮสต์จะรันการทดสอบตัวเองภายในหนึ่งนาที และผลจะแสดงที่นี่หลังจากนั้นไม่นาน",
+    "source": "e7b2cd319154"
+  },
+  "secure_vm.selftest.button": {
+    "text": "รันการทดสอบตัวเอง",
+    "source": "565661c7c5fa"
+  },
+  "secure_vm.selftest.green": {
+    "text": "ผลการทดสอบตัวเองเป็นสีเขียว: VM เข้าถึง UI และอินเทอร์เน็ตได้ และเข้าถึงสิ่งอื่นไม่ได้เลย",
+    "source": "95ce5bf92a05"
+  },
+  "secure_vm.selftest.never": {
+    "text": "ยังไม่มีผลการทดสอบตัวเอง",
+    "source": "169875028cab"
+  },
+  "secure_vm.selftest.recent": {
+    "text": "มีการรันการทดสอบตัวเองไปแล้วในช่วง 5 นาทีที่ผ่านมา โฮสต์จะรันการทดสอบได้ไม่เกินหนึ่งครั้งทุก 5 นาที",
+    "source": "7973755f9113"
+  },
+  "secure_vm.selftest.red": {
+    "text": "ผลการทดสอบตัวเองเป็นสีแดง: VM เข้าถึงบางสิ่งที่อยู่นอก VM ได้",
+    "source": "388a4db850b1"
+  },
+  "secure_vm.selftest.tip": {
+    "text": "จากภายใน VM โฮสต์จะลองเชื่อมต่อไปยังที่อยู่ของโฮสต์เอง LAN ของคุณ และ tailnet ของคุณ ผลจะมาถึงภายในสองนาที",
+    "source": "76052e027532"
+  },
+  "secure_vm.status": {
+    "text": "สถานะ",
+    "source": "920e413c7d41"
+  },
+  "secure_vm.title": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "secure_vm.verify": {
+    "text": "การทดสอบตัวเองบนโฮสต์",
+    "source": "ee157fbe84f4"
+  },
   "settings.about.desc_html": {
     "text": "CashPilot ตรวจสอบรุ่นล่าสุดบน GitHub ปุ่มอัปเดตด้านล่าง (<strong>{update_to}</strong> <strong>{pull}</strong> หรือ <strong>{repull}</strong>) จะรัน <code>docker compose pull &amp;&amp; docker compose up -d</code> ตามเอกสารให้คุณจากคอนเทนเนอร์ตัวช่วยแบบใช้ครั้งเดียว — คำสั่งนี้ติดตั้งแพตช์ล่าสุดของชุดรุ่นอิมเมจที่ไฟล์ compose ของคุณปักหมุดไว้ การย้ายไปชุดรุ่นที่ใหม่กว่ายังต้องแก้ไขแท็กอิมเมจ: โปรดอ่าน <a href=\"https://github.com/GeiserX/CashPilot/blob/main/UPGRADING.md\" target=\"_blank\" rel=\"noopener noreferrer\">UPGRADING.md</a> ก่อน แล้วอัปเดตโฮสต์ UI ก่อน จากนั้นจึงอัปเดตเวิร์กเกอร์ทุกตัว การติดตั้งที่ไม่ได้จัดการโดย Compose จะได้รับคำสั่งสำหรับอัปเดตด้วยตนเองแทน",
     "source": "353851ce9241"
