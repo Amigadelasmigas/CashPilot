@@ -92,6 +92,14 @@ if not API_KEY:
 WORKER_NAME = os.getenv("CASHPILOT_WORKER_NAME", socket.gethostname())
 WORKER_PORT = int(os.getenv("CASHPILOT_PORT", "8081"))
 WORKER_URL = os.getenv("CASHPILOT_WORKER_URL", "")
+#: Set only inside a Linux Secure VM (scripts/cashpilot-vm): the name of the
+#: worker on the host this VM runs on, so the UI shows "Secure VM on <host>".
+SECURE_VM_OF = os.getenv("CASHPILOT_SECURE_VM_OF", "").strip()[:64]
+#: The host's guard writes the outer fence's state here, read-only for us.
+SECURE_VM_FENCE_FILE = Path("/run/cashpilot-vm/fence.json")
+SECURE_VM_SELFTEST_FILE = Path("/run/cashpilot-vm/selftest.json")
+#: The one folder this worker may write for the host: a self-test request.
+SECURE_VM_ASK_DIR = Path("/run/cashpilot-vm-ask")
 HEARTBEAT_INTERVAL = 60  # seconds
 MINER_TARGETS, MINER_ERRORS = miner_read.parse_targets(os.getenv("CASHPILOT_MINERS", ""))
 
@@ -557,6 +565,41 @@ def _gpu_presence() -> dict[str, Any]:
     return {"available": None, "devices": [], "detected_by": None, "reason": host.get("reason")}
 
 
+def _read_guard_file(path: Path) -> dict[str, Any] | None:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8")[:16384])
+    except (OSError, ValueError):
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def _secure_vm_info() -> dict[str, Any] | None:
+    """In a Linux Secure VM: the host worker's name, the outer fence's last check and the last self-test.
+
+    Both come from the host's guard, which the guest cannot see otherwise.
+    Each is None until the guard has written it, or when the file does not
+    read as the guard writes it.
+    """
+    if not SECURE_VM_OF:
+        return None
+
+    def _when(raw: dict[str, Any]) -> int | None:
+        checked = raw.get("checked_at")
+        return checked if isinstance(checked, int) and not isinstance(checked, bool) else None
+
+    fence = None
+    raw = _read_guard_file(SECURE_VM_FENCE_FILE)
+    if raw and raw.get("state") in ("ok", "failed") and _when(raw) is not None:
+        fence = {"state": raw["state"], "checked_at": _when(raw), "reason": str(raw.get("reason") or "")[:200]}
+    selftest = None
+    raw = _read_guard_file(SECURE_VM_SELFTEST_FILE)
+    if raw and isinstance(raw.get("ok"), bool) and _when(raw) is not None:
+        failed = raw.get("failed")
+        failed = [str(line)[:120] for line in failed[:20]] if isinstance(failed, list) else []
+        selftest = {"ok": raw["ok"] and not failed, "checked_at": _when(raw), "failed": failed}
+    return {"host": SECURE_VM_OF, "fence": fence, "selftest": selftest}
+
+
 def _detect_network_type() -> str:
     """residential / hosting / unknown, from local hardware identifiers only.
 
@@ -824,6 +867,8 @@ async def _send_heartbeat() -> None:
             logger.error(refusal)
             _ui_url_refusal_logged = True
         return
+    if (secure_vm := _secure_vm_info()) is not None:
+        features.append("secure_vm")
     payload = {
         "name": WORKER_NAME,
         "client_id": CLIENT_ID,
@@ -875,6 +920,8 @@ async def _send_heartbeat() -> None:
             "proxied_only": route_gate.proxied_only(),
         },
     }
+    if secure_vm is not None:
+        payload["system_info"]["secure_vm"] = secure_vm
     if MINER_TARGETS or MINER_ERRORS:
         features.append("miner_read")
         payload["system_info"]["miners"] = _miner_snapshot or {
@@ -2684,6 +2731,31 @@ async def api_proxied_remove(request: Request, slug: str, proxy_id: int) -> dict
         if not _copy_removals[key]:
             del _copy_removals[key]
     return {"status": "removed", "containers": removed}
+
+
+@app.post("/api/secure-vm/selftest")
+async def api_secure_vm_selftest(request: Request) -> dict[str, str]:
+    """Ask the host's guard to run the Secure VM self-test.
+
+    The worker cannot reach the host, by design. It leaves a request in the
+    one folder it may write; the guard picks it up on its next pass (within a
+    minute), runs the probes and writes the result back, which the next
+    heartbeat reports. The guard runs at most one self-test every 5 minutes.
+    """
+    _verify_api_key(request)
+    # The request reaches the host's guard, so only this worker's own, confirmed
+    # key may send it: never the shared fleet key, which opens the worker until
+    # it enrols.
+    auth = request.headers.get("Authorization", "").encode()
+    if not _worker_key or _key_pending or not hmac.compare_digest(auth, f"Bearer {_worker_key}".encode()):
+        raise HTTPException(status_code=401, detail="Only this worker's own key can ask for a self-test")
+    if not SECURE_VM_OF:
+        raise HTTPException(status_code=404, detail="This worker is not a Secure VM")
+    try:
+        (SECURE_VM_ASK_DIR / "selftest").write_text(str(int(time.time())), encoding="utf-8")
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail=f"Could not ask the host: {exc.strerror}") from None
+    return {"status": "asked"}
 
 
 @app.post("/api/proxy-test")

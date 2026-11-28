@@ -13594,6 +13594,18 @@ async def api_worker_isolation_check(request: Request, worker_id: int) -> dict[s
     return await _proxy_to_worker(worker_id, "POST", "/api/isolation-check", timeout=120)
 
 
+@app.post("/api/workers/{worker_id}/secure-vm/selftest")
+async def api_worker_secure_vm_selftest(request: Request, worker_id: int) -> dict[str, Any]:
+    """Ask a Secure VM's host to run its self-test (scripts/cashpilot-vm).
+
+    Owner only. The worker leaves the request for the host's guard, which runs
+    the probes within a minute; the result arrives with a later heartbeat in
+    system_info.secure_vm.selftest.
+    """
+    _require_owner(request)
+    return await _proxy_to_worker(worker_id, "POST", "/api/secure-vm/selftest", timeout=15)
+
+
 @app.post("/api/workers/{worker_id}/isolation")
 async def api_worker_isolation(request: Request, worker_id: int) -> dict[str, Any]:
     """Turn LAN isolation on for an upgraded worker (app/lan_fence.py).
@@ -13606,6 +13618,39 @@ async def api_worker_isolation(request: Request, worker_id: int) -> dict[str, An
     """
     _require_owner(request)
     return await _proxy_to_worker(worker_id, "POST", "/api/isolation", json={"enable": True}, timeout=60)
+
+
+class WorkerRetire(BaseModel):
+    client_id: str
+
+
+@app.post("/api/workers/retire")
+async def api_worker_retire(request: Request, body: WorkerRetire) -> dict[str, str]:
+    """A Linux Secure VM's worker asks to be forgotten, as ``cashpilot-vm remove`` deletes the VM.
+
+    Only with the worker's own key: the shared key every worker holds would let
+    anyone delete any worker. And only from a worker whose last heartbeat said
+    it is a Secure VM (``system_info.secure_vm``), so no other worker can use
+    this to drop itself out of the fleet page.
+    """
+    cid = (body.client_id or "").strip()
+    if not cid:
+        raise HTTPException(status_code=400, detail="client_id required")
+    if await _authenticate_worker_heartbeat(request, cid) != "ok":
+        raise HTTPException(status_code=403, detail="Retiring a worker requires its own key")
+    worker_id = await database.get_worker_id(cid)
+    worker = await database.get_worker(worker_id) if worker_id is not None else None
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+    try:
+        info = json.loads(worker.get("system_info") or "{}")
+    except (TypeError, ValueError):
+        info = {}
+    if not isinstance(info, dict) or not isinstance(info.get("secure_vm"), dict):
+        raise HTTPException(status_code=403, detail="Only a Secure VM's worker can retire itself")
+    await database.delete_worker(worker_id)
+    logger.info("Secure VM worker '%s' retired itself (cashpilot-vm remove)", worker.get("name"))
+    return {"status": "deleted"}
 
 
 @app.delete("/api/workers/{worker_id}")
