@@ -71,7 +71,7 @@ from app.constants import (  # noqa: E402
     TUNNEL_PREFIX,
     drift_warnings_enabled,
 )
-from app.i18n import t  # noqa: E402
+from app.i18n import Reason, say, t, wire  # noqa: E402
 
 # Cached Docker availability (checked once at startup, refreshed on demand)
 _docker_available: bool | None = None
@@ -537,16 +537,25 @@ def _fatal_entry(container: Any, slug: str) -> dict[str, Any]:
     return {"fatal": kind, "fatal_at": finished} if kind else {}
 
 
-def _held_entry(container: Any) -> dict[str, Any]:
-    """``{"held": why}`` for a container the fence guard keeps stopped (lan_fence.guard), else nothing.
+def _held_entries(container: Any) -> dict[str, Any]:
+    """``held`` and ``held_reason`` for a container the fence guard keeps stopped (lan_fence.guard), else nothing.
 
     The guard's last pass, so the dashboard can say on the service itself why
     the node is down and what brings it back, not only on the Fleet page.
+    ``held_reason`` is the reason's key and arguments beside its English, so
+    the UI words it in its reader's language. Both come from one read of the
+    guard, so a guard pass that lands in between cannot pair one pass's
+    English with the next pass's key.
     """
     from app import lan_fence
 
     why = (lan_fence._state.get("guard") or {}).get(getattr(container, "name", None))
-    return {"held": str(why)} if why else {}
+    if not why:
+        return {}
+    entry: dict[str, Any] = {"held": str(why)}
+    if wired := wire(why):
+        entry["held_reason"] = wired
+    return entry
 
 
 def _shape(container: Any) -> dict[str, Any]:
@@ -1492,10 +1501,12 @@ def deploy_raw(
         if refused:
             raise ContainerRuntimeError(
                 t(
-                    "err.orchestrator.keeps_data_docker_socket_proxy",
+                    "err.orchestrator.keeps_data_worker_does_not_bind",
                     name=name,
-                    refused=", ".join(refused),
-                    bind_mounts_env=BIND_MOUNTS_ENV,
+                    refused=", ".join(src for src, _ in refused),
+                    reasons="; ".join(
+                        t("err.orchestrator.bind_refused_source_why", source=src, why=why) for src, why in refused
+                    ),
                 )
             )
         _ensure_volumes(client, volumes)
@@ -2515,6 +2526,13 @@ def _remember_identity(name: str, identity: str | None) -> None:
         logger.warning("Could not record the identity of %s: %s", name, exc)
 
 
+#: The English a mismatch record holds (reason.identity.mismatch), read back for its two identities.
+_MISMATCH_TEXT = re.compile(
+    r"its identity is (?P<current>\S+), not (?P<expected>\S+) as before the redeploy, so it is not running on the "
+    r"data volume that holds its keystore\. It stays stopped: restore that volume, then redeploy"
+)
+
+
 def identity_problem(container: Any) -> str | None:
     """Why a fence-gated node must stop: a different identity than before its redeploy.
 
@@ -2533,6 +2551,10 @@ def identity_problem(container: Any) -> str | None:
     if held == "MISMATCH":
         # Sticky until the next deploy rewrites the record: a stopped node
         # reads no identity, and must not be started again because of that.
+        # The record keeps the English, as older releases wrote it; the two
+        # identities in it are read back so the UI can word it.
+        if m := _MISMATCH_TEXT.fullmatch(rest):
+            return Reason("reason.identity.mismatch", current=m["current"], expected=m["expected"])
         return rest
     if getattr(container, "status", "") != "running":
         return None
@@ -2544,10 +2566,7 @@ def identity_problem(container: Any) -> str | None:
         _remember_identity(container.name, None)
         logger.info("%s kept its identity %s across the redeploy", container.name, current)
         return None
-    reason = (
-        f"its identity is {current}, not {expected} as before the redeploy, so it is not running on the data "
-        "volume that holds its keystore. It stays stopped: restore that volume, then redeploy"
-    )
+    reason = Reason("reason.identity.mismatch", current=current, expected=expected)
     _MISMATCH_HELD[container.name] = reason
     _remember_identity(container.name, f"MISMATCH {reason}")
     return reason
@@ -2564,7 +2583,7 @@ def _require_fence(slug: str) -> None:
 
     problem = lan_fence.fence_problem(_get_client(), service_name(slug))
     if problem:
-        raise ContainerNetworkError(t("err.orchestrator.not_started", slug=slug, problem=problem))
+        raise ContainerNetworkError(t("err.orchestrator.not_started", slug=slug, problem=say(problem)))
 
 
 def _require_startable(container: Any, slug: str) -> None:
@@ -2591,7 +2610,7 @@ def _require_startable(container: Any, slug: str) -> None:
         or identity_problem(container)
     )
     if problem:
-        raise ContainerNetworkError(t("err.orchestrator.not_started", slug=slug, problem=problem))
+        raise ContainerNetworkError(t("err.orchestrator.not_started", slug=slug, problem=say(problem)))
 
 
 def gated_spec_problem(container: Any, mode: str | None = None) -> str | None:
@@ -2611,49 +2630,53 @@ def gated_spec_problem(container: Any, mode: str | None = None) -> str | None:
     config = attrs.get("Config") if isinstance(attrs.get("Config"), dict) else {}
     network_mode = str(host.get("NetworkMode") or "")
     if network_mode == "host":
-        return "it shares the host's network, where its NET_ADMIN would reach the host's firewall"
+        return Reason("reason.spec.host_network")
     if host.get("Privileged"):
-        return "it runs privileged"
+        return Reason("reason.spec.privileged")
     want_caps = {str(c).upper().removeprefix("CAP_") for c in docker_conf.get("cap_add") or []}
     have_caps = {str(c).upper().removeprefix("CAP_") for c in host.get("CapAdd") or []}
     if extra := sorted(have_caps - want_caps):
-        return f"it holds {', '.join(extra)}, which its catalog entry does not grant"
+        return Reason("reason.spec.extra_caps", caps=", ".join(extra))
     policy = str((host.get("RestartPolicy") or {}).get("Name") or "no")
     if policy != "no":
-        return f"Docker would start it on its own (restart policy {policy}), before the fence is confirmed"
+        return Reason("reason.spec.restart_policy", policy=policy)
     pinned = {docker_conf.get("image")} | set((docker_conf.get("image_by_arch") or {}).values())
     pinned -= {None, ""}
     if pinned and str(config.get("Image") or "") not in pinned:
-        return f"it runs {config.get('Image') or 'an unknown image'}, not the image the catalog pins"
+        if not config.get("Image"):
+            return Reason("reason.spec.unknown_image")
+        return Reason("reason.spec.image", image=config["Image"])
     from app import lan_fence
 
     if mode == lan_fence.MODE_ON and network_mode != lan_fence.NETWORK_NAME:
-        return f"it is not on {lan_fence.NETWORK_NAME}, so the fence does not cover it"
+        return Reason("reason.spec.not_on_fence", network=lan_fence.NETWORK_NAME)
     if mode == lan_fence.MODE_OPERATOR and network_mode != _CONTAINER_NETWORK:
-        return f"it is not on {_CONTAINER_NETWORK}, the network whose rules this worker runs earners under"
+        return Reason("reason.spec.not_on_operator", network=_CONTAINER_NETWORK)
     if mode in (lan_fence.MODE_ON, lan_fence.MODE_OPERATOR):
         settings = attrs.get("NetworkSettings") if isinstance(attrs.get("NetworkSettings"), dict) else {}
         attached = settings.get("Networks") if isinstance(settings.get("Networks"), dict) else {}
         if network_mode not in attached:
-            return f"it is not attached to {network_mode}, so it would start with no network"
+            return Reason("reason.spec.not_attached", network=network_mode)
         if extra := sorted(set(attached) - {network_mode}):
-            return f"it is also attached to {', '.join(extra)}, where the fence does not cover it"
+            return Reason("reason.spec.also_attached", networks=", ".join(extra))
         bindings = host.get("PortBindings") if isinstance(host.get("PortBindings"), dict) else {}
         ui = docker_conf.get("ui_port")
         if isinstance(ui, dict) and f"{ui.get('port')}/tcp" not in bindings:
-            return f"it does not publish its WebUI port {ui.get('port')}"
+            return Reason("reason.spec.no_ui_port", port=ui.get("port"))
         rng = docker_conf.get("udp_port_range")
         if isinstance(rng, dict):
             wanted = _env_port_range(config, str(rng.get("env") or ""))
             if wanted is None and not any(k.endswith("/udp") for k in bindings):
-                return "it publishes none of its UDP ports"
+                return Reason("reason.spec.no_udp")
             if wanted is not None:
                 missing = [p for p in range(wanted[0], wanted[1] + 1) if f"{p}/udp" not in bindings]
                 if missing:
-                    return (
-                        f"it does not publish UDP {missing[0]}"
-                        + (f" and {len(missing) - 1} more" if len(missing) > 1 else "")
-                        + f" of its range {wanted[0]}:{wanted[1]}"
+                    return Reason(
+                        "reason.spec.udp_missing",
+                        port=missing[0],
+                        more=len(missing) - 1,
+                        start=wanted[0],
+                        end=wanted[1],
                     )
     return None
 
@@ -5124,13 +5147,78 @@ def _proxy_bind_roots() -> list[str]:
     the worker can refuse an update the proxy would refuse, with a sentence
     instead of a 403 halfway through.
     """
-    roots: list[str] = []
-    for raw in (os.getenv("CASHPILOT_COMPOSE_DIR", ""), *os.getenv("CASHPILOT_PROXY_BIND_MOUNTS", "").split(",")):
+    return _bind_entries(os.getenv("CASHPILOT_COMPOSE_DIR", ""), *os.getenv(BIND_MOUNTS_ENV, "").split(","))
+
+
+def _bind_entries(*raws: str) -> list[str]:
+    entries: list[str] = []
+    for raw in raws:
         # Taken exactly as the proxy reads them: an entry padded with spaces is
         # not a path to it, so it opens nothing here either.
         if raw.startswith("/") and raw == raw.strip():
-            roots.append(raw.rstrip("/") or "/")
-    return roots
+            entries.append(raw.rstrip("/") or "/")
+    return entries
+
+
+def proxy_bind_mounts() -> list[str]:
+    """The host paths CASHPILOT_PROXY_BIND_MOUNTS lists, each one bindable as itself only."""
+    return _bind_entries(*os.getenv(BIND_MOUNTS_ENV, "").split(","))
+
+
+def bind_source_plain(source: str) -> str:
+    """The one spelling of a bind source the worker matches against the list.
+
+    A trailing slash goes; nothing else is tidied. The kernel resolves
+    ``link/..`` through the link, so ``/listed/link/..`` is wherever the link
+    points, not ``/listed``, and the proxy compares the text as written, so it
+    refuses ``//listed`` or ``/./listed`` after the running container is gone.
+    """
+    return source.rstrip("/") or "/"
+
+
+def bind_source_untidy(source: str) -> bool:
+    """True when a bind source has ``.``, ``..`` or an empty part, so it is not plain."""
+    plain = bind_source_plain(source)
+    return any(part in ("", ".", "..") for part in plain.split("/")[1:]) and plain != "/"
+
+
+def _inside(path: str, folder: str) -> bool:
+    return path != folder and (folder == "/" or path.startswith(folder + "/"))
+
+
+def proxy_bind_refusal(source: str, entries: list[str]) -> str | None:
+    """Why a deploy may not bind this host path behind the proxy, or None when it may.
+
+    A bind source must be exactly one of the listed host paths, never a folder
+    under one: a container that can write into a listed folder could plant
+    ``link -> /`` there, and a second deploy binding ``<folder>/link`` would
+    get the host's root (docs/security-defaults.md). For the same reason a
+    listed path with another listed path inside it binds neither: the outer
+    one's container could swap the inner one for a link. The answer names the
+    exact line to change.
+    """
+    if bind_source_untidy(source):
+        plain = os.path.normpath("/" + source.lstrip("/"))
+        return t("err.orchestrator.bind_untidy_write_as", bind_mounts_env=BIND_MOUNTS_ENV, plain=plain)
+    path = bind_source_plain(source)
+    if path in entries:
+        nested = next((e for e in entries if _inside(e, path) or _inside(path, e)), None)
+        if nested is None:
+            return None
+        outer, inner = (path, nested) if _inside(nested, path) else (nested, path)
+        return t(
+            "err.orchestrator.bind_both_listed_keep_one", outer=outer, inner=inner, bind_mounts_env=BIND_MOUNTS_ENV
+        )
+    outer = [e for e in entries if _inside(path, e)]
+    if outer:
+        return t(
+            "err.orchestrator.bind_exact_paths_only_take_out",
+            bind_mounts_env=BIND_MOUNTS_ENV,
+            path=path,
+            outer=", ".join(outer),
+            n=len(outer),
+        )
+    return t("err.orchestrator.bind_exact_paths_only", bind_mounts_env=BIND_MOUNTS_ENV, path=path)
 
 
 def _within_proxy_roots(path: str, roots: list[str]) -> bool:
@@ -5138,13 +5226,18 @@ def _within_proxy_roots(path: str, roots: list[str]) -> bool:
     return any(root == "/" or path == root or path.startswith(root + "/") for root in roots)
 
 
-def _outside_proxy_roots(volumes: dict[str, Any] | list[str] | None) -> list[str]:
-    """Host folders in a deploy's mounts the socket proxy would refuse; [] when not proxied."""
+def _outside_proxy_roots(volumes: dict[str, Any] | list[str] | None) -> list[tuple[str, str]]:
+    """Host paths in a deploy's mounts a deploy may not bind, each with why; [] when not proxied.
+
+    Deploys bind only the exact paths in CASHPILOT_PROXY_BIND_MOUNTS, the same
+    rule worker_api applies, so a kept mount under a listed folder is refused too.
+    """
     if not proxied() or not volumes:
         return []
     sources = [str(v).split(":", 1)[0] for v in volumes] if isinstance(volumes, list) else list(volumes)
-    roots = _proxy_bind_roots()
-    return [src for src in sources if src.startswith("/") and not _within_proxy_roots(src, roots)]
+    entries = proxy_bind_mounts()
+    refused = [(src, proxy_bind_refusal(src, entries)) for src in sources if src.startswith("/")]
+    return [(src, why) for src, why in refused if why]
 
 
 def _compose_device_path(entry: Any) -> str:
@@ -5664,7 +5757,7 @@ def get_status() -> list[dict[str, Any]]:
                 **_identity_entry(c, slug),
                 **_state_id_entry(c, slug, client),
                 **_fatal_entry(c, slug),
-                **_held_entry(c),
+                **_held_entries(c),
             }
             # Present only when the service declares a dial-back address var;
             # the key's absence is "nothing to say", never "checked and fine".
@@ -5962,7 +6055,7 @@ def get_status_light() -> list[dict[str, Any]]:
                 **_layer_entry(c),
                 **_stop_facts(c),
                 **_fatal_entry(c, slug),
-                **_held_entry(c),
+                **_held_entries(c),
             }
             # Same contract as get_status: key present only when declared+set.
             if advertised := _advertised_address(c, slug):
