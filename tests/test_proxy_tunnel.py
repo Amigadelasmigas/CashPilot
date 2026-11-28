@@ -6,9 +6,11 @@ DNS, no password in docker inspect) lives in scripts/proxy_leak_test.sh.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import os
 import re
+import signal
 import subprocess
 import tarfile
 import threading
@@ -1966,6 +1968,60 @@ class TestAProbeThatEndsWithoutItsResultDoesNotEndTheChecks:
         assert int((tmp_path / "ticks").read_text()) < 5
 
 
+class TestAHungProbeIsStoppedBeforeTheNextOne:
+    """At 2 minutes with no result cp-watch killed the probe job's shell only: the hung cp-probe in it ran on,
+    and each later interval started one more beside it."""
+
+    def test_only_the_newest_probe_is_left_running(self, tmp_path):
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (tmp_path / "cashpilot-secret").mkdir()
+        (tmp_path / "cashpilot-secret" / "own_ip").write_text("198.51.100.9")
+        pids = tmp_path / "probe-pids"
+        stubs = {
+            "sleep": f'n=$(cat {tmp_path}/ticks 2>/dev/null || echo 0); echo $((n + 1)) >{tmp_path}/ticks; [ "$n" -lt 80 ]',
+            # A probe that never ends: its pid is the hung process.
+            "cp-probe": f"echo $$ >>{pids}\nexec /bin/sleep 120",
+        }
+        for name, body in stubs.items():
+            (bin_dir / name).write_text(f"#!/bin/sh\n{body}\n")
+            (bin_dir / name).chmod(0o755)
+        script = _CP_WATCH.replace("/run/", f"{tmp_path}/")
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_WATCH_PROBE_EVERY": "1"}
+        started: list[int] = []
+        try:
+            # Output to a file, not a pipe: the newest probe's job, still running, would hold a pipe open.
+            with (tmp_path / "err").open("w") as err:
+                proc = subprocess.run(
+                    ["sh", "-c", script, "cp-watch", "0", "egress"],
+                    env=env,
+                    stdin=subprocess.DEVNULL,
+                    stdout=err,
+                    stderr=err,
+                    timeout=60,
+                )
+            assert proc.returncode == 0, (tmp_path / "err").read_text()
+            time.sleep(0.5)
+            started = [int(p) for p in pids.read_text().split()]
+            assert len(started) == 4, started
+            alive = [p for p in started if _alive(p)]
+            assert alive == started[-1:], (started, alive)
+        finally:
+            for p in [int(p) for p in pids.read_text().split()] if pids.exists() else started:
+                with contextlib.suppress(ProcessLookupError):
+                    os.kill(p, signal.SIGKILL)
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    # A killed child of a shell that has ended is reaped by init; until then it is a zombie, which is dead.
+    out = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    return bool(out) and not out.startswith("Z")
+
+
 def _stub_clock_bin(tmp_path: Path, curl_cases: str) -> tuple[Path, Path]:
     """Stub date, sleep and curl on a clock that a wait moves on; ``curl_cases`` is a case body on the URL ($*)."""
     bin_dir = tmp_path / "bin"
@@ -2057,10 +2113,20 @@ class TestTheProbeNeverRunsPastTheWorkersWait:
 
     @pytest.mark.parametrize(
         "body",
-        ["198.51.100.7\\n8\\n", "<p>198.51.100.7</p>", "ip=198.51.100.7", "198.51.100.7 198.51.100.8"],
+        [
+            "198.51.100.7\\n8\\n",
+            "<p>198.51.100.7</p>",
+            "ip=198.51.100.7",
+            "198.51.100.7 198.51.100.8",
+            "198.51.100.7 8",
+            "198.51.100.7\\t8",
+            "2001:db8::7 8",
+            "198.51.100.7" + " " * 60 + "x\\n",
+        ],
     )
     def test_an_answer_with_more_than_an_address_gives_the_next_endpoint_its_turn(self, tmp_path, body):
-        """The probe kept only address characters: a second line "8" made 198.51.100.7 into 198.51.100.78."""
+        """The probe kept only address characters: a second line "8", or a blank and an "8", made 198.51.100.7
+        into 198.51.100.78; and it cut the answer at 64 bytes, so an address padded past them hid what followed."""
         import subprocess
 
         bin_dir, clock = _stub_clock_bin(
@@ -2074,10 +2140,11 @@ class TestTheProbeNeverRunsPastTheWorkersWait:
         assert proc.returncode == 0, proc.stderr
         assert '"ip":"203.0.113.7"' in proc.stdout
 
-    def test_an_address_with_a_windows_line_end_is_the_answer(self, tmp_path):
+    @pytest.mark.parametrize("body", ["198.51.100.7\\r\\n", " \\t198.51.100.7 \\n\\n", "\\n198.51.100.7"])
+    def test_an_address_with_blanks_or_line_breaks_around_it_is_the_answer(self, tmp_path, body):
         import subprocess
 
-        bin_dir, clock = _stub_clock_bin(tmp_path, "*https://api.ipify.org*) printf '198.51.100.7\\r\\n'; exit 0 ;;\n")
+        bin_dir, clock = _stub_clock_bin(tmp_path, f"*https://api.ipify.org*) printf '{body}'; exit 0 ;;\n")
         clock.write_text("46")
         env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_DEADLINE": "40"}
         proc = subprocess.run(["sh", str(bin_dir / "cp-probe")], env=env, capture_output=True, text=True, timeout=30)

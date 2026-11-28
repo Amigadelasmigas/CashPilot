@@ -72,12 +72,24 @@ is_ip() {
     esac
 }
 
+# Blanks and line breaks are trimmed from both ends of an answer only. One
+# inside it stays, so is_ip refuses the answer: deleting it would join
+# "203.0.113.7" and a stray " 8" into another address.
+blanks=" $(printf '\t\r')
+"
+trim() {
+    s=$1
+    while :; do case "$s" in [$blanks]*) s=${s#?} ;; *) break ;; esac; done
+    while :; do case "$s" in *[$blanks]) s=${s%?} ;; *) break ;; esac; done
+    printf '%s' "$s"
+}
+
 ip=""
 for url in https://api.ipify.org https://ifconfig.me/ip https://icanhazip.com; do
-    # The whole answer must be the address, a line break or blanks around it
-    # aside: dropping every other character would join "203.0.113.7" and a
-    # stray "8" on the next line into another address.
-    ip=$(curl -fsS --max-time "$(cap 8)" "$url" 2>/dev/null | head -c 64 | tr -d ' \t\r')
+    # An answer over 64 bytes is no address, even if its first 64 hold one.
+    raw=$(curl -fsS --max-time "$(cap 8)" "$url" 2>/dev/null | head -c 65)
+    ip=""
+    [ "${#raw}" -le 64 ] && ip=$(trim "$raw")
     is_ip "$ip" && break
     ip=""
 done

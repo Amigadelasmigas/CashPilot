@@ -73,8 +73,13 @@ while sleep 5; do
     fi
     n=$((n + 1))
     [ $((n % EVERY)) -eq 0 ] && [ -n "$OWN_IP" ] && [ -z "$probe_pid" ] || continue
+    # The job forwards the stop to cp-probe: killing the job's shell alone
+    # would leave a hung probe running beside the next one.
     (
-        cp-probe >"$PROBE" 2>/dev/null
+        trap 'kill "${cpid:-}" 2>/dev/null; exit 1' TERM
+        cp-probe >"$PROBE" 2>/dev/null &
+        cpid=$!
+        wait "$cpid"
         echo $? >"$PROBE.tmp" && mv "$PROBE.tmp" "$PROBE.rc"
     ) &
     probe_pid=$!
