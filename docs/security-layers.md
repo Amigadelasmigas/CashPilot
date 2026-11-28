@@ -61,16 +61,16 @@ gives you one command to run on the host.
 3. **Choose.** Set **Runtime for earners you deploy here from now on**, or press
    **Run under gVisor** on one earner. A running earner is redeployed at once, and
    the page asks first.
-4. **Undo.** Switch every earner back to Standard. If **Runtime for earners you
-   deploy here from now on** says gVisor, set it to Standard too. Then run the
-   remove command. It restores `daemon.json`, deletes gVisor and its backup, reloads Docker and
+4. **Undo.** If a worker variable (`CASHPILOT_CONTAINER_RUNTIME` or
+   `CASHPILOT_CONTAINER_RUNTIME_OVERRIDES`) pins gVisor, the page locks the
+   choice, so start there: remove the variable from the worker's compose file
+   and recreate the worker with `docker compose up -d`. Then switch every
+   earner back to Standard. If **Runtime for earners you deploy here from now
+   on** says gVisor, set it to Standard too. Then run the remove command. It
+   restores `daemon.json`, deletes gVisor and its backup, reloads Docker and
    checks that nothing is left. It refuses while any container, running or
    stopped, still uses a gVisor runtime. Switching a stopped earner saves the
-   choice only, so redeploy or remove each stopped one first. If a worker
-   variable (`CASHPILOT_CONTAINER_RUNTIME` or
-   `CASHPILOT_CONTAINER_RUNTIME_OVERRIDES`) pins gVisor, the page locks the
-   choice: remove the variable from the worker's compose file, recreate the
-   worker with `docker compose up -d`, then redeploy its earners. After the
+   choice only, so redeploy or remove each stopped one first. After the
    remove, an earner still set to gVisor is not redeployed, and while the
    worker's default still says gVisor no new earner is deployed. The page says
    why, and nothing is stopped or removed.
