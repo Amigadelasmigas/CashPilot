@@ -434,6 +434,47 @@ class TestCheckPeriod:
             _deploy(docker, old, settle_seconds=0.01)
         assert not isinstance(refused.value, orchestrator.ImageUpdateFailed)
 
+    def test_an_update_whose_old_container_cannot_be_moved_aside_or_started_needs_the_owner(self, markers, fast):
+        # Docker refuses the rename that sets the old container aside, and then its
+        # start: the app is down, and no new build ran.
+        old, docker = _docker()
+        old.rename.side_effect = orchestrator.APIError("500 Server Error")
+        old.start.side_effect = orchestrator.APIError("500 Server Error")
+        with pytest.raises(orchestrator.ImageUpdateFailed) as failed:
+            _deploy(docker, old, settle_seconds=0.01)
+        assert failed.value.restored is False and failed.value.verified is False
+        assert "could not be started again" in str(failed.value)
+        docker.client.containers.create.assert_not_called()
+        # Control: the same refused rename with the old container running again.
+        old, docker = _docker()
+        old.rename.side_effect = orchestrator.APIError("500 Server Error")
+        with pytest.raises(orchestrator.ContainerRuntimeError) as refused:
+            _deploy(docker, old, settle_seconds=0.01)
+        assert not isinstance(refused.value, orchestrator.ImageUpdateFailed)
+        old.start.assert_called_once()
+
+    def test_an_update_that_needs_the_owner_still_removes_the_refused_container_s_secrets(self, markers, fast):
+        # CASHPILOT_EARNER_SECRETS=file: the new container's credentials live in
+        # their own volume, and the refused container is gone, so they go too.
+        plan = MagicMock(env={}, entrypoint=None, command=None, volume="cashpilot-honeygain-secrets")
+        plan.labels.return_value = {}
+        for old_starts in (False, True):
+            old, docker = _docker()
+            docker.client.containers.create.side_effect = orchestrator.APIError("500 Server Error")
+            docker.client.containers.run.side_effect = orchestrator.APIError("500 Server Error")
+            if not old_starts:
+                old.start.side_effect = orchestrator.APIError("500 Server Error")
+            with (
+                patch.object(orchestrator.secret_env, "plan", return_value=plan),
+                patch.object(orchestrator.secret_env, "mount", return_value=MagicMock()),
+                patch.object(orchestrator.secret_env, "create_volume"),
+                patch.object(orchestrator.secret_env, "remove_volume") as remove,
+                pytest.raises(orchestrator.ContainerRuntimeError) as failed,
+            ):
+                _deploy(docker, old, settle_seconds=0.01)
+            assert isinstance(failed.value, orchestrator.ImageUpdateFailed) is not old_starts
+            remove.assert_called_once_with(docker.client, "cashpilot-honeygain-secrets")
+
     def test_a_final_look_that_ends_after_the_grace_does_not_pass(self, markers, monkeypatch):
         # The look after the 120 s period starts at 122 s, and Docker answers it 31 s
         # later, after the 150 s grace. It cannot pass: undone, and not held.
@@ -491,7 +532,11 @@ class TestCheckPeriod:
         # a Stop sent meanwhile stops the container only once it is released.
         import threading
 
-        container = MagicMock(name="cashpilot-honeygain")
+        # The deploy replaces the container: a lookup before it publishes the
+        # new one finds the old one, so a Stop that looked early stops the wrong one.
+        old = MagicMock(name="cashpilot-honeygain old")
+        container = MagicMock(name="cashpilot-honeygain new")
+        current = {"container": old}
         holding, release, done = threading.Event(), threading.Event(), threading.Event()
         lock = orchestrator.route_gate.deploying("honeygain")
         free_during_stop: list[bool] = []
@@ -514,10 +559,11 @@ class TestCheckPeriod:
             with orchestrator.route_gate.deploying("honeygain"):
                 holding.set()
                 release.wait(5)
+                current["container"] = container
 
         def stop():
             with (
-                patch.object(orchestrator, "_find_container", return_value=container),
+                patch.object(orchestrator, "_find_container", side_effect=lambda *a: current["container"]),
                 patch.object(orchestrator, "fence_gated", return_value=False),
             ):
                 orchestrator.stop_service("honeygain")
@@ -530,9 +576,11 @@ class TestCheckPeriod:
         stopper.start()
         assert not done.wait(0.3), "Stop ran while a deploy held the route lock"
         container.stop.assert_not_called()
+        old.stop.assert_not_called()
         release.set()
         assert done.wait(5)
         container.stop.assert_called_once()
+        old.stop.assert_not_called()
         assert free_during_stop == [False], "the container stopped outside the route lock"
         deployer.join()
         stopper.join()
@@ -579,6 +627,49 @@ class TestCheckPeriod:
         assert orchestrator._stop_wait_seconds("honeygain") + stop < budget
         assert orchestrator._IMAGE_UPDATE_SETTLE_SECONDS == image_updates.SETTLE_SECONDS
 
+    def test_a_restart_waits_for_a_deploy_and_is_refused_past_its_limit(self, monkeypatch):
+        # A restart inside an image update's check period would read as a failure
+        # and put the old container back. It waits as a Stop does.
+        import threading
+
+        from app import main
+
+        monkeypatch.setattr(orchestrator, "_stop_wait_seconds", lambda slug: 0.2)
+        restarted: list[bool] = []
+        monkeypatch.setattr(orchestrator, "_restart_service", lambda slug, instance: restarted.append(True))
+        holding, release = threading.Event(), threading.Event()
+
+        def deploy():
+            with orchestrator.route_gate.deploying("honeygain"):
+                holding.set()
+                release.wait(5)
+
+        deployer = threading.Thread(target=deploy)
+        deployer.start()
+        assert holding.wait(5)
+        try:
+            with pytest.raises(orchestrator.ContainerRuntimeError) as refused:
+                orchestrator.restart_service("honeygain")
+        finally:
+            release.set()
+            deployer.join()
+        assert refused.value.status_code == 409 and "not restarted" in str(refused.value)
+        assert not restarted
+        # Once the deploy is done, the restart runs, and frees the lock after.
+        orchestrator.restart_service("honeygain")
+        assert restarted == [True]
+        assert orchestrator.route_gate.deploying("honeygain").acquire(blocking=False)
+        orchestrator.route_gate.deploying("honeygain").release()
+        # The dashboard waits for it as long as for a Stop.
+        monkeypatch.undo()
+        call = AsyncMock(return_value={})
+        with patch.object(main, "_proxy_to_worker", call):
+            asyncio.run(main._proxy_worker_command(1, "stop", "honeygain"))
+            asyncio.run(main._proxy_worker_command(1, "restart", "honeygain"))
+        stop_wait, restart_wait = (c.kwargs["timeout"] for c in call.call_args_list)
+        assert restart_wait == stop_wait
+        assert restart_wait > orchestrator._stop_wait_seconds("honeygain") + orchestrator._get_stop_timeout("honeygain")
+
 
 class TestRepoDigest:
     def test_only_the_checked_repository_s_digest_is_named(self):
@@ -589,6 +680,9 @@ class TestRepoDigest:
         assert orchestrator._repo_digest(image, "honeygain/honeygain:latest") == ""
         image.attrs["RepoDigests"].append("docker.io/honeygain/honeygain@sha256:" + "d" * 64)
         assert orchestrator._repo_digest(image, "honeygain/honeygain:latest") == "sha256:" + "d" * 64
+        # Docker's old name for Docker Hub is the same repository.
+        image.attrs["RepoDigests"] = ["honeygain/honeygain@sha256:" + "f" * 64]
+        assert orchestrator._repo_digest(image, "index.docker.io/honeygain/honeygain:latest") == "sha256:" + "f" * 64
 
     @pytest.mark.parametrize(
         ("name", "full"),
@@ -596,6 +690,8 @@ class TestRepoDigest:
             ("busybox", "docker.io/library/busybox"),
             ("library/busybox", "docker.io/library/busybox"),
             ("docker.io/busybox", "docker.io/library/busybox"),
+            ("index.docker.io/busybox", "docker.io/library/busybox"),
+            ("index.docker.io/honeygain/honeygain", "docker.io/honeygain/honeygain"),
             ("honeygain/honeygain", "docker.io/honeygain/honeygain"),
             ("localhost/mine", "localhost/mine"),
             ("127.0.0.1:5000/mine", "127.0.0.1:5000/mine"),
@@ -674,6 +770,44 @@ class TestCheckImage:
         with patch.object(orchestrator, "_get_client", return_value=client):
             assert orchestrator.check_image("honeygain")["floating"] is True
 
+    def test_a_check_joins_the_pull_an_earlier_check_left_running(self, monkeypatch):
+        # A pull past its check's deadline keeps running in its thread. The next
+        # check of the same image waits for it rather than starting another beside it.
+        import threading
+
+        monkeypatch.setattr(orchestrator, "_PULLS", {})
+        release, started = threading.Event(), threading.Event()
+        client = MagicMock()
+
+        def pull(*args, **kwargs):
+            started.set()
+            release.wait(5)
+            return iter([{"status": "Download complete"}])
+
+        client.api.pull.side_effect = pull
+        image = "honeygain/honeygain:latest"
+        try:
+            with pytest.raises(orchestrator.PastDeadline):
+                orchestrator._pull_until(client, image, orchestrator.time.monotonic() + 0.1, strict=True)
+            assert started.wait(5)
+            with pytest.raises(orchestrator.PastDeadline):
+                orchestrator._pull_until(client, image, orchestrator.time.monotonic() + 0.1, strict=True)
+            assert client.api.pull.call_count == 1
+            # One still running an hour after it began is stuck: the next check starts its own.
+            monkeypatch.setattr(orchestrator, "_PULL_JOIN_SECONDS", 0)
+            with pytest.raises(orchestrator.PastDeadline):
+                orchestrator._pull_until(client, image, orchestrator.time.monotonic() + 0.1, strict=True)
+            assert client.api.pull.call_count == 2
+            monkeypatch.setattr(orchestrator, "_PULL_JOIN_SECONDS", 3600)
+            release.set()
+            assert orchestrator._pull_until(client, image, orchestrator.time.monotonic() + 5, strict=True) is None
+            assert client.api.pull.call_count == 2
+        finally:
+            release.set()
+        # Once it ended, the next check pulls again.
+        assert orchestrator._pull_until(client, image, orchestrator.time.monotonic() + 5, strict=True) is None
+        assert client.api.pull.call_count == 3
+
     def test_a_stopped_copy_of_an_app_whose_name_ends_in_replaced_is_a_copy(self):
         # A custom app named "Foo Replaced" gets the slug custom-foo-replaced, so
         # its own container name ends in -replaced. Only its set-aside name is skipped.
@@ -750,8 +884,14 @@ class _Hooks:
         async def seen(wid, slug, new_image, results):
             return any((r, new_image) in self._seen for r in results)
 
+        async def latest(wid, slug):
+            if not self.rows:
+                return None
+            result, facts = self.rows[-1]
+            return {"result": result, "new_image": facts.get("new_image", "")}
+
         return image_updates.Hooks(
-            check=check, blocker=blocker, deploy=deploy, record=record, seen=seen, sleep=AsyncMock()
+            check=check, blocker=blocker, deploy=deploy, record=record, seen=seen, sleep=AsyncMock(), latest=latest
         )
 
 
@@ -936,6 +1076,43 @@ class TestDecisions:
         # And a newer build is not held by it.
         state._answer, state._deploy = _answer(latest="sha256:newer"), None
         assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "updated"
+
+    async def test_two_unsaved_rows_of_one_build_are_both_written_in_order(self):
+        # The same build fails twice while the database is locked: each attempt
+        # keeps its own row, and they are written oldest first.
+        state = _Hooks(_answer(), deploy=image_updates.DeployRefused("first", rolled_back=False, changed=True))
+        hooks, writes = self._failing_writes(state)
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "unverified"
+        state._deploy = image_updates.DeployRefused("second", rolled_back=False, changed=True)
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "unverified"
+        assert len(image_updates._unsaved_rows) == 2
+        writes["fail"] = False
+        await image_updates.flush_all(hooks)
+        assert [(r[0], r[1]["detail"]) for r in state.rows] == [
+            (image_updates.FAILED, "first"),
+            (image_updates.FAILED, "second"),
+        ]
+        assert not image_updates._unsaved_rows
+
+    @pytest.mark.parametrize("mode", [image_updates.NOTIFY, image_updates.AUTO])
+    async def test_a_build_the_tag_went_back_to_is_announced_again(self, mode):
+        # The bell shows the newest row. Once it names another build, the build the
+        # tag went back to is recorded again, or the bell names the wrong one.
+        result = image_updates.AVAILABLE if mode == image_updates.NOTIFY else image_updates.SKIPPED
+        state = _Hooks(_answer(), blocker="" if mode == image_updates.NOTIFY else "it has a custom image")
+        assert await _run(state, mode) in ("available", "skipped")
+        state._answer = _answer(latest="sha256:newer")
+        await _run(state, mode)
+        state._answer = _answer()
+        await _run(state, mode)
+        assert [(r, f["new_image"]) for r, f in state.rows] == [
+            (result, "sha256:new"),
+            (result, "sha256:newer"),
+            (result, "sha256:new"),
+        ]
+        # Control: while it is still the newest row, it is not recorded twice.
+        await _run(state, mode)
+        assert len(state.rows) == 3
 
     async def test_a_box_pauses_after_an_undo_whose_row_could_not_be_written(self):
         state = _Hooks(_answer(), deploy=image_updates.DeployRefused("undone", rolled_back=True))
@@ -1382,12 +1559,14 @@ class TestTheDashboardSide:
         with patch.object(main.database, "list_workers", workers), patch.object(main, "_collector_alerts", []):
             await main._refresh_image_update_bell()
             assert "1|honeygain" in main._image_update_bell
-            real = main.database.list_image_updates
-            with patch.object(main.database, "list_image_updates", AsyncMock(side_effect=RuntimeError("locked"))):
+            real = main.database.list_newest_image_updates
+            with patch.object(
+                main.database, "list_newest_image_updates", AsyncMock(side_effect=RuntimeError("locked"))
+            ):
                 await main._refresh_image_update_bell({1: {"honeygain": "current"}})
             assert main._image_update_bell_loaded is False
             # The next tick rebuilds it, with no outcomes of its own: the run's answer still counts.
-            with patch.object(main.database, "list_image_updates", real):
+            with patch.object(main.database, "list_newest_image_updates", real):
                 await main._refresh_image_update_bell()
             assert "1|honeygain" not in main._image_update_bell
             assert main._image_update_bell_loaded is True
@@ -1546,6 +1725,52 @@ class TestTheDashboardSide:
         assert pushed and "needs you" in push.call_args.args[2]
         # Held like an undone build, and never pruned.
         assert await database.image_update_seen(1, "honeygain", "sha256:b", image_updates.HOLDS)
+
+    async def test_a_needs_you_row_stays_in_the_bell_under_long_newer_history(self, db):
+        import sqlite3
+
+        from app import main
+
+        await database.init_db()
+        await database.record_image_update(1, "honeygain", "restore_failed", new_image="sha256:b", detail="x")
+        # More newer rows of other apps than one page of history holds.
+        with sqlite3.connect(database.DB_PATH) as raw:
+            raw.executemany(
+                "INSERT INTO image_updates (worker_id, slug, result, new_image) VALUES (1, ?, 'updated', 'sha256:c')",
+                [(f"app{n}",) for n in range(1100)],
+            )
+        newest = await database.list_newest_image_updates()
+        assert len(newest) == 1101 and newest[-1]["result"] == "restore_failed"
+        assert await database.newest_image_update(1, "honeygain") == newest[-1]
+        assert await database.newest_image_update(1, "nothing") is None
+        workers = AsyncMock(return_value=[{"id": 1, "name": "alpha"}])
+        with (
+            patch.object(main.database, "list_workers", workers),
+            patch.object(main, "_collector_alerts", []),
+            patch.object(main, "_spawn", lambda coro: coro.close()),
+            patch.object(main, "_push_alert", MagicMock(side_effect=lambda *a: asyncio.sleep(0))),
+        ):
+            await main._refresh_image_update_bell()
+        assert "did not start again" in main._image_update_bell["1|honeygain"]["error"]
+        # A run asks the same question of the newest row before it announces a build again.
+        assert main._image_update_hooks().latest is database.newest_image_update
+
+    async def test_every_tick_writes_the_rows_left_unsaved_even_with_every_app_off(self, db):
+        from app import main
+
+        await database.init_db()
+        key = (1, "honeygain", "", image_updates.RESTORE_FAILED, 0)
+        image_updates._unsaved_rows[key] = {"old_image": "sha256:a", "new_image": "", "detail": "not started"}
+        off = image_updates.parse_settings({"mode": "off"})
+        with (
+            patch.object(main, "_image_update_settings", AsyncMock(return_value=off)),
+            patch.object(main, "_obligations_now", AsyncMock(return_value=datetime(2026, 11, 28, 5, 0))),
+            patch.object(main.database, "list_workers", AsyncMock(side_effect=AssertionError("no run when Off"))),
+        ):
+            assert await main._run_image_updates() == {}
+        rows = await database.list_image_updates()
+        assert [(r["result"], r["detail"]) for r in rows] == [(image_updates.RESTORE_FAILED, "not started")]
+        assert not image_updates._unsaved_rows
 
     async def test_a_run_that_cannot_list_the_boxes_does_not_use_up_the_day(self, db):
         from zoneinfo import ZoneInfo

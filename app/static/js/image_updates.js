@@ -59,7 +59,30 @@
     return '';
   }
 
+  // A refresh draws the section again: the overrides stay open if they were,
+  // and the control the owner was on keeps the focus.
+  function keepPlace() {
+    const details = root.querySelector('details.add-worker');
+    const open = !!(details && details.open);
+    const active = document.activeElement;
+    let focus = null;
+    if (active && root.contains && root.contains(active) && active.getAttribute) {
+      for (const attr of ['data-updates-worker', 'data-updates-service', 'data-updates-action']) {
+        const value = active.getAttribute(attr);
+        if (value != null) { focus = `[${attr}=${JSON.stringify(value)}]`; break; }
+      }
+      if (!focus && active.id) focus = `#${active.id}`;
+    }
+    return () => {
+      const again = open && root.querySelector('details.add-worker');
+      if (again) again.open = true;
+      const el = focus && root.querySelector(focus);
+      if (el && el.focus) el.focus();
+    };
+  }
+
   function render() {
+    const restorePlace = keepPlace();
     const s = state.settings;
     if (offer) offer.hidden = !(s.offer && s.mode === 'off');
     const boxes = state.workers.map((w) => `
@@ -119,6 +142,7 @@
           <th>${esc(t('fleet.updates.col.from'))}</th><th>${esc(t('fleet.updates.col.to'))}</th><th>${esc(t('fleet.updates.col.result'))}</th><th></th></tr></thead>
         <tbody>${rows || `<tr><td colspan="7" class="muted">${esc(t('fleet.updates.no_history'))}</td></tr>`}</tbody>
       </table></div>`;
+    restorePlace();
   }
 
   // Each load is numbered, and only the newest one's answer counts: answers

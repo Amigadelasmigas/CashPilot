@@ -148,7 +148,9 @@ proxy. The proxy refuses every image delete, because it cannot tell which
 program an image belongs to. So the old images stay on disk, and the table
 says so. Remove them from time to time with the steps in
 [Cleaning up old images](getting-started.md#cleaning-up-old-images). Step 1
-there (`docker image prune`) removes all of them.
+there (`docker image prune`) removes the old builds that no tag names any
+more, which is what an update over a moving tag leaves. An old build that
+still has another tag stays. Step 2 there removes those.
 
 ## Turn the updates off
 

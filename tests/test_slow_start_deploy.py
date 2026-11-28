@@ -234,10 +234,14 @@ class TestASlowStartIsNotAFailedDeploy:
             stop_alone = 30 + main._catalog_stop_timeout(slug)
             deploy = main._deploy_timeout(slug) + image_updates.SETTLE_SECONDS + 30
         assert proxy.call_args.kwargs["timeout"] == stop_alone + deploy
-        # A restart takes no deploy lock, and its wait is unchanged (the control).
+        # A restart waits for the same lock (orchestrator.restart_service).
         with patch("app.main._proxy_to_worker", proxy):
             asyncio.run(main._proxy_worker_command(1, "restart", slug))
-        assert proxy.call_args.kwargs["timeout"] == stop_alone
+        assert proxy.call_args.kwargs["timeout"] == stop_alone + deploy
+        # A start takes no deploy lock, and its wait is unchanged (the control).
+        with patch("app.main._proxy_to_worker", proxy):
+            asyncio.run(main._proxy_worker_command(1, "start", slug))
+        assert proxy.call_args.kwargs["timeout"] == 30
 
 
 # ---------------------------------------------------------------------------

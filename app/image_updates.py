@@ -33,6 +33,7 @@ moves them.
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -135,6 +136,8 @@ class Hooks:
     seen: Callable[[int, str, str, tuple[str, ...]], Awaitable[bool]]
     #: Sleep between updates (asyncio.sleep, replaced in tests).
     sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep
+    #: The newest row of this service on this box, or None: the one the bell shows.
+    latest: Callable[[int, str], Awaitable[dict[str, Any] | None]] | None = None
 
 
 class DeployRefused(Exception):
@@ -164,17 +167,24 @@ class ModeChanged(Exception):
 
 
 #: Rows of a deploy that changed a container, which could not be written yet,
-#: by (worker_id, slug, new image ID, result): the row's facts. A hold among
-#: them keeps its build held in this process while each check tries the write again.
-_unsaved_rows: dict[tuple[int, str, str, str], dict[str, str]] = {}
+#: by (worker_id, slug, new image ID, result, attempt): the row's facts. One per
+#: attempt, so two never overwrite each other. A hold among them keeps its
+#: build held in this process while each check tries the write again.
+_unsaved_rows: dict[tuple[int, str, str, str, int], dict[str, str]] = {}
+_attempts = itertools.count()
 
 
 async def _record_change(hooks: Hooks, worker_id: int, slug: str, result: str, facts: dict[str, str]) -> None:
     """Write the row of a deploy that changed a container. Never raises: a row that fails waits for a later check."""
-    key = (worker_id, slug, facts["new_image"], result)
+    key = (worker_id, slug, facts["new_image"], result, next(_attempts))
     _unsaved_rows[key] = facts
+    await _write_row(hooks, key)
+
+
+async def _write_row(hooks: Hooks, key: tuple[int, str, str, str, int]) -> None:
+    worker_id, slug, _, result, _ = key
     try:
-        await hooks.record(worker_id, slug, result, **facts)
+        await hooks.record(worker_id, slug, result, **_unsaved_rows[key])
     except Exception as exc:  # noqa: BLE001 - kept in memory, written on a later check
         logger.warning("Could not save the %s row of %s on worker %s yet: %s", result, slug, worker_id, exc)
         return
@@ -182,9 +192,27 @@ async def _record_change(hooks: Hooks, worker_id: int, slug: str, result: str, f
 
 
 async def _flush_rows(hooks: Hooks, worker_id: int, slug: str) -> None:
-    """Write the rows of this service on this box that are still unsaved, whatever the tag names now."""
-    for key in [k for k in _unsaved_rows if k[:2] == (worker_id, slug)]:
-        await _record_change(hooks, worker_id, slug, key[3], _unsaved_rows[key])
+    """Write the rows of this service on this box that are still unsaved, oldest first, whatever the tag names now."""
+    for key in sorted((k for k in _unsaved_rows if k[:2] == (worker_id, slug)), key=lambda k: k[4]):
+        await _write_row(hooks, key)
+
+
+async def flush_all(hooks: Hooks) -> None:
+    """Write every row still unsaved. Each scheduled tick runs it, even with every app Off. Never raises."""
+    for worker_id, slug in sorted({k[:2] for k in _unsaved_rows}):
+        await _flush_rows(hooks, worker_id, slug)
+
+
+async def _announced(hooks: Hooks, worker_id: int, slug: str, new_id: str, result: str) -> bool:
+    """Whether the bell already names this build with this result: the service's newest row does.
+
+    An older row of the same build is not enough. After the tag went back to it,
+    the newest row can name another build, and the bell shows the newest row.
+    """
+    if hooks.latest is None:
+        return await hooks.seen(worker_id, slug, new_id, (result,))
+    row = await hooks.latest(worker_id, slug)
+    return bool(row) and row.get("result") == result and row.get("new_image") == new_id
 
 
 def _short(digest: str) -> str:
@@ -215,7 +243,7 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
     if await hooks.seen(worker_id, slug, new_id, HOLDS):
         return "held"
     if mode == NOTIFY:
-        if not await hooks.seen(worker_id, slug, new_id, (AVAILABLE,)):
+        if not await _announced(hooks, worker_id, slug, new_id, AVAILABLE):
             await hooks.record(worker_id, slug, AVAILABLE, **facts)
         return "available"
     why = await hooks.blocker(worker_id, slug, answer)
@@ -226,7 +254,7 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
         # the box running two builds of it under one undone result.
         why = f"it runs {len(copies)} copies here, and only a single copy is updated by itself"
     if why:
-        if not await hooks.seen(worker_id, slug, new_id, (SKIPPED,)):
+        if not await _announced(hooks, worker_id, slug, new_id, SKIPPED):
             await hooks.record(worker_id, slug, SKIPPED, detail=why, **facts)
         return "skipped"
     expected = {str(c.get("instance") or 1): str(c.get("container_id") or "") for c in copies}
@@ -238,7 +266,7 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
         if exc.mode != NOTIFY:
             return "off"
         # Notify only now: the build is announced as Notify only announces it.
-        if not await hooks.seen(worker_id, slug, new_id, (AVAILABLE,)):
+        if not await _announced(hooks, worker_id, slug, new_id, AVAILABLE):
             await hooks.record(worker_id, slug, AVAILABLE, **facts)
         return "available"
     except DeployRefused as exc:

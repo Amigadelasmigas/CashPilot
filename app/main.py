@@ -8101,10 +8101,10 @@ async def _proxy_worker_command(
     # for storj). Cut off sooner, a stop that went through answers 504 and is
     # never recorded, so the copy raises a container-down alert.
     timeout = 30 + _catalog_stop_timeout(slug) if command in ("stop", "restart", "remove") else 30
-    if command == "stop":
-        # The worker stops every copy under the route lock a redeploy holds
-        # (orchestrator.stop_service), and an image update holds it through its
-        # check period, so a Stop sent during one waits for all of it first.
+    if command in ("stop", "restart"):
+        # The worker stops or restarts every copy under the route lock a redeploy
+        # holds (orchestrator.stop_service, restart_service), and an image update
+        # holds it through its check period, so one sent during it waits for all of it first.
         timeout += _deploy_timeout(slug) + image_updates.SETTLE_SECONDS + 30
     if command == "remove":
         return await _proxy_to_worker(
@@ -14076,6 +14076,7 @@ def _image_update_hooks() -> image_updates.Hooks:
         deploy=_image_update_deploy,
         record=database.record_image_update,
         seen=database.image_update_seen,
+        latest=database.newest_image_update,
     )
 
 
@@ -14108,7 +14109,9 @@ async def _refresh_image_update_bell(outcomes: dict[int, dict[str, str]] | None 
             _image_update_unanswered.setdefault(wid, {}).update(done)
         outcomes = _image_update_unanswered
         try:
-            rows = await database.list_image_updates(1000)
+            # The newest row of each service, however old: a "needs you" row stays
+            # in the bell when newer history of other apps is long.
+            rows = await database.list_newest_image_updates()
             try:
                 cleared = json.loads(await database.get_config(_IMAGE_UPDATE_CLEARED_KEY) or "{}")
             except ValueError:
@@ -14173,6 +14176,9 @@ async def _run_image_updates(*, force: bool = False) -> dict[int, dict[str, str]
     if not force and _image_update_lock.locked():
         return {}
     async with _image_update_lock:
+        # Rows a failed write left in memory are written on every tick, even with
+        # every app Off, so a restart cannot lose a "needs you" row.
+        await image_updates.flush_all(_image_update_hooks())
         # The owner's day and hour, as the docs say, not the server's.
         now = (await _obligations_now()).replace(tzinfo=None)
         async with _image_update_settings_lock:

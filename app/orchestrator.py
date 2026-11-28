@@ -1158,6 +1158,13 @@ def _refuse_past(deadline: float, image: str) -> None:
         raise _past_deadline(image)
 
 
+#: The check's pull running for each image, with when it began, so the next check joins it (_pull_until).
+_PULLS: dict[str, tuple[threading.Thread, dict[str, BaseException], float]] = {}
+_PULLS_LOCK = threading.Lock()
+#: A check's pull still running this long after it began is taken as stuck: the next check starts its own.
+_PULL_JOIN_SECONDS = 3600
+
+
 def _pull_until(client: Any, image: str, deadline: float, *, strict: bool = False) -> APIError | None:
     """Pull ``image``, waiting no later than ``deadline``; the registry's refusal, if it refused.
 
@@ -1185,8 +1192,20 @@ def _pull_until(client: Any, image: str, deadline: float, *, strict: bool = Fals
         except BaseException as exc:  # noqa: BLE001 - handed to the deploy below
             outcome["error"] = exc
 
-    worker = threading.Thread(target=pull, name=f"pull {image}", daemon=True)
-    worker.start()
+    # One check's pull of an image at a time: a pull left past an earlier
+    # deadline may still run (a stream Docker keeps open), and the next check
+    # waits for that one rather than adding another thread beside it. One
+    # running for an hour is stuck, and a new pull replaces it, so a stream
+    # Docker never closes costs one thread an hour, not every later check.
+    with _PULLS_LOCK:
+        running = _PULLS.get(image) if strict else None
+        if running is not None and running[0].is_alive() and time.monotonic() - running[2] < _PULL_JOIN_SECONDS:
+            worker, outcome = running[0], running[1]
+        else:
+            worker = threading.Thread(target=pull, name=f"pull {image}", daemon=True)
+            if strict:
+                _PULLS[image] = (worker, outcome, time.monotonic())
+            worker.start()
     worker.join(max(0.0, deadline - time.monotonic()))
     if worker.is_alive():
         raise _past_deadline(image)
@@ -1596,9 +1615,16 @@ def deploy_raw(
                 if str((old.attrs or {}).get("Name") or "").lstrip("/") != name:
                     old.rename(name)
             _restore_identity(name, identity_before, held_before)
+            again: dict[str, bool] = {"restored": True}
             restored = "The previous container was not replaced and " + _start_again(
-                client, old, replaced_running, gated, name, joined=joined
+                client, old, replaced_running, gated, name, joined=joined, outcome=again
             )
+            if settle_seconds > 0 and not again["restored"]:
+                # An update that left the old container down needs the owner. No
+                # new build ran, so none is held.
+                raise ImageUpdateFailed(
+                    f"{_deploy_failure(exc, restored, slug)}", 409, verified=False, restored=False
+                ) from exc
             raise _deploy_failure(exc, restored, slug) from exc
     except NotFound:
         if old is not None:
@@ -1830,15 +1856,20 @@ def deploy_raw(
         )
         if isinstance(exc, ImageUpdateFailed) and not undo["restored"]:
             exc.restored = False
-        elif settle_seconds > 0 and replaced is not None and not undo["restored"]:
+        if secrets_plan is not None:
+            # The refused container is gone (_roll_back), so its credentials go too.
+            secret_env.remove_volume(client, secrets_plan.volume)
+        if (
+            not isinstance(exc, ImageUpdateFailed)
+            and settle_seconds > 0
+            and replaced is not None
+            and not undo["restored"]
+        ):
             # Any other failure of an update that left the old container down needs
             # the owner too. Nobody judged the new build, so it is not held.
             raise ImageUpdateFailed(
                 f"{_deploy_failure(exc, restored, slug)}", 409, verified=False, restored=False
             ) from exc
-        if secrets_plan is not None:
-            # The refused container is gone (_roll_back), so its credentials go too.
-            secret_env.remove_volume(client, secrets_plan.volume)
         if conflict and (current := deploy_target(client, name)) is not None and current.id != expected_container:
             raise DeployTargetChanged(current.id) from None
         raise _deploy_failure(exc, restored, slug) from exc
@@ -2263,6 +2294,9 @@ def _remove_old_image(client: Any, image_id: str) -> str | None:
 def _repo_name(name: str) -> str:
     """A repository name as Docker Hub spells it in full, so two spellings of one repository compare equal."""
     parts = name.split("/")
+    # Docker's own old name for Docker Hub.
+    if parts[0] == "index.docker.io":
+        parts[0] = "docker.io"
     # A first part with no dot, colon or "localhost" is a Docker Hub namespace, not a registry.
     if len(parts) == 1 or ("." not in parts[0] and ":" not in parts[0] and parts[0] != "localhost"):
         parts = ["docker.io", *parts]
@@ -2806,9 +2840,22 @@ def _require_route(container: Any, slug: str) -> None:
     route_gate.check(slug, _network_mode(container), _get_client())
 
 
-@_holds_slug("start")
 def restart_service(slug: str, instance: int = 1) -> None:
     """Restart the container for a service."""
+    # As a Stop does (stop_service): a restart inside an image update's check
+    # period would read as a failure, so it waits for the deploy, for a bounded
+    # time, before it claims the slug.
+    route = route_gate.deploying(slug)
+    if not route.acquire(timeout=_stop_wait_seconds(slug)):
+        raise ContainerRuntimeError(t("err.orchestrator.restart_waits_for_deploy", slug=slug), 409)
+    try:
+        _restart_service(slug, instance)
+    finally:
+        route.release()
+
+
+@_holds_slug("start")
+def _restart_service(slug: str, instance: int) -> None:
     _refuse_mid_restore(slug, "start")
     container = _find_container(slug, instance)
     _require_route(container, slug)

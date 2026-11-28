@@ -24,13 +24,27 @@ function makePage() {
     querySelectorAll: () => [],
     // The error line the controls carry, present once they are drawn.
     errorLine: {hidden: true, textContent: ''},
-    querySelector: (sel) => (sel === '[data-updates-load-error]' && html.includes('data-updates-load-error') ? root.errorLine : null),
+    // The overrides and a select in them; each drawing makes new ones, closed and not focused.
+    details: null,
+    select: null,
+    contains: () => true,
+    querySelector: (sel) => {
+      if (sel === '[data-updates-load-error]') return html.includes('data-updates-load-error') ? root.errorLine : null;
+      if (sel === 'details.add-worker') return html.includes('add-worker') ? root.details : null;
+      if (sel === '[data-updates-service="honeygain"]') return html ? root.select : null;
+      return null;
+    },
   };
   // Count each time the controls are drawn.
   let html = '';
+  const fresh = () => {
+    root.details = {open: false};
+    root.select = {focused: false, getAttribute: (a) => (a === 'data-updates-service' ? 'honeygain' : null)};
+    root.select.focus = () => { root.select.focused = true; doc.activeElement = root.select; };
+  };
   Object.defineProperty(root, 'innerHTML', {
     get: () => html,
-    set: (v) => { html = v; root.renders += 1; },
+    set: (v) => { html = v; root.renders += 1; fresh(); },
   });
   const pending = [];
   const calls = [];
@@ -45,11 +59,13 @@ function makePage() {
   };
   // The fleet choice, a control whose value a check can change.
   const modeEl = {value: 'auto'};
+  const doc = {
+    activeElement: null,
+    getElementById: (id) => (id === 'updates-body' ? root : id === 'updates-mode' ? modeEl : null),
+    addEventListener: (type, fn) => { listeners.doc[type] = fn; },
+  };
   const context = {
-    document: {
-      getElementById: (id) => (id === 'updates-body' ? root : id === 'updates-mode' ? modeEl : null),
-      addEventListener: (type, fn) => { listeners.doc[type] = fn; },
-    },
+    document: doc,
     window: {CPI18N: globalThis.CPI18N},
     CP: {api, toast: () => {}},
     t,
@@ -71,6 +87,8 @@ function makePage() {
     answerNewest: async (body = data) => { pending.pop().resolve(body); await settle(); },
     fail: async (message) => { pending.shift().reject(new Error(message)); await settle(); },
     open: () => pending.length,
+    // The owner opens the overrides and puts the focus on an app's select, changing nothing.
+    browse: () => { root.details.open = true; doc.activeElement = root.select; },
     data,
   };
 }
@@ -193,6 +211,15 @@ await p.answer({status: 'started'});
 await p.fail('the dashboard did not answer');
 check('a failed reload keeps the controls', p.root.renders === 1, `drawn ${p.root.renders} times`);
 check('a failed reload shows its error beside them', !p.root.errorLine.hidden && p.root.errorLine.textContent.includes('did not answer'), JSON.stringify(p.root.errorLine));
+// 5. A refresh keeps the overrides open and the focus where the owner left it.
+p = makePage();
+await p.answer();
+p.browse();
+p.tick();
+await p.answer();
+check('a refresh draws the controls again', p.root.renders === 2, `drawn ${p.root.renders} times`);
+check('a refresh keeps the overrides open', p.root.details.open === true, JSON.stringify(p.root.details));
+check('a refresh keeps the focus on the same control', p.root.select.focused === true, JSON.stringify(p.root.select));
 p = makePage();
 await p.fail('the dashboard did not answer');
 check('a first load that fails says so in place of the controls', p.root.innerHTML.includes('did not answer'), p.root.innerHTML);

@@ -2269,6 +2269,32 @@ async def image_update_seen(worker_id: int, slug: str, new_image: str, results: 
         await db.close()
 
 
+async def newest_image_update(worker_id: int, slug: str) -> dict[str, Any] | None:
+    """The newest row of one service on one box, or None."""
+    db = await _get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT * FROM image_updates WHERE worker_id = ? AND slug = ? ORDER BY id DESC LIMIT 1", (worker_id, slug)
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+async def list_newest_image_updates() -> list[dict[str, Any]]:
+    """The newest row of each service on each box, newest first, however old: what the bell shows."""
+    db = await _get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT * FROM image_updates WHERE id IN (SELECT MAX(id) FROM image_updates GROUP BY worker_id, slug)"
+            " ORDER BY id DESC"
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+    finally:
+        await db.close()
+
+
 async def list_image_updates(limit: int = 200) -> list[dict[str, Any]]:
     """The newest rows first."""
     db = await _get_db()

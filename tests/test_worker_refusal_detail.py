@@ -182,7 +182,10 @@ def test_a_raw_restart_waits_as_long_as_the_restart_button():
 
     resp = _send("restart", raises=httpx.ReadTimeout("timed out"))
     assert resp.status_code == 504
-    assert f"did not answer within {30 + main._catalog_stop_timeout('mysterium')} s" in resp.json()["detail"]
+    # It also waits for a deploy holding the route lock, as a Stop does.
+    wait = 30 + main._catalog_stop_timeout("mysterium") + main._deploy_timeout("mysterium")
+    wait += main.image_updates.SETTLE_SECONDS + 30
+    assert f"did not answer within {wait} s" in resp.json()["detail"]
 
 
 def test_unreachable_worker_still_reads_communication_failed():
