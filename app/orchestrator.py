@@ -1158,19 +1158,30 @@ def _refuse_past(deadline: float, image: str) -> None:
         raise _past_deadline(image)
 
 
-def _pull_until(client: Any, image: str, deadline: float) -> APIError | None:
+def _pull_until(client: Any, image: str, deadline: float, *, strict: bool = False) -> APIError | None:
     """Pull ``image``, waiting no later than ``deadline``; the registry's refusal, if it refused.
 
     docker-py's pull has no overall deadline, only one per read, so a slow pull
     could run for hours. It runs in its own thread: past the deadline the deploy
     is abandoned (_refuse_past) and the pull may finish on its own, which only
     leaves an image behind.
+
+    ``strict`` (an image check) also takes an error Docker reports in the pull's
+    stream after its progress lines. docker-py's own pull drains that stream
+    without reading it, and then answers with the local tag, which a deploy
+    falls back to but a check must not report as the newest build.
     """
     outcome: dict[str, BaseException] = {}
 
     def pull() -> None:
         try:
-            client.images.pull(image)
+            if not strict:
+                client.images.pull(image)
+                return
+            repository, tag = docker.utils.parse_repository_tag(image)
+            for line in client.api.pull(repository, tag=tag or "latest", stream=True, decode=True):
+                if isinstance(line, dict) and line.get("error"):
+                    raise APIError(str(line.get("error")))
         except BaseException as exc:  # noqa: BLE001 - handed to the deploy below
             outcome["error"] = exc
 
@@ -2209,6 +2220,8 @@ def _settle(container: Any, slug: str, seconds: float, since: float, name: str) 
         if late or now >= cutoff:
             if isinstance(unreadable, _SettleStarting):
                 # Docker answered the last look: the build's own check had not passed in time.
+                # Even an answer that came late proves it: Docker's health status never
+                # goes back to "starting", so it was still starting at the cutoff too.
                 raise ImageUpdateFailed(
                     f"The new {name} had not passed its own health check by the end of its "
                     f"{int(seconds)} s check, so it was undone."
@@ -2295,7 +2308,7 @@ def check_image(slug: str, timeout: float = 900) -> dict[str, Any]:
         return {"floating": False, "ref": ref}
     logger.info("Checking %s for a newer build of %s", slug, ref)
     try:
-        error = _pull_until(client, ref, time.monotonic() + timeout)
+        error = _pull_until(client, ref, time.monotonic() + timeout, strict=True)
     except PastDeadline:
         error = f"the pull took longer than {int(timeout)} s"
     if error is not None:

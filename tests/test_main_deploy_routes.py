@@ -278,6 +278,10 @@ class TestDesktopWalletDeploys:
         spec = {"image": "honeygain/honeygain:latest", "env": self._HONEYGAIN_ENV, field: value}
         response = client.post("/api/workers/2/command", json={"command": "deploy", "slug": "honeygain", "spec": spec})
         assert response.status_code == 400 and "image updater" in response.json()["detail"]
+        # Refused before the worker is asked anything: neither its deploy target nor the deploy.
+        from app import main
+
+        assert not main._worker_deploy_target.await_count
         assert not post.await_count
 
     def test_raw_deploy_refuses_a_seed_in_fields_docker_strips(self, client, worker_target, fake_wallet_seed):

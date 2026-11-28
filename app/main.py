@@ -13755,8 +13755,12 @@ _image_update_lock = asyncio.Lock()
 #: an owner's save never overwrite each other. Never held during a check.
 _image_update_settings_lock = asyncio.Lock()
 _image_update_bell_lock = asyncio.Lock()
-#: The catalog definition each blocker judged, by (worker id, slug), for its deploy.
+#: The definition each blocker judged, by (worker id, slug), for its deploy: the
+#: catalog's, or a custom service's without its values (_custom_judged).
 _image_update_checked: dict[tuple[int, str], dict[str, Any]] = {}
+#: Outcomes of the last run whose bell rebuild failed, by worker id and slug:
+#: the next rebuild still answers the rows they answer.
+_image_update_unanswered: dict[int, dict[str, str]] = {}
 #: Config key of the bell rows a later check answered: "<worker id>|<slug>" ->
 #: the row id. It keeps a cleared row out of the bell after a restart too.
 _IMAGE_UPDATE_CLEARED_KEY = "image_updates_cleared"
@@ -13836,9 +13840,8 @@ async def _image_update_blocker(worker_id: int, slug: str, answer: dict[str, Any
     svc = await _custom_service(slug, reveal=False) if is_custom else catalog.get_service(slug)
     if not svc:
         return "it is no longer in the catalog"
-    if not is_custom:
-        # The definition judged here is the one the update deploys (_image_update_deploy).
-        _image_update_checked[(worker_id, slug)] = svc
+    # The definition judged here is the one the update deploys (_image_update_deploy).
+    _image_update_checked[(worker_id, slug)] = svc
     if svc.get("status") in _UNDEPLOYABLE_STATUSES:
         return "the catalog no longer deploys it"
     recorded = await database.get_deployment_spec(slug, worker_id=worker_id)
@@ -13901,6 +13904,11 @@ async def _image_update_blocker(worker_id: int, slug: str, answer: dict[str, Any
     return ""
 
 
+def _custom_judged(svc: dict[str, Any]) -> dict[str, Any]:
+    """What the blocker compares of a custom service, with or without its values: image, command, volumes, limits."""
+    return {key: value for key, value in (svc.get("docker") or {}).items() if key != "env"}
+
+
 async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, str], new_image: str) -> dict[str, Any]:
     """The dashboard's own blank redeploy, with the check period, as the Redeploy button runs it."""
     body = DeployRequest(env={}, replace_existing=True, expected_containers=expected)
@@ -13910,9 +13918,10 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
         if slug in _custom_deleting:
             raise image_updates.DeployRefused(f"{slug} is being deleted", rolled_back=False)
         _custom_deploying[slug] += 1
-    # The catalog definition the blocker compared, so a catalog reloaded since
-    # cannot bring in a command it never looked at.
-    snapshot = None if custom else _image_update_checked.pop((worker_id, slug), None)
+    # The definition the blocker compared, so a catalog reloaded since, or a
+    # custom service saved since, cannot bring in a command it never looked at.
+    judged = _image_update_checked.pop((worker_id, slug), None)
+    snapshot = None if custom else judged
     try:
         if custom:
             # Again here, on the one copy of the definition the deploy then sends:
@@ -13921,6 +13930,10 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
             snapshot = await _custom_service(slug, reveal=True)
             if not snapshot:
                 raise image_updates.DeployRefused("it is no longer saved", rolled_back=False)
+            if judged is None or _custom_judged(snapshot) != _custom_judged(judged):
+                raise image_updates.DeployRefused(
+                    "it was saved again during its check; the next run checks it", rolled_back=False
+                )
             recorded = await database.get_deployment_spec(slug, worker_id=worker_id) or {}
             if await _custom_values_unsaved(slug, recorded, worker_id, snapshot):
                 raise image_updates.DeployRefused(_CUSTOM_UNSAVED, rolled_back=False)
@@ -13947,6 +13960,8 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
             # Held: the worker judged the new build bad.
             rolled_back=error in ("image_update_rolled_back", "image_update_restore_failed"),
             restore_failed=error in ("image_update_restore_failed", "image_update_restore_failed_unverified"),
+            # Replaced and put back, but Docker never said how the build did.
+            changed=error == "image_update_unverified",
         ) from None
     finally:
         if custom:
@@ -13988,6 +14003,11 @@ async def _refresh_image_update_bell(outcomes: dict[int, dict[str, str]] | None 
     # One at a time: a rebuild after a settings save must not write the answered
     # rows back over the ones a run's rebuild just wrote.
     async with _image_update_bell_lock:
+        # A run's outcomes wait here until a rebuild has used them, so a rebuild
+        # that fails once does not lose the rows they answer. A newer run's win.
+        for wid, done in (outcomes or {}).items():
+            _image_update_unanswered.setdefault(wid, {}).update(done)
+        outcomes = _image_update_unanswered
         try:
             rows = await database.list_image_updates(1000)
             try:
@@ -14039,10 +14059,13 @@ async def _refresh_image_update_bell(outcomes: dict[int, dict[str, str]] | None 
             _image_update_bell.clear()
             _image_update_bell.update(bell)
             _image_update_bell_loaded = True
+            _image_update_unanswered.clear()
             _collector_alerts = [a for a in _collector_alerts if a.get("kind") != "image_update"]
             _collector_alerts.extend(_image_update_bell.values())
         except Exception as exc:  # noqa: BLE001 - the bell must not break a run
             logger.warning("Could not rebuild the image update alerts: %s", exc)
+            # The next tick tries the rebuild again, with the outcomes kept above.
+            _image_update_bell_loaded = False
 
 
 async def _run_image_updates(*, force: bool = False) -> dict[int, dict[str, str]]:

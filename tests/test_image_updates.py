@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -51,9 +52,14 @@ def fast(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def no_unsaved_holds(monkeypatch):
-    """Each test starts with no hold waiting for its row (image_updates._unsaved_holds)."""
-    monkeypatch.setattr(image_updates, "_unsaved_holds", {})
+def no_unsaved_rows(monkeypatch):
+    """Each test starts with no row waiting to be written (image_updates._unsaved_rows),
+    and no judged definition or unanswered outcome left in the dashboard by another."""
+    monkeypatch.setattr(image_updates, "_unsaved_rows", {})
+    main = sys.modules.get("app.main")
+    if main is not None:
+        monkeypatch.setattr(main, "_image_update_checked", {})
+        monkeypatch.setattr(main, "_image_update_unanswered", {})
 
 
 @pytest.fixture(autouse=True)
@@ -619,7 +625,7 @@ class TestCheckImage:
         client = self._client("sha256:same", "sha256:same")
         with patch.object(orchestrator, "_get_client", return_value=client):
             answer = orchestrator.check_image("honeygain")
-        client.images.pull.assert_called_once_with("honeygain/honeygain:latest")
+        client.api.pull.assert_called_once_with("honeygain/honeygain", tag="latest", stream=True, decode=True)
         assert answer["floating"] and answer["latest"]["id"] == answer["containers"][0]["image_id"]
 
     def test_a_moved_tag_names_both_builds(self):
@@ -651,6 +657,23 @@ class TestCheckImage:
                 answer = orchestrator.check_image("honeygain")
             assert [c["container_id"] for c in answer["containers"]] == ["c1", "c2"], name
 
+    def test_a_pull_that_fails_in_its_stream_is_a_failed_check(self):
+        # Docker sends progress, then the error, in one answer; the old build is still cached.
+        client = self._client("sha256:old", "sha256:old")
+        client.api.pull.return_value = iter(
+            [{"status": "Pulling fs layer"}, {"error": "unexpected EOF", "errorDetail": {"message": "unexpected EOF"}}]
+        )
+        with (
+            patch.object(orchestrator, "_get_client", return_value=client),
+            pytest.raises(orchestrator.ContainerRuntimeError) as failed,
+        ):
+            orchestrator.check_image("honeygain")
+        assert failed.value.status_code == 502 and "unexpected EOF" in str(failed.value)
+        # Control: the same stream without the error is a check.
+        client.api.pull.return_value = iter([{"status": "Pulling fs layer"}, {"status": "Download complete"}])
+        with patch.object(orchestrator, "_get_client", return_value=client):
+            assert orchestrator.check_image("honeygain")["floating"] is True
+
     def test_a_stopped_copy_of_an_app_whose_name_ends_in_replaced_is_a_copy(self):
         # A custom app named "Foo Replaced" gets the slug custom-foo-replaced, so
         # its own container name ends in -replaced. Only its set-aside name is skipped.
@@ -673,6 +696,7 @@ class TestCheckImage:
         client = self._client("sha256:old", "sha256:new", ref=ref)
         with patch.object(orchestrator, "_get_client", return_value=client):
             assert orchestrator.check_image("honeygain")["floating"] is False
+        client.api.pull.assert_not_called()
         client.images.pull.assert_not_called()
 
     def test_floating_refs(self):
@@ -819,9 +843,77 @@ class TestDecisions:
         writes["fail"] = False
         assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "held"
         assert [r[0] for r in state.rows] == ["rolled_back"] and state.rows[0][1]["detail"] == "undone"
-        assert not image_updates._unsaved_holds
+        assert not image_updates._unsaved_rows
         assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "held"
         assert len(state.deploys) == 1 and len(state.rows) == 1
+
+    @staticmethod
+    def _failing_writes(state):
+        hooks = state.hooks()
+        real_record = hooks.record
+        writes = {"fail": True}
+
+        async def record(*args, **kwargs):
+            if writes["fail"]:
+                raise RuntimeError("database is locked")
+            await real_record(*args, **kwargs)
+
+        hooks.record = record
+        return hooks, writes
+
+    async def test_a_needs_you_row_of_an_unjudged_build_is_saved_later_and_holds_nothing(self):
+        refused = image_updates.DeployRefused("refused, not started again", rolled_back=False, restore_failed=True)
+        state = _Hooks(_answer(), deploy=refused)
+        hooks, writes = self._failing_writes(state)
+        done = await image_updates.run_worker(hooks, {"mode": "auto", "workers": {}, "services": {}}, 1, ["honeygain"])
+        # The outcome stays, so the box pauses after it.
+        assert done == {"honeygain": image_updates.RESTORE_FAILED}
+        hooks.sleep.assert_awaited_once_with(image_updates.GAP_SECONDS)
+        # The next check writes the row first, and the build is tried again: nobody judged it.
+        writes["fail"], state._deploy = False, None
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "updated"
+        assert [(r[0], r[1]["new_image"]) for r in state.rows] == [
+            (image_updates.RESTORE_FAILED, ""),
+            (image_updates.UPDATED, "sha256:new"),
+        ]
+
+    async def test_an_undo_docker_could_not_judge_pauses_the_box_and_is_tried_again(self):
+        changed = image_updates.DeployRefused("not described", rolled_back=False, changed=True)
+        state = _Hooks(_answer(), deploy=changed)
+        settings = {"mode": "auto", "workers": {}, "services": {}}
+        hooks = state.hooks()
+        assert await image_updates.run_worker(hooks, settings, 1, ["honeygain"]) == {"honeygain": "unverified"}
+        hooks.sleep.assert_awaited_once_with(image_updates.GAP_SECONDS)
+        assert [r[0] for r in state.rows] == [image_updates.FAILED]
+        state._deploy = None
+        assert await _run(state, image_updates.AUTO) == "updated"
+        # Its row waiting to be saved does not hold the build either.
+        state = _Hooks(_answer(), deploy=changed)
+        hooks, writes = self._failing_writes(state)
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "unverified"
+        # Still unsaved at the next check, and the build is tried again.
+        state._deploy = None
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "updated"
+        writes["fail"] = False
+        state._answer = _answer(running="sha256:new")
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "current"
+        assert sorted(r[0] for r in state.rows) == [image_updates.FAILED, image_updates.UPDATED]
+        # Control: a refusal that changed nothing does not pause the box.
+        state = _Hooks(_answer(), deploy=image_updates.DeployRefused("refused", rolled_back=False))
+        hooks = state.hooks()
+        assert await image_updates.run_worker(hooks, settings, 1, ["honeygain"]) == {"honeygain": "failed"}
+        hooks.sleep.assert_not_awaited()
+
+    async def test_an_update_whose_row_cannot_be_saved_still_pauses_and_is_saved_later(self):
+        state = _Hooks(_answer())
+        hooks, writes = self._failing_writes(state)
+        done = await image_updates.run_worker(hooks, {"mode": "auto", "workers": {}, "services": {}}, 1, ["honeygain"])
+        assert done == {"honeygain": "updated"}
+        hooks.sleep.assert_awaited_once_with(image_updates.GAP_SECONDS)
+        writes["fail"] = False
+        state._answer = _answer(running="sha256:new")
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "current"
+        assert [(r[0], r[1]["new_image"]) for r in state.rows] == [(image_updates.UPDATED, "sha256:new")]
 
     async def test_an_unsaved_hold_is_written_whatever_the_tag_names_now(self):
         state = _Hooks(_answer(), deploy=image_updates.DeployRefused("undone", rolled_back=True))
@@ -1059,15 +1151,15 @@ class TestTheDashboardSide:
         assert not caught.value.rolled_back
 
     @pytest.mark.parametrize(
-        ("code", "rolled_back", "restore_failed"),
+        ("code", "rolled_back", "restore_failed", "changed"),
         [
-            ("image_update_restore_failed", True, True),
-            ("image_update_restore_failed_unverified", False, True),
-            ("image_update_unverified", False, False),
-            ("image_update_unsupported", False, False),
+            ("image_update_restore_failed", True, True, False),
+            ("image_update_restore_failed_unverified", False, True, False),
+            ("image_update_unverified", False, False, True),
+            ("image_update_unsupported", False, False, False),
         ],
     )
-    async def test_each_worker_code_is_recorded_as_what_it_means(self, code, rolled_back, restore_failed):
+    async def test_each_worker_code_is_recorded_as_what_it_means(self, code, rolled_back, restore_failed, changed):
         from fastapi import HTTPException
 
         from app import main
@@ -1085,6 +1177,7 @@ class TestTheDashboardSide:
             await main._image_update_deploy(1, "honeygain", {"1": "abc"}, "sha256:" + "a" * 64)
         assert str(caught.value) == "why"
         assert (caught.value.rolled_back, caught.value.restore_failed) == (rolled_back, restore_failed)
+        assert caught.value.changed is changed
 
     async def test_a_worker_without_the_checked_route_gets_no_image_update(self):
         """The old route ignores the check period and the expected build, so nothing is sent."""
@@ -1137,6 +1230,7 @@ class TestTheDashboardSide:
         reads = iter([checked, edited, edited])
         deploy = AsyncMock(return_value={})
         auto = {"mode": "auto", "workers": {}, "services": {}}
+        main._image_update_checked[(1, "custom-mine")] = {"custom": True, "docker": {"image": "example/mine:latest"}}
         with (
             patch.object(main, "_custom_service", AsyncMock(side_effect=lambda *a, **k: next(reads))),
             patch.object(main, "_image_update_settings", AsyncMock(return_value=auto)),
@@ -1152,11 +1246,20 @@ class TestTheDashboardSide:
 
         judged = {"slug": "honeygain", "docker": {"image": "honeygain/honeygain", "command": "old"}}
         reloaded = {"slug": "honeygain", "docker": {"image": "honeygain/honeygain", "command": "new"}}
+        entry = {"slug": "honeygain", "container_id": "abc123def456", "shape": {"image": "honeygain/honeygain"}}
+        answer = {"ref": "honeygain/honeygain", "containers": [{"container_id": "abc123def456" + "0" * 52}]}
         with (
             patch.object(main.catalog, "get_service", return_value=judged),
-            patch.object(main.database, "get_deployment_spec", AsyncMock(return_value=None)),
+            patch.object(
+                main.database, "get_deployment_spec", AsyncMock(return_value={"image": "honeygain/honeygain"})
+            ),
+            patch.object(main, "_image_for_worker", AsyncMock(side_effect=lambda w, s, asked: asked)),
+            patch.object(main.database, "get_worker", AsyncMock(return_value={"containers": json.dumps([entry])})),
+            patch.object(main.egress, "container_slug", lambda e: e["slug"]),
+            patch.object(main.drift, "container_drift", lambda *a, **k: []),
         ):
-            assert "no deployment record" in await main._image_update_blocker(1, "honeygain", {})
+            # The blocker lets the update through, then the catalog is reloaded.
+            assert await main._image_update_blocker(1, "honeygain", answer) == ""
         deploy = AsyncMock(return_value={})
         auto = {"mode": "auto", "workers": {}, "services": {}}
         with (
@@ -1230,12 +1333,64 @@ class TestTheDashboardSide:
             patch.object(main, "_image_update_settings", AsyncMock(side_effect=lambda: dict(settings))),
             patch.object(main.database, "get_deployment_spec", AsyncMock(return_value={"env": {}})),
             patch.object(main, "_custom_service", AsyncMock(return_value={"custom": True, "docker": {}})),
+            patch.dict(main._image_update_checked, {(1, "custom-mine"): {"custom": True, "docker": {}}}),
             patch.object(main, "_custom_values_unsaved", owner_turns_it_off),
             patch.object(main, "_deploy", deploy),
             pytest.raises(image_updates.ModeChanged),
         ):
             await main._image_update_deploy(1, "custom-mine", {"1": "abc"}, "sha256:" + "a" * 64)
         deploy.assert_not_called()
+
+    async def test_a_custom_definition_saved_during_the_check_is_not_deployed(self):
+        """The blocker judged one command; the owner saved another before the deploy."""
+        from app import custom_services, main
+
+        slug = "custom-mine"
+        old, _ = custom_services.validate({"name": "Mine", "image": "example/mine:latest", "command": "run --fast"})
+        new, _ = custom_services.validate({"name": "Mine", "image": "example/mine:latest", "command": "run --slow"})
+        auto = {"mode": "auto", "workers": {}, "services": {}}
+        for saved, refused in ((new, True), (old, False)):
+            main._image_update_checked[(1, slug)] = custom_services.as_service(slug, old, reveal=False)
+            deploy = AsyncMock(return_value={})
+            with (
+                patch.object(main, "_image_update_settings", AsyncMock(return_value=auto)),
+                patch.object(main.database, "get_deployment_spec", AsyncMock(return_value={"env": {}})),
+                patch.object(
+                    main,
+                    "_custom_service",
+                    AsyncMock(return_value=custom_services.as_service(slug, saved, reveal=True)),
+                ),
+                patch.object(main, "_custom_values_unsaved", AsyncMock(return_value=False)),
+                patch.object(main, "_deploy", deploy),
+            ):
+                if refused:
+                    with pytest.raises(image_updates.DeployRefused) as caught:
+                        await main._image_update_deploy(1, slug, {"1": "abc"}, "sha256:" + "a" * 64)
+                    assert "saved again" in str(caught.value) and not caught.value.rolled_back
+                    deploy.assert_not_called()
+                else:
+                    # Control: the definition it judged is deployed.
+                    await main._image_update_deploy(1, slug, {"1": "abc"}, "sha256:" + "a" * 64)
+                    deploy.assert_awaited_once()
+
+    async def test_a_bell_rebuild_that_fails_keeps_the_runs_answer_for_the_next_one(self, db):
+        from app import main
+
+        await database.init_db()
+        await database.record_image_update(1, "honeygain", "available", new_image="sha256:new")
+        workers = AsyncMock(return_value=[{"id": 1, "name": "alpha"}])
+        with patch.object(main.database, "list_workers", workers), patch.object(main, "_collector_alerts", []):
+            await main._refresh_image_update_bell()
+            assert "1|honeygain" in main._image_update_bell
+            real = main.database.list_image_updates
+            with patch.object(main.database, "list_image_updates", AsyncMock(side_effect=RuntimeError("locked"))):
+                await main._refresh_image_update_bell({1: {"honeygain": "current"}})
+            assert main._image_update_bell_loaded is False
+            # The next tick rebuilds it, with no outcomes of its own: the run's answer still counts.
+            with patch.object(main.database, "list_image_updates", real):
+                await main._refresh_image_update_bell()
+            assert "1|honeygain" not in main._image_update_bell
+            assert main._image_update_bell_loaded is True
 
     async def test_a_custom_value_saved_after_the_blocker_is_not_deployed(self):
         from app import main
@@ -1246,6 +1401,7 @@ class TestTheDashboardSide:
             patch.object(main, "_image_update_settings", AsyncMock(return_value=auto)),
             patch.object(main.database, "get_deployment_spec", AsyncMock(return_value={"env": {"A": "old"}})),
             patch.object(main, "_custom_service", AsyncMock(return_value={"custom": True, "docker": {}})),
+            patch.dict(main._image_update_checked, {(1, "custom-mine"): {"custom": True, "docker": {}}}),
             patch.object(main, "_custom_values_unsaved", AsyncMock(return_value=True)),
             patch.object(main, "_deploy", deploy),
             pytest.raises(image_updates.DeployRefused) as caught,
@@ -1632,6 +1788,10 @@ class TestCustomServiceBlocker:
         made = {"image": "example/mine:latest", "command": "run --fast", "data_path": "/data"}
         saved = {"name": "Mine", "image": "example/mine:latest", "command": "run --fast", "data_path": "/data"}
         assert await self._blocker(monkeypatch, saved, made) == ""
+        # The definition it judged waits for the deploy, which refuses any other.
+        from app import main
+
+        assert main._image_update_checked[(1, "custom-mine")]["docker"]["command"] == "run --fast"
 
     async def test_a_container_the_last_report_does_not_describe_is_left_for_the_next_run(self, monkeypatch):
         # The box replaced it after its last report: that report's shape is of another container.

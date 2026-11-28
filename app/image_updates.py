@@ -142,14 +142,17 @@ class DeployRefused(Exception):
 
     ``rolled_back`` when the worker undid an update whose new build failed its
     check: that build is held. ``restore_failed`` when the old container did not
-    start again: the owner is needed, with or without ``rolled_back``. Any other
-    refusal is tried again the next day.
+    start again: the owner is needed, with or without ``rolled_back``.
+    ``changed`` when the worker replaced the container and put the old one back
+    without judging the build: the box pauses, and the build is tried again the
+    next day. Any other refusal changed nothing and is tried again the next day.
     """
 
-    def __init__(self, message: str, *, rolled_back: bool, restore_failed: bool = False) -> None:
+    def __init__(self, message: str, *, rolled_back: bool, restore_failed: bool = False, changed: bool = False) -> None:
         super().__init__(message)
         self.rolled_back = rolled_back
         self.restore_failed = restore_failed
+        self.changed = changed
 
 
 class ModeChanged(Exception):
@@ -160,26 +163,28 @@ class ModeChanged(Exception):
         self.mode = mode
 
 
-#: Holds whose row could not be written yet, by (worker_id, slug, new image ID):
-#: the result and the row's facts. The build stays held in this process while
-#: the write is tried again on each check.
-_unsaved_holds: dict[tuple[int, str, str], tuple[str, dict[str, str]]] = {}
+#: Rows of a deploy that changed a container, which could not be written yet,
+#: by (worker_id, slug, new image ID, result): the row's facts. A hold among
+#: them keeps its build held in this process while each check tries the write again.
+_unsaved_rows: dict[tuple[int, str, str, str], dict[str, str]] = {}
 
 
-async def _record_hold(hooks: Hooks, worker_id: int, slug: str, result: str, facts: dict[str, str]) -> None:
-    key = (worker_id, slug, facts["new_image"])
-    _unsaved_holds[key] = (result, facts)
-    await hooks.record(worker_id, slug, result, **facts)
-    _unsaved_holds.pop(key, None)
+async def _record_change(hooks: Hooks, worker_id: int, slug: str, result: str, facts: dict[str, str]) -> None:
+    """Write the row of a deploy that changed a container. Never raises: a row that fails waits for a later check."""
+    key = (worker_id, slug, facts["new_image"], result)
+    _unsaved_rows[key] = facts
+    try:
+        await hooks.record(worker_id, slug, result, **facts)
+    except Exception as exc:  # noqa: BLE001 - kept in memory, written on a later check
+        logger.warning("Could not save the %s row of %s on worker %s yet: %s", result, slug, worker_id, exc)
+        return
+    _unsaved_rows.pop(key, None)
 
 
-async def _flush_holds(hooks: Hooks, worker_id: int, slug: str) -> None:
-    """Write the holds of this service on this box that are still unsaved, whatever the tag names now."""
-    for key in [k for k in _unsaved_holds if k[:2] == (worker_id, slug)]:
-        try:
-            await _record_hold(hooks, worker_id, slug, *_unsaved_holds[key])
-        except Exception as exc:  # noqa: BLE001 - still held; written on a later check
-            logger.warning("Could not save the hold of %s on worker %s yet: %s", slug, worker_id, exc)
+async def _flush_rows(hooks: Hooks, worker_id: int, slug: str) -> None:
+    """Write the rows of this service on this box that are still unsaved, whatever the tag names now."""
+    for key in [k for k in _unsaved_rows if k[:2] == (worker_id, slug)]:
+        await _record_change(hooks, worker_id, slug, key[3], _unsaved_rows[key])
 
 
 def _short(digest: str) -> str:
@@ -188,7 +193,7 @@ def _short(digest: str) -> str:
 
 async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> str:
     """Check one service on one box and act on the mode. Returns what happened, for the log and the tests."""
-    await _flush_holds(hooks, worker_id, slug)
+    await _flush_rows(hooks, worker_id, slug)
     if mode == OFF:
         return "off"
     answer = await hooks.check(worker_id, slug)
@@ -205,7 +210,7 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
     old_id, old_digest = str(stale[0].get("image_id") or ""), str(stale[0].get("digest") or "")
     facts = {"old_image": old_id, "new_image": new_id, "old_digest": old_digest, "new_digest": new_digest}
     # A build that already failed here is never tried again; a newer one is.
-    if (worker_id, slug, new_id) in _unsaved_holds:
+    if any(k[:3] == (worker_id, slug, new_id) and k[3] in HOLDS for k in _unsaved_rows):
         return "held"
     if await hooks.seen(worker_id, slug, new_id, HOLDS):
         return "held"
@@ -239,22 +244,23 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
     except DeployRefused as exc:
         result = RESTORE_FAILED if exc.restore_failed else ROLLED_BACK
         if exc.rolled_back:
-            try:
-                await _record_hold(hooks, worker_id, slug, result, {**facts, "detail": str(exc)})
-            except Exception as write:  # noqa: BLE001 - held in memory, written on a later check
-                logger.warning("Could not save the hold of %s on worker %s yet: %s", slug, worker_id, write)
+            await _record_change(hooks, worker_id, slug, result, {**facts, "detail": str(exc)})
             return result
         if exc.restore_failed:
             # The owner is needed, but nobody judged the build: no image ID, so no hold.
-            await hooks.record(worker_id, slug, RESTORE_FAILED, detail=str(exc), **{**facts, "new_image": ""})
+            await _record_change(hooks, worker_id, slug, RESTORE_FAILED, {**facts, "new_image": "", "detail": str(exc)})
             return result
+        if exc.changed:
+            # Replaced and put back, build not judged: tried again the next day, after a pause.
+            await _record_change(hooks, worker_id, slug, FAILED, {**facts, "detail": str(exc)})
+            return "unverified"
         await hooks.record(worker_id, slug, FAILED, detail=str(exc), **facts)
         return "failed"
     done = result.get("image_update") if isinstance(result.get("image_update"), dict) else {}
     kept = str(done.get("old_kept") or "")
     detail = f"The old image stays on disk: {kept}." if kept else ""
-    await hooks.record(
-        worker_id, slug, UPDATED, detail=detail, **{**facts, "new_image": str(done.get("new_image") or new_id)}
+    await _record_change(
+        hooks, worker_id, slug, UPDATED, {**facts, "detail": detail, "new_image": str(done.get("new_image") or new_id)}
     )
     logger.info("Updated %s on worker %s from %s to %s", slug, worker_id, _short(old_digest), _short(new_digest))
     return "updated"
@@ -270,6 +276,6 @@ async def run_worker(hooks: Hooks, settings: dict[str, Any], worker_id: int, slu
         except Exception as exc:  # noqa: BLE001 - one service's failure never stops the others
             logger.warning("Image check of %s on worker %s failed: %s", slug, worker_id, exc)
             outcomes[slug] = "error"
-        if outcomes[slug] in ("updated", ROLLED_BACK, RESTORE_FAILED):
+        if outcomes[slug] in ("updated", "unverified", ROLLED_BACK, RESTORE_FAILED):
             await hooks.sleep(GAP_SECONDS)
     return outcomes
