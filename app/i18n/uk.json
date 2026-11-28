@@ -2063,6 +2063,10 @@
     "text": " — зник із машини",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — оновлення образу",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — відсутній",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "ця резервна копія містить {have}, але {slug} зберігає {want}. Це не резервна копія {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "Триває розгортання {slug}, тому його не прочитано для резервної копії. Спробуйте знову, коли розгортання завершиться.",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "{outer} і {inner} обидва є в {bind_mounts_env}, а контейнер, який монтує {outer}, може розмістити посилання там, де знаходиться {inner}. Залиште в {bind_mounts_env} лише один із них у файлі .env поруч із вашим файлом compose, потім виконайте docker compose up -d",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "На цій машині виконується видалення {slug}, тому {action, select, start {його не запущено} backup {його не прочитано для резервної копії} other {нічого не розгорнуто}}. Спробуйте ще раз, коли воно завершиться.",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "Розгортання {slug} ще триває, тому його не перезапущено. Перезапустіть його, коли розгортання завершиться.",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "Відновлення {slug} не завершилося, тому його дані можуть бути записані наполовину, і {action, select, start {його не запущено} backup {його не прочитано для резервної копії} other {його не розгорнуто}}. Видаліть сервіс разом із даними (це пропонує «Видалити з цієї машини» на панелі сервісу на сторінці «Панель»), а потім відновіть резервну копію ще раз.",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "{name} запустився до завершення відновлення, тому відновлення скасовано",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "Сервіс {slug} ще розгортається, тому його не зупинено. Зупиніть його ще раз, коли розгортання завершиться.",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "Оновлення вже виконується.",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "{hidden, plural, one {# контейнер} few {# контейнери} many {# контейнерів} other {# контейнера}} на {w, plural, one {# недоступному воркері} few {# недоступних воркерах} many {# недоступних воркерах} other {# недоступного воркера}} не враховано вище. Вони й далі працюють і заробляють, поки їхній воркер не в мережі. Просто CashPilot зараз їх не бачить.",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "Оновлення образу для {name}",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "Оновлення образів на {name}",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop сам оновлює свої застосунки.",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "Docker зараз недоступний на цій машині, тому її застосунки не перевіряються.",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "Зараз не в мережі.",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "Оновіть цей воркер, щоб отримувати оновлення образів.",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "Застосунок",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "Оновлення",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "Було",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "Результат",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "Стало",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "Коли",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "Контейнер застосунку змінюється лише тоді, коли в його реєстрі з'являється нова збірка. Новий контейнер має пропрацювати {seconds, plural, one {# секунду} few {# секунди} many {# секунд} other {# секунди}} без жодного збою, інакше CashPilot повертає старий. Збірку, яка не пройшла цю перевірку, на цій машині більше не пробують.",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "Кожен застосунок на кожній машині",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "Що зробили оновлення",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "Щоденна перевірка о",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "Як це працює",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "Остання щоденна перевірка: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "Не вдалося завантажити оновлення: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "Завантаження оновлень",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "Встановлює нові збірки образів ваших застосунків, по одному застосунку за раз на кожній машині.",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "Оновлювати автоматично",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "Успадковувати",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "Лише сповіщати",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "Вимкнено",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "Щоденної перевірки ще не було.",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "Ще немає розгорнутих застосунків.",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "Ще немає машин.",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "Поки нічого.",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "Автоматичні оновлення в цій інсталяції вимкнено. Увімкніть їх, щоб раз на день отримувати нову збірку кожного застосунку.",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "Увімкнути автоматичні оновлення",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "Вибір для кожної машини й кожного застосунку",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "Власний вибір застосунку має перевагу над вибором його машини, а вибір машини — над вибором парку.",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "Нова збірка",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "Не вдалося",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "Потрібна ваша дія",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "Скасовано",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "Не встановлено",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "Оновлено",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "Перевірити зараз",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "Не вдалося запустити перевірку: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "Перевірка…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "Не вдалося зберегти: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "Налаштування оновлень збережено",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "Перевірку запущено. Результати з’являтимуться тут у міру того, як відповідатимуть машини.",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "Оновлення образів застосунків",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "На цьому телефоні старіший випуск CashPilot Android, ніж найновіший опублікований ({ref}). Встановіть новіший APK зі сторінки випусків на GitHub.",

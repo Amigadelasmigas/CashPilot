@@ -2063,6 +2063,10 @@
     "text": " — 머신에서 사라짐",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — 이미지 업데이트",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — 누락됨",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "이 백업에는 {have}이(가) 들어 있지만 {slug}은(는) {want}을(를) 보관합니다. {slug}의 백업이 아닙니다.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "{slug}의 배포가 진행 중이므로 백업을 위해 읽지 않았습니다. 배포가 끝난 후 다시 시도하십시오.",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "{outer}과(와) {inner}이(가) 모두 {bind_mounts_env}에 있으며, {outer}을(를) 바인딩하는 컨테이너는 {inner} 위치에 링크를 둘 수 있습니다. compose 파일 옆의 .env 파일에서 {bind_mounts_env}에 둘 중 하나만 남긴 다음 docker compose up -d를 실행하십시오",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "이 머신에서 {slug} 제거가 실행 중이므로 {action, select, start {시작하지 않았습니다} backup {백업을 위해 읽지 않았습니다} other {아무것도 배포하지 않았습니다}}. 끝나면 다시 시도하십시오.",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "{slug}의 배포가 아직 진행 중이므로 재시작하지 않았습니다. 배포가 끝난 후 재시작하십시오.",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "{slug} 복원이 완료되지 않아 데이터가 절반만 기록되었을 수 있으므로 {action, select, start {시작하지 않았습니다} backup {백업을 위해 읽지 않았습니다} other {배포하지 않았습니다}}. 서비스를 데이터와 함께 제거한 다음(서비스의 대시보드 패널에 있는 ‘이 머신에서 제거’에서 이 옵션을 제공합니다) 백업을 다시 복원하십시오.",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "복원이 끝나기 전에 {name}이(가) 시작되어 복원을 되돌렸습니다",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "{slug} 배포가 아직 진행 중이어서 중지하지 않았습니다. 배포가 끝나면 다시 중지하십시오.",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "이미 업데이트가 실행 중입니다.",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "연결할 수 없는 {w, plural, other {워커 #개}}에 있는 {hidden, plural, other {컨테이너 #개}}는 위 집계에 포함되지 않습니다. 워커가 오프라인인 동안에도 계속 실행되며 수익을 냅니다. CashPilot이 지금 볼 수 없을 뿐입니다.",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "{name}의 이미지 업데이트",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "{name} 머신의 이미지 업데이트",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop은 자체 앱을 직접 업데이트합니다.",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "지금 이 머신에서 Docker에 연결할 수 없으므로 이 머신의 앱을 확인하지 않습니다.",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "현재 오프라인입니다.",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "이미지 업데이트를 받으려면 이 워커를 업데이트하십시오.",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "앱",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "업데이트",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "변경 전",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "결과",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "변경 후",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "일시",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "앱의 컨테이너는 레지스트리에 새 빌드가 있을 때만 바뀝니다. 새 컨테이너는 {seconds, plural, other {#초}} 동안 실패 없이 실행되어야 하며, 그렇지 않으면 CashPilot이 이전 컨테이너로 되돌립니다. 이 점검에 실패한 빌드는 해당 머신에서 다시 시도하지 않습니다.",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "모든 머신의 모든 앱",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "업데이트 결과 내역",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "일일 확인 시각",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "작동 방식",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "마지막 일일 확인: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "업데이트를 불러올 수 없습니다: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "업데이트 불러오는 중",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "앱 이미지의 새 빌드를 설치합니다. 각 머신에서 한 번에 앱 하나씩 설치합니다.",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "자동으로 업데이트",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "상속",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "알림만",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "사용 안 함",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "아직 일일 점검이 실행되지 않았습니다.",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "아직 배포된 앱이 없습니다.",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "아직 머신이 없습니다.",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "아직 아무것도 없습니다.",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "이 설치에서는 자동 업데이트가 꺼져 있습니다. 자동 업데이트를 켜면 하루에 한 번 각 앱의 새 빌드를 받습니다.",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "자동 업데이트 켜기",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "머신별 및 앱별 선택",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "앱 자체의 선택이 해당 머신의 선택보다 우선하고, 머신의 선택은 플릿의 선택보다 우선합니다.",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "새 빌드",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "실패",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "사용자 조치 필요",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "되돌림",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "설치되지 않음",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "업데이트됨",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "지금 확인",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "확인을 시작할 수 없습니다: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "확인 중…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "저장할 수 없습니다: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "업데이트 설정을 저장했습니다",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "확인을 시작했습니다. 각 머신이 응답하는 대로 여기에 결과가 표시됩니다.",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "앱 이미지 업데이트",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "이 휴대폰의 CashPilot Android 릴리스는 최신 게시 릴리스({ref})보다 오래되었습니다. GitHub 릴리스 페이지에서 새 APK를 설치하십시오.",
