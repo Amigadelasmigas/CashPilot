@@ -1,8 +1,8 @@
 # Security layers
 
 You decide how many layers protect your computer from the earners. Each layer
-guards one thing. Stacked, they mean an attacker needs one separate escape per
-layer.
+guards against a different threat, and each one you add closes a path the
+others leave open.
 
 The Fleet page shows the layers of each worker in its **Security layers** row.
 For each earner it shows the layers that the earner really got. It says whether
@@ -48,7 +48,9 @@ gives you one command to run on the host.
    what it will change and asks before it does. It installs a pinned gVisor
    release, checked by sha512, in its own folder, and registers two runtimes in
    `/etc/docker/daemon.json` after a backup. Docker reloads its settings, so your
-   running containers keep running.
+   running containers keep running. If the reload does not pick the runtimes
+   up, the helper asks you again before it restarts Docker, and says that a
+   restart stops every container on the host, CashPilot's and any others.
 2. **Check.** Press **Check gVisor**. The worker starts a short probe under each
    gVisor runtime, on the earners' network. Green needs gVisor's own kernel and a
    working name lookup. Red says which one failed.
@@ -57,8 +59,9 @@ gives you one command to run on the host.
    the page asks first.
 4. **Undo.** Switch every earner back to Standard, then run the remove command.
    It restores `daemon.json`, deletes gVisor and its backup, reloads Docker and
-   checks that nothing is left. It refuses while an earner still runs under
-   gVisor. After the remove, an earner still set to gVisor is not redeployed,
+   checks that nothing is left. It refuses while any container, running or
+   stopped, still uses a gVisor runtime. Switching a stopped earner saves the
+   choice only, so redeploy or remove each stopped one first. After the remove, an earner still set to gVisor is not redeployed,
    and while the worker's default still says gVisor no new earner is deployed.
    The page says why, and nothing is stopped or removed.
 

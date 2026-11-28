@@ -424,10 +424,15 @@ not get it, so the page gives you one command to run on the host:
    asks before it redeploys a running earner. Each earner then shows the
    runtime it really got.
 4. **Undo.** Switch every earner back to Standard, then run the remove command
-   from the same row. It refuses while an earner still runs under gVisor. It
-   puts back your `daemon.json`, or keeps your own later edits and removes only
-   its runtimes. Then it deletes gVisor, reloads Docker and checks that nothing
-   of it is left.
+   from the same row. It refuses while any container, running or stopped, still
+   uses a gVisor runtime. Switching a stopped earner saves the choice only, so
+   redeploy or remove each stopped one first. If a worker variable below pins
+   gVisor, the page shows the choice locked: remove the variable from the
+   worker's compose file, recreate the worker with `docker compose up -d`, then
+   redeploy those earners. The
+   remove command puts back your `daemon.json`, or keeps your own later edits
+   and removes only its runtimes. Then it deletes gVisor, reloads Docker and
+   checks that nothing of it is left.
 
 The helper refuses Unraid, Docker Desktop, rootless Docker and the snap
 package, and says why. It also refuses when `daemon.json` already holds a
@@ -443,9 +448,12 @@ The runtimes it registers, next to any you already have:
 }
 ```
 
-The worker gives an earner that declares `NET_RAW`, such as Bitping,
-`runsc-hostnet-raw`, and every other earner `runsc-hostnet`. A worker without
-the runtime an earner needs refuses that deploy and says what to install.
+When you set an earner to gVisor, the worker runs it under `runsc-hostnet-raw`
+if it declares `NET_RAW`, such as Bitping, and under `runsc-hostnet` otherwise.
+An earner set to Standard runs under `runc`. A worker without the
+runtime an earner needs refuses that deploy and says what to install. A copy
+routed through one of your proxies runs under Standard only, so an earner set
+to gVisor is not routed: set it back to Standard first.
 
 ### What we ran under it
 
