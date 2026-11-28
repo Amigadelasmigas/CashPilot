@@ -5791,6 +5791,26 @@
     "text": "bản sao lưu này chứa {have}, nhưng {slug} lưu {want}. Đây không phải là bản sao lưu của {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} và {inner} đều có trong {bind_mounts_env}, và một container bind {outer} có thể đặt một liên kết tại vị trí của {inner}. Hãy chỉ giữ lại một trong hai mục đó trong {bind_mounts_env} ở file .env cạnh file compose của bạn, rồi chạy docker compose up -d",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "container chỉ bind đúng các đường dẫn có trong {bind_mounts_env}, không bind một thư mục nằm bên dưới một đường dẫn trong đó. Để cho phép đường dẫn này, hãy thêm {path} vào {bind_mounts_env} trong file .env cạnh file compose của bạn (cách nhau bằng dấu phẩy), rồi chạy docker compose up -d",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "container chỉ bind đúng các đường dẫn có trong {bind_mounts_env}, không bind một thư mục nằm bên dưới một đường dẫn trong đó. Để cho phép đường dẫn này, hãy thêm {path} vào {bind_mounts_env} trong file .env cạnh file compose của bạn (cách nhau bằng dấu phẩy) và bỏ {outer} ra, trừ khi có dịch vụ bind {n, plural, =1 {nó} one {một trong # thư mục đó} other {một trong số chúng}}: không thể liệt kê cùng lúc một thư mục và một thư mục nằm bên trong nó, rồi chạy docker compose up -d",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "đường dẫn có '//', '.' hoặc '..' trong đó, và một bind phải khớp với một mục của {bind_mounts_env} đúng như cách mục đó được viết. Hãy viết nó thành {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "Không thể kiểm tra runtime {runtime}: Docker daemon không phản hồi.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "Không tìm thấy bản {instance} của {slug}",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} lưu dữ liệu trong {refused}, mà worker không cho container bind, nên không tạo được container thay thế. Container đang chạy không bị động đến. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} lưu dữ liệu của nó trong một thư mục trên máy chủ, hoặc không lưu gì, nên không thể khôi phục nó từ bảng điều khiển. Hãy dùng các bước dòng lệnh trong hướng dẫn sao lưu.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker đã từ chối container: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "Worker không cho container bind {source}: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Cần một đối tượng JSON",

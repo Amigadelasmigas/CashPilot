@@ -5791,6 +5791,26 @@
     "text": "ta kopia zapasowa zawiera {have}, ale {slug} przechowuje {want}. To nie jest kopia zapasowa {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "Zarówno {outer}, jak i {inner} są w {bind_mounts_env}, a kontener montujący {outer} mógłby umieścić dowiązanie tam, gdzie jest {inner}. Zostaw tylko jedną z tych ścieżek w {bind_mounts_env} w pliku .env obok pliku compose, a potem uruchom docker compose up -d",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "kontenery montują tylko dokładnie te ścieżki, które są w {bind_mounts_env}, a nie folder wewnątrz którejś z nich. Aby pozwolić na tę ścieżkę, dodaj {path} do {bind_mounts_env} w pliku .env obok pliku compose (wartości rozdzielone przecinkami), a potem uruchom docker compose up -d",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "kontenery montują tylko dokładnie te ścieżki, które są w {bind_mounts_env}, a nie folder wewnątrz którejś z nich. Aby pozwolić na tę ścieżkę, dodaj {path} do {bind_mounts_env} w pliku .env obok pliku compose (wartości rozdzielone przecinkami) i usuń {outer}, chyba że jakaś usługa {n, plural, =1 {go montuje} one {montuje jeden z nich} few {montuje jeden z nich} many {montuje jeden z nich} other {montuje jeden z nich}}: nie można jednocześnie wymienić folderu i folderu w nim zawartego. Potem uruchom docker compose up -d",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "ścieżka zawiera '//', '.' lub '..', a montowana ścieżka musi odpowiadać wpisowi w {bind_mounts_env} dokładnie w zapisanej postaci. Zapisz ją jako {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "Nie można sprawdzić środowiska uruchomieniowego {runtime}: demon Docker nie odpowiada.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "Nie znaleziono instancji {instance} usługi {slug}",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} przechowuje dane w {refused}, a worker nie pozwala kontenerom tego montować, więc nie udało się utworzyć zastępstwa. Działającego kontenera nie ruszano. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} przechowuje dane w folderze hosta albo nie przechowuje ich wcale, więc nie da się go przywrócić z panelu. Użyj kroków wiersza poleceń z przewodnika po kopiach zapasowych.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker odrzucił kontener: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "Worker nie pozwala kontenerom montować {source}: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Oczekiwano obiektu JSON",

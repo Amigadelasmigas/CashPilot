@@ -5791,6 +5791,26 @@
     "text": "cadangan ini berisi {have}, tetapi {slug} menyimpan {want}. Ini bukan cadangan {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} dan {inner} sama-sama ada di {bind_mounts_env}, dan kontainer yang melakukan bind ke {outer} dapat menaruh tautan di tempat {inner} berada. Simpan hanya salah satunya di {bind_mounts_env} di file .env di samping file compose Anda, lalu jalankan docker compose up -d",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "kontainer hanya melakukan bind ke jalur yang persis tercantum di {bind_mounts_env}, bukan ke folder di bawah salah satunya. Untuk mengizinkan jalur ini, tambahkan {path} ke {bind_mounts_env} di file .env di samping file compose Anda (dipisahkan koma), lalu jalankan docker compose up -d",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "kontainer hanya melakukan bind ke jalur yang persis tercantum di {bind_mounts_env}, bukan ke folder di bawah salah satunya. Untuk mengizinkan jalur ini, tambahkan {path} ke {bind_mounts_env} di file .env di samping file compose Anda (dipisahkan koma) dan keluarkan {outer} dari sana, kecuali ada layanan yang melakukan bind ke {n, plural, =1 {folder itu} other {salah satu folder itu}}: sebuah folder dan folder di dalamnya tidak dapat sama-sama tercantum, lalu jalankan docker compose up -d",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "jalur ini mengandung '//', '.' atau '..', dan bind harus cocok dengan entri {bind_mounts_env} persis seperti yang tertulis. Tulis sebagai {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "Tidak dapat memeriksa runtime {runtime}: daemon Docker tidak menjawab.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "Instans {instance} dari {slug} tidak ditemukan",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} menyimpan datanya di {refused}, dan worker tidak mengizinkan kontainer melakukan bind ke sana, jadi penggantinya tidak dapat dibuat. Kontainer yang berjalan tidak disentuh. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} menyimpan datanya di folder host, atau tidak menyimpan data sama sekali, jadi tidak dapat dipulihkan dari dasbor. Gunakan langkah baris perintah di panduan cadangan.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker menolak kontainer: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "Worker tidak mengizinkan kontainer melakukan bind ke {source}: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Diharapkan sebuah objek JSON",

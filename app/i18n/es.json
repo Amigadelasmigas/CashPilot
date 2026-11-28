@@ -5791,6 +5791,26 @@
     "text": "esta copia de seguridad contiene {have}, pero {slug} guarda {want}. No es una copia de seguridad de {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "Tanto {outer} como {inner} están en {bind_mounts_env}, y un contenedor que enlace {outer} podría poner un enlace donde está {inner}. Deja solo una de las dos en {bind_mounts_env} en el .env junto a tu archivo compose y luego ejecuta docker compose up -d",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "los contenedores solo enlazan las rutas exactas de {bind_mounts_env}, no una carpeta dentro de una de ellas. Para permitir esta, añade {path} a {bind_mounts_env} en el .env junto a tu archivo compose (separadas por comas) y luego ejecuta docker compose up -d",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "los contenedores solo enlazan las rutas exactas de {bind_mounts_env}, no una carpeta dentro de una de ellas. Para permitir esta, añade {path} a {bind_mounts_env} en el .env junto a tu archivo compose (separadas por comas) y quita {outer}, a menos que un servicio enlace {n, plural, =1 {esa ruta} one {esa ruta} other {una de esas rutas}}: no se pueden incluir a la vez una carpeta y otra carpeta dentro de ella; luego ejecuta docker compose up -d",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "la ruta contiene '//', '.' o '..', y una ruta enlazada debe coincidir con una entrada de {bind_mounts_env} tal como está escrita. Escríbela como {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "No se puede comprobar el runtime {runtime}: el daemon de Docker no responde.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "No se encontró la instancia {instance} de {slug}",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} guarda sus datos en {refused}, que el worker no deja enlazar a los contenedores, así que no se pudo crear el sustituto. No se tocó el contenedor en ejecución. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} guarda sus datos en una carpeta del host, o no guarda datos, así que no se puede restaurar desde el panel. Sigue los pasos de línea de comandos de la guía de copias de seguridad.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker rechazó el contenedor: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "El worker no deja que los contenedores enlacen {source}: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Se esperaba un objeto JSON",

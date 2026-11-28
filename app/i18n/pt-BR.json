@@ -5791,6 +5791,26 @@
     "text": "este backup contém {have}, mas {slug} mantém {want}. Não é um backup de {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} e {inner} estão ambos em {bind_mounts_env}, e um contêiner que vincula {outer} poderia colocar um link onde está {inner}. Mantenha apenas um deles em {bind_mounts_env} no .env ao lado do seu arquivo compose e depois execute docker compose up -d",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "os contêineres vinculam apenas os caminhos exatos de {bind_mounts_env}, não uma pasta dentro de um deles. Para permitir este, adicione {path} a {bind_mounts_env} no .env ao lado do seu arquivo compose (separados por vírgula) e depois execute docker compose up -d",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "os contêineres vinculam apenas os caminhos exatos de {bind_mounts_env}, não uma pasta dentro de um deles. Para permitir este, adicione {path} a {bind_mounts_env} no .env ao lado do seu arquivo compose (separados por vírgula) e retire {outer}, a menos que um serviço vincule {n, plural, =1 {esse caminho} one {um desses # caminhos} other {um desses caminhos}}: uma pasta e uma pasta dentro dela não podem estar ambas na lista; depois execute docker compose up -d",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "o caminho contém '//', '.' ou '..', e uma vinculação precisa corresponder a uma entrada de {bind_mounts_env} tal como está escrita. Escreva-o como {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "Não é possível verificar o runtime {runtime}: o daemon do Docker não está respondendo.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "Instância {instance} de {slug} não encontrada",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} mantém seus dados em {refused}, que o worker não deixa os contêineres vincularem, então o substituto não pôde ser criado. O contêiner em execução não foi alterado. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} guarda o estado em uma pasta do host, ou não guarda nenhum, então não pode ser restaurado pelo painel. Use os passos de linha de comando do guia de backup.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "O Docker recusou o contêiner: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "O worker não deixa os contêineres vincularem {source}: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Era esperado um objeto JSON",

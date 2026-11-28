@@ -5791,6 +5791,26 @@
     "text": "このバックアップには {have} が含まれていますが、{slug} が保持するのは {want} です。{slug} のバックアップではありません。",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} と {inner} はどちらも {bind_mounts_env} に含まれています。{outer} をバインドするコンテナは、{inner} の場所にリンクを置くことができます。Compose ファイルの隣にある .env の {bind_mounts_env} には、どちらか一方だけを残し、docker compose up -d を実行してください",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "コンテナがバインドするのは {bind_mounts_env} にある正確なパスだけで、その下にあるフォルダーはバインドしません。これを許可するには、Compose ファイルの隣にある .env の {bind_mounts_env} に {path} を追加し (カンマ区切り)、docker compose up -d を実行してください",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "コンテナがバインドするのは {bind_mounts_env} にある正確なパスだけで、その下にあるフォルダーはバインドしません。これを許可するには、Compose ファイルの隣にある .env の {bind_mounts_env} に {path} を追加し (カンマ区切り)、{outer} を削除してください。ただし、サービスが{n, plural, =1 {それ} other {そのいずれか}}をバインドしている場合は削除しないでください。フォルダーとその中にあるフォルダーを両方とも指定することはできません。その後、docker compose up -d を実行してください",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "パスに '//'、'.' または '..' が含まれていますが、バインドは {bind_mounts_env} のエントリと書かれたとおりに一致する必要があります。{plain} と書いてください",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "{runtime} ランタイムを確認できません: Docker デーモンが応答していません。",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "{slug} のインスタンス {instance} が見つかりません",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} はデータを {refused} に保持していますが、ワーカーはコンテナにそのバインドを許可しないため、置き換えのコンテナを作成できませんでした。実行中のコンテナには触れていません。{reasons}。",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} はデータをホストのフォルダーに保持しているか、データを保持していないため、ダッシュボードからは復元できません。バックアップ ガイドにあるコマンドラインの手順を使ってください。",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker がコンテナを拒否しました: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "ワーカーは、コンテナに {source} のバインドを許可しません: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "JSON オブジェクトが必要です",

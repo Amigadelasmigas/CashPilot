@@ -5791,6 +5791,26 @@
     "text": "ข้อมูลสำรองนี้มี {have} แต่ {slug} เก็บ {want} จึงไม่ใช่ข้อมูลสำรองของ {slug}",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} และ {inner} อยู่ใน {bind_mounts_env} ทั้งคู่ และคอนเทนเนอร์ที่ผูก {outer} อาจวางลิงก์ไว้ในตำแหน่งของ {inner} ได้ โปรดเก็บไว้เพียงรายการเดียวใน {bind_mounts_env} ในไฟล์ .env ข้างไฟล์ compose ของคุณ แล้วรัน docker compose up -d",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "คอนเทนเนอร์ผูกได้เฉพาะพาธที่ระบุไว้ตรงตัวใน {bind_mounts_env} เท่านั้น ไม่รวมโฟลเดอร์ที่อยู่ภายใต้พาธเหล่านั้น หากต้องการอนุญาตพาธนี้ ให้เพิ่ม {path} ลงใน {bind_mounts_env} ในไฟล์ .env ข้างไฟล์ compose ของคุณ (คั่นด้วยจุลภาค) แล้วรัน docker compose up -d",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "คอนเทนเนอร์ผูกได้เฉพาะพาธที่ระบุไว้ตรงตัวใน {bind_mounts_env} เท่านั้น ไม่รวมโฟลเดอร์ที่อยู่ภายใต้พาธเหล่านั้น หากต้องการอนุญาตพาธนี้ ให้เพิ่ม {path} ลงใน {bind_mounts_env} ในไฟล์ .env ข้างไฟล์ compose ของคุณ (คั่นด้วยจุลภาค) และนำ {outer} ออก เว้นแต่มีบริการที่ผูก{n, plural, =1 {พาธนั้น} other {พาธใดพาธหนึ่งในนั้น}}อยู่ เพราะระบุทั้งโฟลเดอร์และโฟลเดอร์ที่อยู่ภายในโฟลเดอร์นั้นพร้อมกันไม่ได้ จากนั้นรัน docker compose up -d",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "พาธนี้มี '//', '.' หรือ '..' อยู่ และการผูกต้องตรงกับรายการใน {bind_mounts_env} ตามที่เขียนไว้ทุกตัวอักษร โปรดเขียนเป็น {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "ตรวจสอบรันไทม์ {runtime} ไม่ได้: Docker daemon ไม่ตอบสนอง",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "ไม่พบอินสแตนซ์ {instance} ของ {slug}",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} เก็บข้อมูลไว้ใน {refused} ซึ่งเวิร์กเกอร์ไม่อนุญาตให้คอนเทนเนอร์ผูก จึงสร้างคอนเทนเนอร์ตัวแทนไม่ได้ ไม่ได้แตะต้องคอนเทนเนอร์ที่กำลังทำงานอยู่ {reasons}",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} เก็บข้อมูลไว้ในโฟลเดอร์ของโฮสต์ หรือไม่ได้เก็บไว้เลย จึงกู้คืนจากแดชบอร์ดไม่ได้ โปรดใช้ขั้นตอนบรรทัดคำสั่งในคู่มือข้อมูลสำรอง",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker ปฏิเสธคอนเทนเนอร์: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "เวิร์กเกอร์ไม่อนุญาตให้คอนเทนเนอร์ผูก {source}: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "ต้องเป็นออบเจ็กต์ JSON",

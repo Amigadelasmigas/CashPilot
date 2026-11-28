@@ -5791,6 +5791,26 @@
     "text": "ця резервна копія містить {have}, але {slug} зберігає {want}. Це не резервна копія {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.bind_both_listed_keep_one": {
+    "text": "{outer} і {inner} обидва є в {bind_mounts_env}, а контейнер, який монтує {outer}, може розмістити посилання там, де знаходиться {inner}. Залиште в {bind_mounts_env} лише один із них у файлі .env поруч із вашим файлом compose, потім виконайте docker compose up -d",
+    "source": "d7271c920b6f"
+  },
+  "err.orchestrator.bind_exact_paths_only": {
+    "text": "контейнери монтують лише точні шляхи з {bind_mounts_env}, а не папку всередині одного з них. Щоб дозволити цей шлях, додайте {path} до {bind_mounts_env} у файлі .env поруч із вашим файлом compose (через кому), потім виконайте docker compose up -d",
+    "source": "4a0f4eafe34a"
+  },
+  "err.orchestrator.bind_exact_paths_only_take_out": {
+    "text": "контейнери монтують лише точні шляхи з {bind_mounts_env}, а не папку всередині одного з них. Щоб дозволити цей шлях, додайте {path} до {bind_mounts_env} у файлі .env поруч із вашим файлом compose (через кому) і приберіть {outer}, якщо тільки якийсь сервіс не монтує {n, plural, =1 {його} one {один із # шляху} few {один із # шляхів} many {один із # шляхів} other {один із # шляху}}: папку й папку всередині неї не можна вказати разом, потім виконайте docker compose up -d",
+    "source": "6a267583f8fc"
+  },
+  "err.orchestrator.bind_refused_source_why": {
+    "text": "{source}: {why}",
+    "source": "d1063400e281"
+  },
+  "err.orchestrator.bind_untidy_write_as": {
+    "text": "шлях містить '//', '.' або '..', а монтування має збігатися із записом у {bind_mounts_env} точно так, як його написано. Запишіть його як {plain}",
+    "source": "57adb9c6fc8e"
+  },
   "err.orchestrator.cannot_check_runtime_docker_daemon": {
     "text": "Неможливо перевірити середовище виконання {runtime}: демон Docker не відповідає.",
     "source": "6eb4ef7a276c"
@@ -5914,6 +5934,10 @@
   "err.orchestrator.instance_not_found": {
     "text": "Екземпляр {instance} сервісу {slug} не знайдено",
     "source": "2d22a18a1dd6"
+  },
+  "err.orchestrator.keeps_data_worker_does_not_bind": {
+    "text": "{name} зберігає дані в {refused}, а воркер не дозволяє контейнерам монтувати цю папку, тому замінний контейнер не вдалося створити. Запущений контейнер не змінено. {reasons}.",
+    "source": "5508753c964e"
   },
   "err.orchestrator.keeps_state_host_folder_keeps": {
     "text": "{slug} зберігає свої дані в папці хоста або не зберігає їх зовсім, тому його не можна відновити з панелі. Скористайтеся кроками для командного рядка з посібника з резервного копіювання.",
@@ -9658,6 +9682,10 @@
   "worker.docker_refused_container": {
     "text": "Docker відхилив контейнер: {reason}",
     "source": "0960ec1facc4"
+  },
+  "worker.does_not_let_containers_bind": {
+    "text": "Воркер не дозволяє контейнерам монтувати {source}: {why}",
+    "source": "19d00b3f8f9d"
   },
   "worker.expected_json_object": {
     "text": "Очікується об'єкт JSON",
