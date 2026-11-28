@@ -79,6 +79,8 @@ function makePage() {
     change: () => listeners.root.change(),
     // Pick a fleet choice on the page, as the owner does, without saving it.
     pickMode: (value) => { modeEl.value = value; listeners.root.change(); },
+    // The fleet choice as the page drew it, with no change by the owner.
+    showMode: (value) => { modeEl.value = value; },
     click: (action) => listeners.doc.click({target: {closest: () => ({dataset: {updatesAction: action}})}}),
     tick: () => context.tick(),
     // Answer the oldest open request, then let the script run on.
@@ -220,6 +222,18 @@ await p.answer();
 check('a refresh draws the controls again', p.root.renders === 2, `drawn ${p.root.renders} times`);
 check('a refresh keeps the overrides open', p.root.details.open === true, JSON.stringify(p.root.details));
 check('a refresh keeps the focus on the same control', p.root.select.focused === true, JSON.stringify(p.root.select));
+// 5b. Enable sets the fleet choice on the page too: a change made while its
+// save waits, saved after it, sends auto, never the off the page showed.
+p = makePage();
+await p.answer({...p.data, settings: {...p.data.settings, mode: 'off', offer: true}});
+p.showMode('off');
+p.click('enable');
+check('Enable sends auto', p.calls.at(-1).method === 'PUT' && p.calls.at(-1).body.mode === 'auto', JSON.stringify(p.calls.at(-1)));
+p.change();
+await p.answer({});
+await p.answer({...p.data, settings: {...p.data.settings, mode: 'auto'}});
+p.click('save');
+check('a save after Enable keeps auto', p.calls.at(-1).body.mode === 'auto', JSON.stringify(p.calls.at(-1).body));
 p = makePage();
 await p.fail('the dashboard did not answer');
 check('a first load that fails says so in place of the controls', p.root.innerHTML.includes('did not answer'), p.root.innerHTML);

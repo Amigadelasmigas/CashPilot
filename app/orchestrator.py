@@ -1619,6 +1619,15 @@ def deploy_raw(
             restored = "The previous container was not replaced and " + _start_again(
                 client, old, replaced_running, gated, name, joined=joined, outcome=again
             )
+            # Put back means under its own name too: one left as <name>-replaced is
+            # one the dashboard cannot find, so the owner has to step in.
+            current = ""
+            with contextlib.suppress(Exception):
+                old.reload()
+                current = str((old.attrs or {}).get("Name") or getattr(old, "name", "") or "").lstrip("/")
+            if current != name:
+                again["restored"] = False
+                restored += f" It could not be given back its name {name}."
             if settle_seconds > 0 and not again["restored"]:
                 # An update that left the old container down needs the owner. No
                 # new build ran, so none is held.

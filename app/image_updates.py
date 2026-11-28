@@ -138,6 +138,8 @@ class Hooks:
     sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep
     #: The newest row of this service on this box, or None: the one the bell shows.
     latest: Callable[[int, str], Awaitable[dict[str, Any] | None]] | None = None
+    #: The choice saved now for this service on this box, read before each check, or None to use the run's.
+    mode: Callable[[int, str], Awaitable[str]] | None = None
 
 
 class DeployRefused(Exception):
@@ -178,29 +180,41 @@ async def _record_change(hooks: Hooks, worker_id: int, slug: str, result: str, f
     """Write the row of a deploy that changed a container. Never raises: a row that fails waits for a later check."""
     key = (worker_id, slug, facts["new_image"], result, next(_attempts))
     _unsaved_rows[key] = facts
-    await _write_row(hooks, key)
+    # Behind any older row of this service still unsaved, so the rows reach the
+    # database in the order they happened and the newest one is the latest result.
+    await _flush_rows(hooks, worker_id, slug)
 
 
-async def _write_row(hooks: Hooks, key: tuple[int, str, str, str, int]) -> None:
+async def _write_row(hooks: Hooks, key: tuple[int, str, str, str, int]) -> bool:
     worker_id, slug, _, result, _ = key
     try:
         await hooks.record(worker_id, slug, result, **_unsaved_rows[key])
     except Exception as exc:  # noqa: BLE001 - kept in memory, written on a later check
         logger.warning("Could not save the %s row of %s on worker %s yet: %s", result, slug, worker_id, exc)
-        return
+        return False
     _unsaved_rows.pop(key, None)
+    return True
 
 
-async def _flush_rows(hooks: Hooks, worker_id: int, slug: str) -> None:
-    """Write the rows of this service on this box that are still unsaved, oldest first, whatever the tag names now."""
+async def _flush_rows(hooks: Hooks, worker_id: int, slug: str) -> int:
+    """Write the unsaved rows of this service on this box, oldest first, whatever the tag names now. How many.
+
+    It stops at the first write that fails: a newer row is never written before an older one.
+    """
+    written = 0
     for key in sorted((k for k in _unsaved_rows if k[:2] == (worker_id, slug)), key=lambda k: k[4]):
-        await _write_row(hooks, key)
+        if not await _write_row(hooks, key):
+            break
+        written += 1
+    return written
 
 
-async def flush_all(hooks: Hooks) -> None:
-    """Write every row still unsaved. Each scheduled tick runs it, even with every app Off. Never raises."""
+async def flush_all(hooks: Hooks) -> int:
+    """Write every row still unsaved; how many were. Each scheduled tick runs it, even with every app Off. Never raises."""
+    written = 0
     for worker_id, slug in sorted({k[:2] for k in _unsaved_rows}):
-        await _flush_rows(hooks, worker_id, slug)
+        written += await _flush_rows(hooks, worker_id, slug)
+    return written
 
 
 async def _announced(hooks: Hooks, worker_id: int, slug: str, new_id: str, result: str) -> bool:
@@ -298,8 +312,10 @@ async def run_worker(hooks: Hooks, settings: dict[str, Any], worker_id: int, slu
     """Check each service on one box in turn; a pause follows each real update. Never raises."""
     outcomes: dict[str, str] = {}
     for slug in slugs:
-        mode = effective_mode(settings, worker_id, slug)
         try:
+            # Saved now, not when the run began: an app the owner turned Off
+            # while an earlier one ran its check period is not checked.
+            mode = await hooks.mode(worker_id, slug) if hooks.mode else effective_mode(settings, worker_id, slug)
             outcomes[slug] = await update_service(hooks, worker_id, slug, mode)
         except Exception as exc:  # noqa: BLE001 - one service's failure never stops the others
             logger.warning("Image check of %s on worker %s failed: %s", slug, worker_id, exc)

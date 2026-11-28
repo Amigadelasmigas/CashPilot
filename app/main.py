@@ -10,6 +10,7 @@ import asyncio
 import base64
 import collections
 import contextlib
+import contextvars
 import hashlib
 import hmac
 import ipaddress
@@ -8376,9 +8377,13 @@ async def _send_worker_deploy(
                     "current_container": current,
                 },
             )
-        if not checked and (spec.get("settle_seconds") or spec.get("expect_image")):
+        if (spec.get("settle_seconds") or spec.get("expect_image")) and (
+            not checked or image_updates.FEATURE not in await _worker_features(worker_id)
+        ):
             # The old route ignores both: the container would be replaced with no
-            # check period and with whatever build the tag names now.
+            # check period and with whatever build the tag names now. So does a
+            # worker with the checked route that predates image updates, as its
+            # latest heartbeat says (one rolled back since the run listed it).
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -8445,7 +8450,7 @@ async def _proxy_worker_deploy(
     if leave_route:
         # Only after _confirm_leave_route checked the owner's password.
         spec = {**spec, "route_approval": await _sign_for_worker(worker_id, step_up.ACTION_LEAVE_ROUTE, slug)}
-    return await _send_worker_deploy(
+    result = await _send_worker_deploy(
         worker_id,
         slug,
         spec,
@@ -8454,6 +8459,10 @@ async def _proxy_worker_deploy(
         # Desktop gets its runtime settings from its own catalog.
         desktop_json={key: spec[key] for key in _DesktopDeploySpec.model_fields if key in spec},
     )
+    if settle_seconds and (answer := _image_update_answer.get()) is not None:
+        # The worker's own answer, kept for the update's row (_image_update_deploy).
+        answer["result"] = result
+    return result
 
 
 async def _image_for_worker(worker_id: int, slug: str, spec: dict[str, Any]) -> dict[str, Any]:
@@ -13857,6 +13866,11 @@ _image_update_bell_lock = asyncio.Lock()
 #: The definition each blocker judged, by (worker id, slug), for its deploy: the
 #: catalog's, or a custom service's without its values (_custom_judged).
 _image_update_checked: dict[tuple[int, str], dict[str, Any]] = {}
+#: Set by an image update while it deploys: the worker's answer lands in it, so an
+#: update the worker carried out is recorded even when the bookkeeping after it fails.
+_image_update_answer: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
+    "image_update_answer", default=None
+)
 #: Outcomes of the last run whose bell rebuild failed, by worker id and slug:
 #: the next rebuild still answers the rows they answer.
 _image_update_unanswered: dict[int, dict[str, str]] = {}
@@ -14021,6 +14035,8 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
     # custom service saved since, cannot bring in a command it never looked at.
     judged = _image_update_checked.pop((worker_id, slug), None)
     snapshot = None if custom else judged
+    answer: dict[str, Any] = {}
+    token = _image_update_answer.set(answer)
     try:
         if custom:
             # Again here, on the one copy of the definition the deploy then sends:
@@ -14050,7 +14066,14 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
             expect_image=new_image,
             checked_svc=snapshot,
         )
-    except HTTPException as exc:
+    except Exception as exc:
+        if isinstance(answer.get("result"), dict):
+            # The worker replaced the container and said so; only the dashboard's
+            # own records after it failed. The update happened, so it is recorded.
+            logger.warning("Image update of %s on worker %s: its records failed after it: %s", slug, worker_id, exc)
+            return answer["result"]
+        if not isinstance(exc, HTTPException):
+            raise
         detail = exc.detail
         message = str(detail.get("message") or detail) if isinstance(detail, dict) else str(detail)
         error = _worker_error(exc)
@@ -14063,6 +14086,7 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
             changed=error == "image_update_unverified",
         ) from None
     finally:
+        _image_update_answer.reset(token)
         if custom:
             _custom_deploying[slug] -= 1
             if not _custom_deploying[slug]:
@@ -14077,7 +14101,13 @@ def _image_update_hooks() -> image_updates.Hooks:
         record=database.record_image_update,
         seen=database.image_update_seen,
         latest=database.newest_image_update,
+        mode=_image_update_mode_now,
     )
+
+
+async def _image_update_mode_now(worker_id: int, slug: str) -> str:
+    async with _image_update_settings_lock:
+        return image_updates.effective_mode(await _image_update_settings(), worker_id, slug)
 
 
 def _image_update_alert_text(row: dict[str, Any], worker_name: str) -> str:
@@ -14177,8 +14207,10 @@ async def _run_image_updates(*, force: bool = False) -> dict[int, dict[str, str]
         return {}
     async with _image_update_lock:
         # Rows a failed write left in memory are written on every tick, even with
-        # every app Off, so a restart cannot lose a "needs you" row.
-        await image_updates.flush_all(_image_update_hooks())
+        # every app Off, so a restart cannot lose a "needs you" row. One written
+        # reaches the bell at once, not at the next daily run.
+        if await image_updates.flush_all(_image_update_hooks()):
+            await _refresh_image_update_bell()
         # The owner's day and hour, as the docs say, not the server's.
         now = (await _obligations_now()).replace(tzinfo=None)
         async with _image_update_settings_lock:
@@ -14196,12 +14228,16 @@ async def _run_image_updates(*, force: bool = False) -> dict[int, dict[str, str]
         outcomes = {wid: result for (wid, _), result in zip(targets, done, strict=True)}
         # The day counts once its run is done, so a run that broke off is run
         # again on the next tick. Check now does not count as the day's run.
-        if not force:
-            async with _image_update_settings_lock:
-                current = await _image_update_settings()
-                current["last_run"] = now.date().isoformat()
-                await _save_image_update_settings(current)
-        await _refresh_image_update_bell(outcomes)
+        try:
+            if not force:
+                async with _image_update_settings_lock:
+                    current = await _image_update_settings()
+                    current["last_run"] = now.date().isoformat()
+                    await _save_image_update_settings(current)
+        finally:
+            # The run's answers reach the bell even when the day's stamp could not
+            # be saved; the day then stays due.
+            await _refresh_image_update_bell(outcomes)
         return outcomes
 
 
@@ -14228,8 +14264,10 @@ class ImageUpdateSettingsBody(BaseModel):
 
 
 @app.get("/api/image-updates")
-async def api_image_updates(_auth: dict[str, Any] = Depends(_require_owner)) -> dict[str, Any]:
+async def api_image_updates(response: Response, _auth: dict[str, Any] = Depends(_require_owner)) -> dict[str, Any]:
     """The update settings, the boxes and services they apply to, and what the updates did. Owner only."""
+    # Owner data: the browser keeps no copy after a logout or a role change.
+    response.headers["Cache-Control"] = "no-store"
     settings = await _image_update_settings()
     workers = []
     services: dict[str, str] = {}

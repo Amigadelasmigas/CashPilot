@@ -2239,17 +2239,27 @@ async def record_image_update(
 ) -> None:
     db = await _get_db()
     try:
-        await db.execute(
-            "INSERT INTO image_updates (worker_id, slug, result, old_image, new_image, old_digest, new_digest, detail)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (worker_id, slug, result, old_image, new_image, old_digest, new_digest, detail[:1000]),
-        )
-        await db.execute(
-            "DELETE FROM image_updates WHERE result NOT IN ('rolled_back', 'restore_failed')"
-            " AND id <= (SELECT MAX(id) FROM image_updates) - ?",
-            (IMAGE_UPDATE_ROWS,),
-        )
-        await db.commit()
+        # One transaction: a prune that fails takes the insert back with it, so a
+        # caller that writes the row again later cannot leave two of it.
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            await db.execute(
+                "INSERT INTO image_updates (worker_id, slug, result, old_image, new_image, old_digest, new_digest, detail)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (worker_id, slug, result, old_image, new_image, old_digest, new_digest, detail[:1000]),
+            )
+            # The newest row of each service stays too: the bell shows it, and
+            # without it an older restore failure would read as the latest result.
+            await db.execute(
+                "DELETE FROM image_updates WHERE result NOT IN ('rolled_back', 'restore_failed')"
+                " AND id <= (SELECT MAX(id) FROM image_updates) - ?"
+                " AND id NOT IN (SELECT MAX(id) FROM image_updates GROUP BY worker_id, slug)",
+                (IMAGE_UPDATE_ROWS,),
+            )
+            await db.commit()
+        except BaseException:
+            await db.rollback()
+            raise
     finally:
         await db.close()
 

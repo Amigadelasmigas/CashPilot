@@ -236,7 +236,14 @@
     const action = btn.dataset.updatesAction;
     if (action === 'save') save();
     else if (action === 'run') runNow();
-    else if (action === 'enable') save('auto');
+    else if (action === 'enable') {
+      // Enable is a change of the mode control like any other: a later Save,
+      // or a retry after this one failed, sends auto too, never the off it showed.
+      const modeEl = document.getElementById('updates-mode');
+      if (modeEl) modeEl.value = 'auto';
+      edits += 1;
+      save('auto');
+    }
   });
 
   load();

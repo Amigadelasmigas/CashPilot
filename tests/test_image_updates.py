@@ -453,6 +453,23 @@ class TestCheckPeriod:
         assert not isinstance(refused.value, orchestrator.ImageUpdateFailed)
         old.start.assert_called_once()
 
+    def test_an_old_container_left_under_its_set_aside_name_needs_the_owner(self, markers, fast):
+        # Docker renamed it aside and then timed out, and the rename back fails:
+        # it runs, but under a name the dashboard does not find.
+        old, docker = _docker()
+        renames = iter([orchestrator.APIError("timed out"), orchestrator.APIError("refused")])
+
+        def rename(new):
+            old.name = "cashpilot-honeygain" + orchestrator.REPLACED_SUFFIX
+            raise next(renames)
+
+        old.rename.side_effect = rename
+        with pytest.raises(orchestrator.ImageUpdateFailed) as failed:
+            _deploy(docker, old, settle_seconds=0.01)
+        assert failed.value.restored is False and failed.value.verified is False
+        assert "could not be given back its name" in str(failed.value)
+        old.start.assert_called_once()
+
     def test_an_update_that_needs_the_owner_still_removes_the_refused_container_s_secrets(self, markers, fast):
         # CASHPILOT_EARNER_SECRETS=file: the new container's credentials live in
         # their own volume, and the refused container is gone, so they go too.
@@ -799,9 +816,22 @@ class TestCheckImage:
                 orchestrator._pull_until(client, image, orchestrator.time.monotonic() + 0.1, strict=True)
             assert client.api.pull.call_count == 2
             monkeypatch.setattr(orchestrator, "_PULL_JOIN_SECONDS", 3600)
-            release.set()
+            # The pull is let go only once this check has chosen it, so it is
+            # still running when chosen, and the check takes its result.
+            real_lock = orchestrator._PULLS_LOCK
+
+            class _ReleaseAfterChoice:
+                def __enter__(self):
+                    return real_lock.__enter__()
+
+                def __exit__(self, *exc):
+                    real_lock.__exit__(*exc)
+                    release.set()
+
+            monkeypatch.setattr(orchestrator, "_PULLS_LOCK", _ReleaseAfterChoice())
             assert orchestrator._pull_until(client, image, orchestrator.time.monotonic() + 5, strict=True) is None
             assert client.api.pull.call_count == 2
+            monkeypatch.setattr(orchestrator, "_PULLS_LOCK", real_lock)
         finally:
             release.set()
         # Once it ended, the next check pulls again.
@@ -1094,6 +1124,39 @@ class TestDecisions:
         ]
         assert not image_updates._unsaved_rows
 
+    async def test_a_newer_row_waits_behind_an_older_one_that_is_not_saved_yet(self):
+        # The restore failure cannot be saved; the next check updates the app and
+        # could save that row. Written first, it would leave the failure as the latest result.
+        refused = image_updates.DeployRefused("not started again", rolled_back=False, restore_failed=True)
+        state = _Hooks(_answer(), deploy=refused)
+        hooks = state.hooks()
+        real_record = hooks.record
+        failing = {image_updates.RESTORE_FAILED}
+
+        async def record(wid, slug, result, **facts):
+            if result in failing:
+                raise RuntimeError("database is locked")
+            await real_record(wid, slug, result, **facts)
+
+        hooks.record = record
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "restore_failed"
+        state._deploy = None
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "updated"
+        assert not state.rows and len(image_updates._unsaved_rows) == 2
+        failing.clear()
+        assert await image_updates.flush_all(hooks) == 2
+        assert [r[0] for r in state.rows] == [image_updates.RESTORE_FAILED, image_updates.UPDATED]
+
+    async def test_an_app_turned_off_during_the_run_is_not_checked(self):
+        state = _Hooks(_answer(running="sha256:new"))
+        hooks = state.hooks()
+        hooks.mode = AsyncMock(
+            side_effect=lambda wid, slug: image_updates.OFF if slug == "earnapp" else image_updates.AUTO
+        )
+        settings = {"mode": "auto", "workers": {}, "services": {}}
+        done = await image_updates.run_worker(hooks, settings, 1, ["honeygain", "earnapp"])
+        assert done == {"honeygain": "current", "earnapp": "off"} and state.checks == 1
+
     @pytest.mark.parametrize("mode", [image_updates.NOTIFY, image_updates.AUTO])
     async def test_a_build_the_tag_went_back_to_is_announced_again(self, mode):
         # The bell shows the newest row. Once it names another build, the build the
@@ -1378,6 +1441,57 @@ class TestTheDashboardSide:
             await main._send_worker_deploy(1, "honeygain", {"image": "honeygain/honeygain:latest"}, expected=current)
         assert send.await_args.args[2] == "/api/containers/honeygain/deploy"
 
+    async def test_a_worker_with_the_checked_route_but_no_image_updates_gets_none(self):
+        """Such a worker drops the check period and the expected build too: it says so in its heartbeat."""
+        from fastapi import HTTPException
+
+        from app import main
+
+        current = "a" * 12
+        spec = {"image": "honeygain/honeygain:latest", "settle_seconds": 120, "expect_image": "sha256:" + "b" * 64}
+        for features, sent in ((set(), False), ({image_updates.FEATURE}, True)):
+            send = AsyncMock(return_value={"container_id": "x"})
+            with (
+                patch.object(main, "_worker_deploy_target", AsyncMock(return_value=(current, True))),
+                patch.object(main, "_worker_features", AsyncMock(return_value=features)),
+                patch.object(main, "_worker_is_desktop", AsyncMock(return_value=False)),
+                patch.object(main, "_proxy_to_worker", send),
+            ):
+                if sent:
+                    await main._send_worker_deploy(1, "honeygain", spec, expected=current)
+                else:
+                    with pytest.raises(HTTPException) as refused:
+                        await main._send_worker_deploy(1, "honeygain", spec, expected=current)
+                    assert refused.value.detail["error"] == "image_update_unsupported"
+            assert send.await_count == (1 if sent else 0), features
+
+    async def test_an_update_the_worker_made_is_recorded_when_the_records_after_it_fail(self):
+        from app import main
+
+        done = {"container_id": "new", "image_update": {"new_image": "sha256:" + "a" * 64, "old_kept": ""}}
+
+        async def deploy(*args, **kwargs):
+            # The worker's answer arrives through _proxy_worker_deploy, then a record fails.
+            with patch.object(main, "_send_worker_deploy", AsyncMock(return_value=done)):
+                assert await main._proxy_worker_deploy(1, "honeygain", {"image": "x"}, settle_seconds=120) == done
+            raise RuntimeError("database is locked")
+
+        auto = {"mode": "auto", "workers": {}, "services": {}}
+        with (
+            patch.object(main, "_image_update_settings", AsyncMock(return_value=auto)),
+            patch.object(main, "_image_for_worker", AsyncMock(side_effect=lambda w, s, spec: spec)),
+            patch.object(main, "_deploy", deploy),
+        ):
+            assert await main._image_update_deploy(1, "honeygain", {"1": "abc"}, "sha256:" + "a" * 64) == done
+        assert main._image_update_answer.get() is None
+        # Control: a failure before the worker answered is still a failure.
+        with (
+            patch.object(main, "_image_update_settings", AsyncMock(return_value=auto)),
+            patch.object(main, "_deploy", AsyncMock(side_effect=RuntimeError("database is locked"))),
+            pytest.raises(RuntimeError),
+        ):
+            await main._image_update_deploy(1, "honeygain", {"1": "abc"}, "sha256:" + "a" * 64)
+
     async def test_a_box_whose_worker_is_too_old_is_not_checked_and_says_why(self):
         from app import main
 
@@ -1390,7 +1504,9 @@ class TestTheDashboardSide:
             patch.object(main.database, "list_image_updates", AsyncMock(return_value=[])),
             patch.object(main, "_image_update_settings", AsyncMock(return_value=image_updates.parse_settings({}))),
         ):
-            page = await main.api_image_updates(_auth={"r": "owner"})
+            response = main.Response()
+            page = await main.api_image_updates(response, _auth={"r": "owner"})
+        assert response.headers["Cache-Control"] == "no-store"
         assert [(w["id"], w["supported"], w["online"]) for w in page["workers"]] == [(1, False, True), (2, True, True)]
         # The Fleet page names the reason for that box.
         from pathlib import Path
@@ -1754,6 +1870,7 @@ class TestTheDashboardSide:
         assert "did not start again" in main._image_update_bell["1|honeygain"]["error"]
         # A run asks the same question of the newest row before it announces a build again.
         assert main._image_update_hooks().latest is database.newest_image_update
+        assert main._image_update_hooks().mode is main._image_update_mode_now
 
     async def test_every_tick_writes_the_rows_left_unsaved_even_with_every_app_off(self, db):
         from app import main
@@ -1771,6 +1888,83 @@ class TestTheDashboardSide:
         rows = await database.list_image_updates()
         assert [(r["result"], r["detail"]) for r in rows] == [(image_updates.RESTORE_FAILED, "not started")]
         assert not image_updates._unsaved_rows
+
+    async def test_a_row_the_tick_writes_reaches_the_bell_at_once(self, db):
+        from app import main
+
+        await database.init_db()
+        off = image_updates.parse_settings({"mode": "off"})
+        refresh = AsyncMock()
+        for pending, rebuilt in ((True, 1), (False, 0)):
+            if pending:
+                image_updates._unsaved_rows[(1, "honeygain", "", image_updates.RESTORE_FAILED, 0)] = {"new_image": ""}
+            with (
+                patch.object(main, "_image_update_settings", AsyncMock(return_value=off)),
+                patch.object(main, "_obligations_now", AsyncMock(return_value=datetime(2026, 11, 28, 5, 0))),
+                patch.object(main, "_refresh_image_update_bell", refresh),
+            ):
+                await main._run_image_updates()
+            assert refresh.await_count == rebuilt
+            refresh.reset_mock()
+
+    async def test_a_run_whose_day_cannot_be_stamped_still_answers_the_bell(self, db):
+        from zoneinfo import ZoneInfo
+
+        from app import main
+
+        five_am = datetime(2026, 11, 28, 5, 0, tzinfo=ZoneInfo("UTC"))
+        await database.init_db()
+        auto = image_updates.parse_settings({"mode": "auto", "hour": 5})
+        refresh = AsyncMock()
+        with (
+            patch.object(main, "_obligations_now", AsyncMock(return_value=five_am)),
+            patch.object(main, "_image_update_settings", AsyncMock(return_value=auto)),
+            patch.object(main.database, "list_workers", AsyncMock(return_value=[])),
+            patch.object(main, "_save_image_update_settings", AsyncMock(side_effect=RuntimeError("locked"))),
+            patch.object(main, "_refresh_image_update_bell", refresh),
+            pytest.raises(RuntimeError),
+        ):
+            await main._run_image_updates()
+        refresh.assert_awaited_once_with({})
+
+    async def test_a_history_row_whose_prune_fails_is_not_left_half_written(self, db, monkeypatch):
+        await database.init_db()
+        real = database._get_db
+
+        async def failing_prune():
+            db_ = await real()
+
+            class _Wrapped:
+                def __getattr__(self, name):
+                    return getattr(db_, name)
+
+                async def execute(self, sql, *args):
+                    if sql.startswith("DELETE FROM image_updates"):
+                        raise RuntimeError("database is locked")
+                    return await db_.execute(sql, *args)
+
+            return _Wrapped()
+
+        monkeypatch.setattr(database, "_get_db", failing_prune)
+        with pytest.raises(RuntimeError):
+            await database.record_image_update(1, "honeygain", "updated", new_image="sha256:a")
+        monkeypatch.setattr(database, "_get_db", real)
+        # The insert went back with the prune: a later write cannot make two of it.
+        await database.record_image_update(1, "earnapp", "updated", new_image="sha256:b")
+        assert [r["slug"] for r in await database.list_image_updates()] == ["earnapp"]
+
+    async def test_the_prune_keeps_the_newest_row_of_each_app(self, db, monkeypatch):
+        monkeypatch.setattr(database, "IMAGE_UPDATE_ROWS", 2)
+        await database.init_db()
+        await database.record_image_update(1, "honeygain", "restore_failed", new_image="")
+        await database.record_image_update(1, "honeygain", "updated", new_image="sha256:a")
+        for n in range(4):
+            await database.record_image_update(1, f"app{n}", "updated", new_image="sha256:b")
+        # The app recovered: its latest result is the update, not the older failure.
+        assert (await database.newest_image_update(1, "honeygain"))["result"] == "updated"
+        # Older rows that are not the newest of their app still go.
+        await database.record_image_update(1, "app0", "updated", new_image="sha256:c")
+        assert len([r for r in await database.list_image_updates() if r["slug"] == "app0"]) == 1
 
     async def test_a_run_that_cannot_list_the_boxes_does_not_use_up_the_day(self, db):
         from zoneinfo import ZoneInfo

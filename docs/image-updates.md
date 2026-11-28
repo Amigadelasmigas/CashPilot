@@ -94,8 +94,10 @@ table shows **Not installed** and the reason:
 - The box has no deployment record of the app, for example because you made
   the container by hand.
 
-An update that did not go through for another reason, such as a registry that
-did not answer, shows **Failed**. CashPilot tries again at the next daily check.
+An update that the worker refused shows **Failed**, and CashPilot tries
+again at the next daily check. A check that could not run, such as one where
+the registry did not answer, changes nothing and adds no row. The dashboard
+log says why, and the next daily check tries again.
 
 ## Limits
 
@@ -118,9 +120,12 @@ These are known limits of this release:
 - **A worker that stops during the check period.** The worker can restart
   during the 2 minutes. Then the new container keeps running without the rest
   of its check. The old one stays stopped as `<name>-replaced`. Remove that
-  container when the new build works. To go back to the old build, stop the
-  new container first, because it still holds the app's ports, and then start
-  the old one.
+  container when the new build works. To go back to the old build, the old
+  container must get the app's name back, because the dashboard finds the app
+  by that name. Stop the new container first, because it still holds the
+  app's ports. Rename it, for example with
+  `docker rename <name> <name>-new`. Then give the old one its name with
+  `docker rename <name>-replaced <name>`, and start it.
 - **A dashboard that restarts before it can save an undo.** The database
   can fail to save the row of an undone update. Then the dashboard keeps the
   hold in memory and saves it on a later check. If the dashboard restarts
