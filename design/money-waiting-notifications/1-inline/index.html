@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Design 1, Inline actions: Money waiting and Notifications</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<style>
+/* ===== Mockup chrome (not part of the design) ===== */
+.demo-panel { margin: 0 0 40px; }
+.demo-label {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
+  font-family: var(--font-mono); font-size: var(--fs-2); color: var(--accent-secondary);
+  border-top: 1px dashed var(--border-strong); padding: 10px 0 12px; margin: 0;
+}
+.demo-label b { color: var(--text-primary); font-weight: 500; }
+.demo-label span { color: var(--text-muted); font-family: var(--font-ui); }
+.demo-intro { color: var(--text-secondary); max-width: 90ch; margin: 0 0 24px; font-size: var(--fs-2); }
+.phone-frame { width: 390px; max-width: 100%; border: 1px solid var(--border-light); padding: 14px 12px; background: var(--bg-primary); }
+.frame { border: 1px solid var(--border-color); padding: 16px 20px; background: var(--bg-primary); }
+@media (max-width: 768px) { .frame { padding: 12px; } }
+
+/* ===== New: Money waiting rows with inline actions =====
+   The list is a size container, so a row lays out by the room it has, not by
+   the window: the same rule serves the Dashboard and any narrow slot. */
+.mwx-list { container: mw / inline-size; }
+.attn-row.mwx-row {
+  grid-template-columns: minmax(92px, max-content) minmax(120px, 140px) minmax(0, 1fr);
+  align-items: start; padding: 10px 0 10px 10px;
+}
+.mwx-row > .attn-tag { padding-top: 2px; }
+.mwx-row .mwx-main { grid-column: 3; display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--text-secondary); }
+.mwx-main .mw-loss { max-width: 90ch; }
+.mwx-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; font-size: var(--fs-2); }
+.mwx-meta .mw-how[open] { order: 9; flex-basis: 100%; }
+.mwx-meta .mw-how[open] > span { display: block; max-width: 90ch; padding: 2px 0 2px 10px; border-left: 1px solid var(--border-light); margin-top: 2px; }
+.mwx-rules { color: var(--text-secondary); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+.mwx-rules:hover { color: var(--text-primary); text-decoration-color: currentColor; }
+.mwx-rules .mwx-date { white-space: nowrap; }
+
+/* The action line: never wraps. Doing actions on the left, in the order people
+   use them; the stop action on the right, apart from them. */
+.mwx-bar { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; }
+.mwx-bar .btn { white-space: nowrap; }
+.mwx-seg { display: inline-flex; align-items: center; gap: 0; }
+.mwx-seg-label { font-size: var(--fs-2); color: var(--text-secondary); margin-right: 6px; }
+.mwx-seg .btn + .btn { margin-left: -1px; }
+.mwx-end { margin-left: auto; }
+.btn.mwx-stop { color: var(--text-secondary); border-color: var(--border-color); }
+.btn.mwx-stop:hover:not(:disabled) { color: var(--text-primary); border-color: var(--border-light); }
+.mwx-note { font-size: var(--fs-2); color: var(--text-muted); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mwx-overflow { display: none; position: relative; }
+.mwx-overflow summary { list-style: none; }
+.mwx-overflow summary::-webkit-details-marker { display: none; }
+.mwx-overflow .mw-menu { top: calc(100% + 4px); }
+.mwx-overflow .mw-menu .btn { justify-content: flex-start; }
+.mw-menu hr { border: 0; border-top: 1px solid var(--border-color); margin: 2px 0; }
+.mwx-ext { font-size: 0.85em; }
+
+@container mw (max-width: 600px) {
+  .attn-row.mwx-row { grid-template-columns: auto minmax(0, 1fr); padding-right: 0; }
+  .mwx-row .mwx-main { grid-column: 1 / -1; }
+  .mwx-wide { display: none !important; }
+  .mwx-overflow { display: block; margin-left: auto; }
+}
+
+/* The stopped list at the foot of the panel. */
+.mwx-foot { padding: 8px 0 0 12px; }
+.mwx-stopped > summary { cursor: pointer; color: var(--text-secondary); width: max-content; max-width: 100%; }
+.mwx-stopped > summary:hover { color: var(--text-primary); }
+.mwx-stopped[open] > summary { margin-bottom: 8px; }
+.mwx-stopped-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-color); max-width: 980px; }
+.mwx-stopped-list li {
+  display: grid; grid-template-columns: minmax(110px, 140px) minmax(0, 1fr) auto auto; gap: 2px 14px; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px solid var(--border-color); font-size: var(--fs-2); color: var(--text-secondary);
+}
+.mwx-stopped-list .attn-what { color: var(--text-primary); }
+.mwx-by { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); white-space: nowrap; }
+.mwx-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 10px 0 4px; font-size: var(--fs-2); color: var(--text-secondary); }
+.mwx-add select { height: 24px; padding: 0 6px; font-size: var(--fs-2); width: auto; max-width: 100%; }
+.mwx-help { font-size: var(--fs-2); color: var(--text-muted); margin: 6px 0 0; max-width: 90ch; }
+.mwx-help a, .nt a.nt-link { color: var(--text-secondary); text-underline-offset: 3px; }
+@container mw (max-width: 600px) {
+  .mwx-stopped-list li { grid-template-columns: minmax(0, 1fr) auto; }
+  .mwx-stopped-list li > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .mwx-stopped-list li > .mwx-by { grid-column: 1; grid-row: 3; }
+  .mwx-stopped-list li > .btn { grid-column: 2; grid-row: 1; }
+}
+
+/* Off notice above the list when notifications are off. */
+.mwx-quiet { font-size: var(--fs-2); color: var(--text-secondary); padding: 6px 0 6px 10px; border-left: 2px solid var(--border-strong); margin: 8px 0 0; }
+
+/* The undo toast: a normal success toast with two actions under its text. */
+.mwx-toast-wrap { position: relative; }
+.toast.mwx-toast { position: absolute; top: 8px; right: 0; z-index: 30; flex-direction: column; align-items: stretch; gap: 8px; max-width: min(430px, 100%); transform: none; }
+.mwx-toast-top { display: flex; gap: 10px; align-items: flex-start; }
+.mwx-toast-top svg { flex: none; margin-top: 3px; color: var(--success); }
+.mwx-toast-text { flex: 1; min-width: 0; }
+.mwx-toast-sub { font-size: var(--fs-2); color: var(--text-muted); }
+.mwx-toast-close { background: none; border: 0; color: var(--text-secondary); font-size: var(--fs-4); line-height: 1; cursor: pointer; padding: 0 2px; }
+.mwx-toast-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 26px; }
+.mwx-toast-timer { height: 2px; background: var(--border-color); margin: 0 0 0 26px; }
+.mwx-toast-timer span { display: block; width: 62%; height: 100%; background: var(--text-muted); }
+
+/* ===== New: the Notifications section =====
+   One self-contained block (.nt). It assumes nothing about the page around it. */
+.nt { max-width: 820px; }
+.nt-master { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border-light); background: var(--bg-secondary); margin: 0 0 18px; }
+.nt-master-title { font-weight: 600; color: var(--text-primary); }
+.nt-master-desc { font-size: var(--fs-2); color: var(--text-secondary); }
+.nt-switch {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative; cursor: pointer;
+  width: 36px; height: 20px; margin-top: 1px; border: 1px solid var(--border-strong); border-radius: 2px; background: var(--bg-input);
+}
+.nt-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 1px; background: var(--text-muted); transition: left var(--transition); }
+.nt-switch:checked { background: var(--accent); border-color: var(--accent); }
+.nt-switch:checked::after { left: 19px; background: var(--bg-primary); }
+.nt-switch:disabled { cursor: not-allowed; opacity: 0.45; }
+.nt-switch-sm { width: 30px; height: 18px; }
+.nt-switch-sm::after { width: 10px; height: 10px; }
+.nt-switch-sm:checked::after { left: 15px; }
+
+.nt-group { border: 0; padding: 0; margin: 0 0 22px; min-width: 0; }
+.nt-legend { font-size: var(--fs-3); font-weight: 600; color: var(--text-primary); padding: 0; margin: 0 0 2px; }
+.nt-group-desc { font-size: var(--fs-2); color: var(--text-muted); margin: 0 0 8px; }
+.nt-kinds { border-top: 1px solid var(--border-color); }
+.nt-kind { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 12px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+.nt-kind-title { font-weight: 500; color: var(--text-primary); cursor: pointer; }
+.nt-kind-desc { font-size: var(--fs-2); color: var(--text-secondary); }
+.nt-kind-desc .muted { color: var(--text-muted); }
+.nt-kind-state { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); white-space: nowrap; padding-top: 2px; }
+.nt-kind.is-off .nt-kind-title { color: var(--text-secondary); }
+.nt-chip { display: inline-block; font-size: var(--fs-1); padding: 0 6px; border: 1px solid var(--border-light); color: var(--text-secondary); border-radius: 2px; margin-left: 6px; font-weight: 400; vertical-align: 1px; }
+.nt-chip-new { color: var(--accent); border-color: var(--accent); }
+
+.nt-more { margin-top: 8px; font-size: var(--fs-2); }
+.nt-more > summary { cursor: pointer; color: var(--text-secondary); width: max-content; max-width: 100%; }
+.nt-more > summary:hover { color: var(--text-primary); }
+.nt-more[open] > summary { margin-bottom: 6px; }
+.nt-types { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px 28px; padding: 8px 0 0 10px; border-left: 1px solid var(--border-light); }
+.nt-types h4 { font-size: var(--fs-2); font-weight: 600; color: var(--text-primary); margin: 0 0 4px; }
+.nt-types label { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; color: var(--text-secondary); }
+.nt-types code { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); margin-left: auto; padding-left: 8px; }
+.nt-types .is-off { color: var(--text-muted); }
+.nt-levels { padding: 6px 0 0 10px; border-left: 1px solid var(--border-light); color: var(--text-secondary); }
+.nt-levels dt { font-weight: 600; color: var(--text-primary); }
+.nt-levels dd { margin: 0 0 6px; }
+
+.nt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.nt-row + .nt-row { margin-top: 10px; }
+.nt-radio { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; color: var(--text-primary); cursor: pointer; }
+.nt-radio input { accent-color: var(--accent); width: 15px; height: 15px; }
+.nt-check { display: flex; align-items: baseline; gap: 8px; color: var(--text-primary); cursor: pointer; }
+.nt-check input { accent-color: var(--accent); width: 15px; height: 15px; flex: none; transform: translateY(2px); }
+.nt-check-desc { display: block; font-size: var(--fs-2); color: var(--text-secondary); }
+.nt-time { width: 6.4rem; font-family: var(--font-mono); }
+.nt-select { height: 28px; padding: 0 6px; width: auto; max-width: 100%; }
+.nt-days { display: inline-flex; }
+.nt-day { min-width: 34px; height: 28px; padding: 0 6px; font: inherit; font-size: var(--fs-2); cursor: pointer; background: none; color: var(--text-secondary); border: 1px solid var(--border-light); }
+.nt-day + .nt-day { margin-left: -1px; }
+.nt-day[aria-pressed="true"] { background: var(--accent-soft); color: var(--text-primary); border-color: var(--accent); position: relative; z-index: 1; }
+.nt-hint { font-size: var(--fs-2); color: var(--text-muted); margin: 6px 0 0; }
+.nt-paused { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 0 6px 10px; border-left: 2px solid var(--warning); color: var(--text-primary); }
+
+.nt-ways { display: flex; flex-direction: column; gap: 10px; }
+.nt-channels { margin: 8px 0 0 23px; border-top: 1px solid var(--border-color); }
+.nt-channel { display: grid; grid-template-columns: auto 110px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-color); font-size: var(--fs-2); }
+.nt-channel-name { font-weight: 600; color: var(--text-primary); font-size: var(--fs-3); }
+.nt-ok { color: var(--success); }
+.nt-channel code { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); }
+.nt-channel .muted { color: var(--text-muted); }
+
+.nt-mutes { border-top: 1px solid var(--border-color); }
+.nt-mute { display: grid; grid-template-columns: minmax(110px, 150px) minmax(0, 1fr) auto; gap: 2px 14px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--border-color); font-size: var(--fs-2); color: var(--text-secondary); }
+.nt-mute b { color: var(--text-primary); font-size: var(--fs-3); font-weight: 600; }
+.nt-empty { padding: 8px 0; color: var(--text-muted); font-size: var(--fs-2); border-bottom: 1px solid var(--border-color); }
+.nt-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+
+.nt-disabled { opacity: 0.5; pointer-events: none; }
+.nt-kept { font-size: var(--fs-2); color: var(--text-secondary); padding: 8px 0 8px 10px; border-left: 2px solid var(--border-strong); }
+
+/* Settings index: the new entry. */
+.settings-index a.is-new { color: var(--text-primary); border-left-color: var(--accent); }
+
+@media (max-width: 768px) {
+  .nt-kind { grid-template-columns: auto minmax(0, 1fr); }
+  .nt-kind-state { grid-column: 2; padding-top: 0; }
+  .nt-channel { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .nt-channel > :nth-child(3) { grid-column: 2 / -1; }
+  .nt-channels { margin-left: 0; }
+  .nt-mute { grid-template-columns: minmax(0, 1fr) auto; }
+  .nt-mute > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+  .nt-mute > .btn { grid-column: 2; grid-row: 1; }
+}
+
+/* The bell with notifications off: no number, the bell-off glyph, and a
+   one-line state in the open list. */
+.bell-demo { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.bell-demo-bar { position: relative; display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 12px; background: var(--gradient-sidebar); border: 1px solid var(--border-color); width: 380px; max-width: 100%; justify-content: flex-end; }
+.bell-demo .notify-dropdown { display: block; position: absolute; right: 0; top: calc(100% + 6px); width: 360px; max-width: calc(100vw - 32px); }
+.bell-demo-wrap { position: relative; padding-bottom: 400px; width: 380px; max-width: 100%; }
+.notify-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.notify-header a { font-weight: 400; color: var(--text-secondary); font-size: var(--fs-2); text-underline-offset: 3px; }
+.notify-item-platform .sfx { text-transform: none; }
+.notify-state { padding: 6px 12px; font-size: var(--fs-2); color: var(--text-secondary); border-bottom: 1px solid var(--border-color); background: var(--bg-tertiary); }
+</style>
+</head>
+<body>
+<div class="main-content">
+
+<!-- ======================= Top bar (as today) ======================= -->
+<header class="topbar">
+  <a href="#" class="topbar-brand" aria-label="Home">
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD54F"/><stop offset=".45" stop-color="#FF9800"/><stop offset=".75" stop-color="#E91E63"/><stop offset="1" stop-color="#AB47BC"/></linearGradient></defs><circle cx="12" cy="12" r="10" fill="url(#g)"/></svg>
+    <span>CashPilot</span>
+  </a>
+  <nav class="topnav" aria-label="Main">
+    <a href="#" class="sidebar-link active">Dashboard</a>
+    <a href="#" class="sidebar-link">Fleet</a>
+    <a href="#" class="sidebar-link">Catalog</a>
+    <a href="#" class="sidebar-link">Payouts</a>
+    <a href="#" class="sidebar-link">Activity</a>
+    <a href="#" class="sidebar-link">Settings</a>
+  </nav>
+  <div class="topbar-right">
+    <a href="#" class="btn btn-primary btn-sm topbar-add" aria-label="Add service"><span aria-hidden="true">+</span><span class="topbar-add-label" aria-hidden="true"> Add service</span></a>
+    <div class="topbar-earnings"><span>$52.07</span><select class="topbar-currency-select" aria-label="Currency"><option>USD</option></select></div>
+    <div class="topbar-notifications">
+      <button class="topbar-icon-btn topbar-notify-btn" aria-label="Alerts, 4 new" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span class="notify-badge">4</span>
+      </button>
+    </div>
+    <div class="topbar-avatar-wrap"><button class="topbar-avatar" aria-label="User menu">S</button></div>
+  </div>
+</header>
+
+<main class="page-content">
+  <div class="page-head"><h1 class="page-title">Dashboard</h1></div>
+
+  <p class="demo-intro">Design 1, <b>Inline actions</b>. Mockup with sample data. The Dashboard below is the main view. Labelled state panels follow it. Each panel is a part of the same design.</p>
+
+  <section class="stats-grid money-strip" aria-label="Money">
+    <div class="stat-card stat-card-balance"><div class="stat-label">Balance</div><div class="stat-value">$52.07</div></div>
+    <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value">$0.41</div><div class="stat-change">+$0.03 vs yesterday</div></div>
+    <div class="stat-card"><div class="stat-label">This month</div><div class="stat-value">$11.86</div><div class="stat-change">13 earners</div></div>
+    <div class="stat-card stat-card-ops"><div class="stat-label">Containers up</div><div class="stat-value">31 / 33</div></div>
+  </section>
+
+  <!-- ============ (a) Money waiting at full width: every action on one line ============ -->
+  <p class="demo-label"><b>(a) Money waiting, main view</b><span>Five rows. On a desktop (1440 and 900 px) each row keeps all its actions on one line, under its text. At phone width the same markup turns into panel (b).</span></p>
+
+  <section class="attention money-waiting" aria-labelledby="mw-a-title">
+    <div class="block-head"><h2 class="block-title" id="mw-a-title">Money waiting <span class="count">5</span></h2></div>
+    <div class="attn-list mwx-list">
+
+      <div class="attn-row attn-warn mwx-row" data-obligation="mysterium:claim-monthly-rewards-pool">
+        <span class="attn-tag">Claim</span>
+        <span class="attn-what">MystNodes</span>
+        <div class="mwx-main">
+          <span class="mw-title">Claim last month's MystNodes rewards</span>
+          <span class="mw-when">by 1 Dec 2026, 3 days left</span>
+          <span class="mw-loss">Rewards not claimed within 30 days of the monthly distribution are forfeited and go back into the next month's pool.</span>
+          <div class="mwx-meta">
+            <details class="mw-how"><summary>How</summary><span>Open the Rewards page and swap your points for MYST.</span></details>
+            <a class="mwx-rules" href="https://help.mystnodes.com/en/articles/13925332-mystnodes-rewards-system" target="_blank" rel="noopener">Claim rules at MystNodes, checked <span class="mwx-date">24 Nov 2026</span><span class="mwx-ext" aria-hidden="true"> ↗</span><span class="sr-only"> (opens the MystNodes website in a new tab)</span></a>
+          </div>
+          <div class="mwx-bar">
+            <a class="btn btn-primary btn-sm" href="#" target="_blank" rel="noopener">Open MystNodes<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+            <button class="btn btn-ghost btn-sm" type="button">Done</button>
+            <span class="mwx-note mwx-wide">Too close to snooze</span>
+            <button class="btn btn-ghost btn-sm mwx-stop mwx-end mwx-wide" type="button">Stop reminding me</button>
+            <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm" aria-label="More actions for MystNodes">More</summary>
+              <div class="mw-menu"><button class="btn btn-ghost btn-sm" type="button">Stop reminding me</button></div></details>
+          </div>
+        </div>
+      </div>
+
+      <div class="attn-row attn-ask mwx-row" data-obligation="honeygain:cash-out">
+        <span class="attn-tag">Cash out</span>
+        <span class="attn-what">Honeygain</span>
+        <div class="mwx-main">
+          <span class="mw-title">Cash out your Honeygain balance: 20.76 USD</span>
+          <span class="mw-loss">Money left at a provider can be lost if it bans the account, stalls payouts or closes.</span>
+          <div class="mwx-meta">
+            <details class="mw-how"><summary>How</summary><span>PayPal payouts go through Tipalti. The balance leaves your account as soon as you request, even while the payout waits for Tipalti.</span></details>
+          </div>
+          <div class="mwx-bar">
+            <a class="btn btn-primary btn-sm" href="#" target="_blank" rel="noopener">Open Honeygain<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+            <button class="btn btn-ghost btn-sm" type="button">Requested</button>
+            <span class="mwx-seg mwx-wide" role="group" aria-label="Snooze"><span class="mwx-seg-label" aria-hidden="true">Snooze</span><button class="btn btn-ghost btn-sm" type="button" aria-label="Snooze a day">1 day</button><button class="btn btn-ghost btn-sm" type="button" aria-label="Snooze a week">1 week</button></span>
+            <button class="btn btn-ghost btn-sm mwx-stop mwx-end mwx-wide" type="button">Stop reminding me</button>
+            <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm" aria-label="More actions for Honeygain">More</summary>
+              <div class="mw-menu"><button class="btn btn-ghost btn-sm">Snooze a day</button><button class="btn btn-ghost btn-sm">Snooze a week</button><hr><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+          </div>
+        </div>
+      </div>
+
+      <div class="attn-row attn-warn mwx-row" data-obligation="storj:cash-out">
+        <span class="attn-tag">Arrived?</span>
+        <span class="attn-what">Storj</span>
+        <div class="mwx-main">
+          <span class="mw-title">Cash out your Storj balance: 41.20 STORJ (≈ $15.32)</span>
+          <span class="mw-loss">You marked this requested two weeks ago. Did the payout arrive?</span>
+          <span class="mw-loss">Money left at a provider can be lost if it bans the account, stalls payouts or closes.</span>
+          <div class="mwx-bar">
+            <a class="btn btn-primary btn-sm" href="#" target="_blank" rel="noopener">Open Storj<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+            <button class="btn btn-ghost btn-sm" type="button">It arrived</button>
+            <span class="mwx-seg mwx-wide" role="group" aria-label="Snooze"><span class="mwx-seg-label" aria-hidden="true">Snooze</span><button class="btn btn-ghost btn-sm" type="button" aria-label="Snooze a day">1 day</button><button class="btn btn-ghost btn-sm" type="button" aria-label="Snooze a week">1 week</button></span>
+            <button class="btn btn-ghost btn-sm mwx-stop mwx-end mwx-wide" type="button">Stop reminding me</button>
+            <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm" aria-label="More actions for Storj">More</summary>
+              <div class="mw-menu"><button class="btn btn-ghost btn-sm">Snooze a day</button><button class="btn btn-ghost btn-sm">Snooze a week</button><hr><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+          </div>
+        </div>
+      </div>
+
+      <div class="attn-row attn-ask mwx-row" data-obligation="packetstream:keep-active">
+        <span class="attn-tag">Keep active</span>
+        <span class="attn-what">PacketStream</span>
+        <div class="mwx-main">
+          <span class="mw-title">Log in to PacketStream to keep the balance</span>
+          <span class="mw-when">by 10 Dec 2026, 12 days left</span>
+          <span class="mw-loss">After a long time with no login, PacketStream may treat the unpaid balance as expired.</span>
+          <div class="mwx-meta">
+            <details class="mw-how" open><summary>How</summary><span>Sign in to the PacketStream dashboard once. Sharing alone does not count as activity.</span></details>
+            <a class="mwx-rules" href="#" target="_blank" rel="noopener">Inactivity rules at PacketStream, checked <span class="mwx-date">24 Nov 2026</span><span class="mwx-ext" aria-hidden="true"> ↗</span><span class="sr-only"> (opens the PacketStream website in a new tab)</span></a>
+          </div>
+          <div class="mwx-bar">
+            <a class="btn btn-primary btn-sm" href="#" target="_blank" rel="noopener">Open PacketStream<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+            <button class="btn btn-ghost btn-sm" type="button">Done</button>
+            <span class="mwx-seg mwx-wide" role="group" aria-label="Snooze"><span class="mwx-seg-label" aria-hidden="true">Snooze</span><button class="btn btn-ghost btn-sm" type="button" aria-label="Snooze a day">1 day</button><button class="btn btn-ghost btn-sm" type="button" aria-label="Snooze a week">1 week</button></span>
+            <button class="btn btn-ghost btn-sm mwx-stop mwx-end mwx-wide" type="button">Stop reminding me</button>
+            <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm" aria-label="More actions for PacketStream">More</summary>
+              <div class="mw-menu"><button class="btn btn-ghost btn-sm">Snooze a day</button><button class="btn btn-ghost btn-sm">Snooze a week</button><hr><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+          </div>
+        </div>
+      </div>
+
+      <div class="attn-row attn-ask mwx-row" data-obligation="earnfm:claim">
+        <span class="attn-tag">Claim</span>
+        <span class="attn-what">EarnFM</span>
+        <div class="mwx-main">
+          <span class="mw-title">Claim your EarnFM balance</span>
+          <span class="mw-when">by 22 Dec 2026 or earlier, 24 days left</span>
+          <span class="mw-loss">EarnFM may remove a balance that is not claimed in time.</span>
+          <div class="mwx-meta">
+            <a class="mwx-rules" href="#" target="_blank" rel="noopener">Claim rules at EarnFM, checked <span class="mwx-date">24 Nov 2026</span><span class="mwx-ext" aria-hidden="true"> ↗</span><span class="sr-only"> (opens the EarnFM website in a new tab)</span></a>
+          </div>
+          <div class="mwx-bar">
+            <a class="btn btn-primary btn-sm" href="#" target="_blank" rel="noopener">Open EarnFM<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+            <button class="btn btn-ghost btn-sm" type="button">Done</button>
+            <span class="mwx-seg mwx-wide" role="group" aria-label="Snooze"><span class="mwx-seg-label" aria-hidden="true">Snooze</span><button class="btn btn-ghost btn-sm" type="button" aria-label="Snooze a day">1 day</button><button class="btn btn-ghost btn-sm" type="button" aria-label="Snooze a week">1 week</button></span>
+            <button class="btn btn-ghost btn-sm mwx-stop mwx-end mwx-wide" type="button">Stop reminding me</button>
+            <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm" aria-label="More actions for EarnFM">More</summary>
+              <div class="mw-menu"><button class="btn btn-ghost btn-sm">Snooze a day</button><button class="btn btn-ghost btn-sm">Snooze a week</button><hr><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="attn-foot mwx-foot">
+      <details class="mwx-stopped"><summary>2 stopped reminders</summary></details>
+    </div>
+  </section>
+
+  <!-- ============ (b) Phone ============ -->
+  <section class="demo-panel">
+    <p class="demo-label"><b>(b) Phone, 390 px</b><span>Open and the main answer stay on the row. Snooze and Stop reminding me move into More. The first menu is drawn open.</span></p>
+    <div class="phone-frame">
+      <section class="attention money-waiting" aria-labelledby="mw-b-title">
+        <div class="block-head"><h2 class="block-title" id="mw-b-title">Money waiting <span class="count">5</span></h2></div>
+        <div class="attn-list mwx-list">
+          <div class="attn-row attn-ask mwx-row">
+            <span class="attn-tag">Cash out</span>
+            <span class="attn-what">Honeygain</span>
+            <div class="mwx-main">
+              <span class="mw-title">Cash out your Honeygain balance: 20.76 USD</span>
+              <span class="mw-loss">Money left at a provider can be lost if it bans the account, stalls payouts or closes.</span>
+              <div class="mwx-meta"><details class="mw-how"><summary>How</summary><span>PayPal payouts go through Tipalti.</span></details></div>
+              <div class="mwx-bar">
+                <a class="btn btn-primary btn-sm" href="#">Open Honeygain<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+                <button class="btn btn-ghost btn-sm" type="button">Requested</button>
+                <details class="mwx-overflow" open><summary class="btn btn-ghost btn-sm" aria-label="More actions for Honeygain" aria-expanded="true">More</summary>
+                  <div class="mw-menu"><button class="btn btn-ghost btn-sm">Snooze a day</button><button class="btn btn-ghost btn-sm">Snooze a week</button><hr><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+              </div>
+            </div>
+          </div>
+          <div class="attn-row attn-warn mwx-row">
+            <span class="attn-tag">Claim</span>
+            <span class="attn-what">MystNodes</span>
+            <div class="mwx-main">
+              <span class="mw-title">Claim last month's MystNodes rewards</span>
+              <span class="mw-when">by 1 Dec 2026, 3 days left</span>
+              <span class="mw-loss">Rewards not claimed within 30 days of the monthly distribution are forfeited.</span>
+              <div class="mwx-meta">
+                <details class="mw-how"><summary>How</summary><span>Open the Rewards page and swap your points for MYST.</span></details>
+                <a class="mwx-rules" href="#">Claim rules at MystNodes, checked <span class="mwx-date">24 Nov 2026</span><span class="mwx-ext" aria-hidden="true"> ↗</span></a>
+              </div>
+              <div class="mwx-bar">
+                <a class="btn btn-primary btn-sm" href="#">Open MystNodes<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+                <button class="btn btn-ghost btn-sm" type="button">Done</button>
+                <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm" aria-label="More actions for MystNodes">More</summary><div class="mw-menu"><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+              </div>
+            </div>
+          </div>
+          <div class="attn-row attn-ask mwx-row">
+            <span class="attn-tag">Keep active</span>
+            <span class="attn-what">PacketStream</span>
+            <div class="mwx-main">
+              <span class="mw-title">Log in to PacketStream to keep the balance</span>
+              <span class="mw-when">by 10 Dec 2026, 12 days left</span>
+              <div class="mwx-meta"><details class="mw-how"><summary>How</summary><span>Sign in once.</span></details><a class="mwx-rules" href="#">Inactivity rules at PacketStream, checked <span class="mwx-date">24 Nov 2026</span><span class="mwx-ext" aria-hidden="true"> ↗</span></a></div>
+              <div class="mwx-bar">
+                <a class="btn btn-primary btn-sm" href="#">Open PacketStream<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+                <button class="btn btn-ghost btn-sm" type="button">Done</button>
+                <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm" aria-label="More actions for PacketStream">More</summary><div class="mw-menu"><button class="btn btn-ghost btn-sm">Snooze a day</button></div></details>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="attn-foot mwx-foot"><details class="mwx-stopped"><summary>2 stopped reminders</summary></details></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ============ (c) Just stopped, with undo ============ -->
+  <section class="demo-panel">
+    <p class="demo-label"><b>(c) A row just stopped</b><span>After Stop reminding me on MystNodes: the row leaves, a toast offers Undo for 10 seconds, and the foot counts one more. The toast also offers the wider stop for the whole service.</span></p>
+    <div class="mwx-toast-wrap">
+      <div class="toast success show mwx-toast" role="status">
+        <div class="mwx-toast-top">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          <div class="mwx-toast-text">MystNodes: "Claim last month's rewards" is stopped.<div class="mwx-toast-sub">No more reminders or pushes for it, for everyone here.</div></div>
+          <button class="mwx-toast-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="mwx-toast-actions">
+          <button class="btn btn-secondary btn-sm" type="button">Undo</button>
+          <button class="btn btn-ghost btn-sm" type="button">Stop all MystNodes reminders</button>
+        </div>
+        <div class="mwx-toast-timer" aria-hidden="true"><span></span></div>
+      </div>
+      <section class="attention money-waiting" aria-labelledby="mw-c-title">
+        <div class="block-head"><h2 class="block-title" id="mw-c-title">Money waiting <span class="count">4</span></h2></div>
+        <div class="attn-list mwx-list">
+          <div class="attn-row attn-ask mwx-row">
+            <span class="attn-tag">Cash out</span><span class="attn-what">Honeygain</span>
+            <div class="mwx-main">
+              <span class="mw-title">Cash out your Honeygain balance: 20.76 USD</span>
+              <span class="mw-loss">Money left at a provider can be lost if it bans the account, stalls payouts or closes.</span>
+              <div class="mwx-bar">
+                <a class="btn btn-primary btn-sm" href="#">Open Honeygain<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+                <button class="btn btn-ghost btn-sm">Requested</button>
+                <span class="mwx-seg mwx-wide" role="group" aria-label="Snooze"><span class="mwx-seg-label" aria-hidden="true">Snooze</span><button class="btn btn-ghost btn-sm" aria-label="Snooze a day">1 day</button><button class="btn btn-ghost btn-sm" aria-label="Snooze a week">1 week</button></span>
+                <button class="btn btn-ghost btn-sm mwx-stop mwx-end mwx-wide">Stop reminding me</button>
+                <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm">More</summary><div class="mw-menu"><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+              </div>
+            </div>
+          </div>
+          <div class="attn-row attn-warn mwx-row">
+            <span class="attn-tag">Arrived?</span><span class="attn-what">Storj</span>
+            <div class="mwx-main">
+              <span class="mw-title">Cash out your Storj balance: 41.20 STORJ (≈ $15.32)</span>
+              <span class="mw-loss">You marked this requested two weeks ago. Did the payout arrive?</span>
+              <div class="mwx-bar">
+                <a class="btn btn-primary btn-sm" href="#">Open Storj<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+                <button class="btn btn-ghost btn-sm">It arrived</button>
+                <span class="mwx-seg mwx-wide" role="group" aria-label="Snooze"><span class="mwx-seg-label" aria-hidden="true">Snooze</span><button class="btn btn-ghost btn-sm" aria-label="Snooze a day">1 day</button><button class="btn btn-ghost btn-sm" aria-label="Snooze a week">1 week</button></span>
+                <button class="btn btn-ghost btn-sm mwx-stop mwx-end mwx-wide">Stop reminding me</button>
+                <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm">More</summary><div class="mw-menu"><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="attn-foot mwx-foot"><details class="mwx-stopped"><summary>3 stopped reminders</summary></details></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ============ (d) Stopped reminders, managed ============ -->
+  <section class="demo-panel">
+    <p class="demo-label"><b>(d) Stopped reminders, opened</b><span>The foot of Money waiting, open. Writers and the owner manage every stop here. The owner sees the same list in Settings, Notifications.</span></p>
+    <section class="attention money-waiting">
+      <div class="attn-list mwx-list">
+        <div class="attn-foot mwx-foot" style="padding-left:0">
+          <details class="mwx-stopped" open><summary>3 stopped reminders</summary>
+            <ul class="mwx-stopped-list">
+              <li><span class="attn-what">MystNodes</span><span>Claim last month's MystNodes rewards</span><span class="mwx-by">sergio, 28 Nov 2026</span><button class="btn btn-ghost btn-sm" type="button">Remind me again</button></li>
+              <li><span class="attn-what">Honeygain</span><span>Keep a Honeygain device sharing, or make a payout</span><span class="mwx-by">sergio, 12 Nov 2026</span><button class="btn btn-ghost btn-sm" type="button">Remind me again</button></li>
+              <li><span class="attn-what">Repocket</span><span>Every reminder</span><span class="mwx-by">sergio, 3 Nov 2026</span><button class="btn btn-ghost btn-sm" type="button">Remind me again</button></li>
+            </ul>
+            <div class="mwx-add">
+              <label for="mw-add-svc">Stop every reminder for</label>
+              <select id="mw-add-svc" class="form-input"><option>PacketStream</option><option>EarnFM</option><option>Bitping</option><option>Storj</option></select>
+              <button class="btn btn-ghost btn-sm" type="button">Stop reminders</button>
+            </div>
+            <p class="mwx-help">A stopped reminder stays hidden and sends no pushes, for everyone here, until someone starts it again. <a href="#">Learn more about reminders</a></p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============ (e) Settings frame, Notifications defaults ============ -->
+  <section class="demo-panel">
+    <p class="demo-label"><b>(e) Settings, Notifications, defaults</b><span>A plain Settings frame. The section is one block, so the Settings layout lane can move it. The defaults give the same result as CashPilot today.</span></p>
+    <div class="frame">
+      <div class="page-head"><h1 class="page-title">Settings</h1></div>
+      <div class="settings-layout">
+        <nav class="settings-index" aria-label="Settings sections">
+          <a href="#">Earnings collection</a><a href="#">Device ids</a><a href="#">Restore</a><a href="#">Encryption key</a><a href="#">Earner credentials</a>
+          <a href="#nt-e" class="is-new" aria-current="true">Notifications</a>
+          <a href="#">Environment</a><a href="#">About and updates</a><a href="#">Import</a>
+        </nav>
+        <div class="settings-body">
+          <div class="card settings-section nt" id="nt-e">
+            <h3 class="settings-section-title">Notifications</h3>
+            <p class="settings-section-desc">Choose what CashPilot tells you about, and when. These choices apply to the whole install. <a class="nt-link" href="#">Learn more</a></p>
+
+            <div class="nt-master">
+              <input type="checkbox" role="switch" class="nt-switch" id="nt-e-on" checked>
+              <div><label class="nt-master-title" for="nt-e-on">Notifications are on</label>
+                <div class="nt-master-desc">Turn this off to stop every alert, reminder and banner. CashPilot still records each problem in the bell and on the Dashboard.</div></div>
+            </div>
+
+            <fieldset class="nt-group">
+              <legend class="nt-legend">Pause</legend>
+              <div class="nt-row">
+                <label for="nt-e-pause" class="sr-only">Pause for</label>
+                <select id="nt-e-pause" class="form-input nt-select"><option>1 day</option><option>3 days</option><option>1 week</option><option>30 days</option></select>
+                <button class="btn btn-secondary btn-sm" type="button">Pause everything</button>
+              </div>
+              <p class="nt-hint">Nothing is sent during a pause. Open problems still show in the bell.</p>
+            </fieldset>
+
+            <fieldset class="nt-group">
+              <legend class="nt-legend">What to tell me about</legend>
+              <div class="nt-kinds">
+                <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="k1" checked><div><label class="nt-kind-title" for="k1">Money waiting reminders</label><div class="nt-kind-desc">Deadlines before a provider keeps your money. Balances ready to cash out.</div></div></div>
+                <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="k2" checked><div><label class="nt-kind-title" for="k2">Collection problems</label><div class="nt-kind-desc">CashPilot could not read a balance. For example, a provider rejected a saved login.</div></div></div>
+                <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="k3" checked><div><label class="nt-kind-title" for="k3">Payouts and quiet balances</label><div class="nt-kind-desc">A balance dropped, so it may be a payout. Or a balance stopped growing.</div></div></div>
+                <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="k4" checked><div><label class="nt-kind-title" for="k4">Earners and workers</label><div class="nt-kind-desc">An earner stopped or carries almost no traffic. A worker went offline.</div></div></div>
+                <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="k5" checked><div><label class="nt-kind-title" for="k5">Activity alerts</label><div class="nt-kind-desc">An earner sent mail, reached into your home network, or had an unusual hour. <span class="muted">Owner only.</span></div></div></div>
+                <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="k6" checked><div><label class="nt-kind-title" for="k6">CashPilot updates</label><div class="nt-kind-desc">A new version is out. It shows as a banner at the top of the page.</div></div></div>
+              </div>
+              <details class="nt-more"><summary>Choose single alert types (18)</summary></details>
+            </fieldset>
+
+            <fieldset class="nt-group">
+              <legend class="nt-legend">Minimum level</legend>
+              <div class="nt-row">
+                <label class="nt-radio"><input type="radio" name="lv-e" checked> Everything</label>
+                <label class="nt-radio"><input type="radio" name="lv-e"> Warnings and problems</label>
+                <label class="nt-radio"><input type="radio" name="lv-e"> Problems only</label>
+              </div>
+              <details class="nt-more"><summary>Which alert has which level</summary></details>
+            </fieldset>
+
+            <fieldset class="nt-group">
+              <legend class="nt-legend">Quiet hours</legend>
+              <div class="nt-row">
+                <input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="q-e" checked aria-describedby="q-e-hint">
+                <label for="q-e">Hold pushes from</label>
+                <input type="time" class="form-input nt-time" value="21:00" aria-label="Quiet hours start">
+                <span>to</span>
+                <input type="time" class="form-input nt-time" value="09:00" aria-label="Quiet hours end">
+              </div>
+              <div class="nt-row">
+                <span class="nt-days" role="group" aria-label="Days">
+                  <button class="nt-day" aria-pressed="true">Mon</button><button class="nt-day" aria-pressed="true">Tue</button><button class="nt-day" aria-pressed="true">Wed</button><button class="nt-day" aria-pressed="true">Thu</button><button class="nt-day" aria-pressed="true">Fri</button><button class="nt-day" aria-pressed="true">Sat</button><button class="nt-day" aria-pressed="true">Sun</button>
+                </span>
+              </div>
+              <div class="nt-row"><label class="nt-check"><input type="checkbox" checked> Let problems through. For example, a worker offline or an earner stopped.</label></div>
+              <p class="nt-hint" id="q-e-hint">Times use your time zone, Europe/Madrid. Held pushes go out when quiet hours end. The bell always updates.</p>
+            </fieldset>
+
+            <fieldset class="nt-group">
+              <legend class="nt-legend">How to tell me</legend>
+              <div class="nt-ways">
+                <label class="nt-check"><input type="checkbox" checked><span>A number on the bell</span></label>
+                <label class="nt-check"><input type="checkbox"><span>A pop-up in the page <span class="nt-chip nt-chip-new">New</span><span class="nt-check-desc">Only while CashPilot is open.</span></span></label>
+                <label class="nt-check"><input type="checkbox"><span>A browser notification <span class="nt-chip nt-chip-new">New</span><span class="nt-check-desc">Also when the tab is in the background. Each browser asks you once.</span></span></label>
+                <div>
+                  <label class="nt-check"><input type="checkbox" checked><span>A push to your channels<span class="nt-check-desc">A message to your phone or another app.</span></span></label>
+                  <div class="nt-channels">
+                    <div class="nt-channel"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" checked aria-label="Use ntfy"><span class="nt-channel-name">ntfy</span><span><span class="nt-ok">Set up</span> <code>CASHPILOT_NTFY_URL</code></span><button class="btn btn-ghost btn-sm">Send a test</button></div>
+                    <div class="nt-channel"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" checked aria-label="Use Telegram"><span class="nt-channel-name">Telegram</span><span><span class="nt-ok">Set up</span> <code>CASHPILOT_TELEGRAM_*</code></span><button class="btn btn-ghost btn-sm">Send a test</button></div>
+                    <div class="nt-channel"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" disabled aria-label="Use webhook"><span class="nt-channel-name">Webhook</span><span class="muted">Not set up.</span><a class="nt-link" href="#">How to set it up</a></div>
+                  </div>
+                  <p class="nt-hint">Channels come from environment variables. Change them, then restart CashPilot. <a class="nt-link" href="#">Learn more</a></p>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="nt-group">
+              <legend class="nt-legend">Muted</legend>
+              <p class="nt-group-desc">A muted service or reminder sends nothing. Its problems still show on the Dashboard.</p>
+              <div class="nt-mutes">
+                <div class="nt-mute"><b>Honeygain</b><span>Reminder: Keep a Honeygain device sharing, or make a payout</span><button class="btn btn-ghost btn-sm">Remind me again</button></div>
+                <div class="nt-mute"><b>Repocket</b><span>Every reminder</span><button class="btn btn-ghost btn-sm">Remind me again</button></div>
+              </div>
+              <div class="nt-add">
+                <label for="nt-e-svc" class="sr-only">Service</label>
+                <select id="nt-e-svc" class="form-input nt-select"><option>Choose a service</option><option>Traffmonetizer</option></select>
+                <label for="nt-e-what" class="sr-only">What to mute</label>
+                <select id="nt-e-what" class="form-input nt-select"><option>Reminders and alerts</option><option>Reminders only</option><option>Alerts only</option></select>
+                <button class="btn btn-ghost btn-sm" type="button">Mute</button>
+              </div>
+            </fieldset>
+
+            <div class="settings-actions">
+              <button class="btn btn-primary" type="button">Save notifications</button>
+              <span class="muted">No changes.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ (f) Notifications with changes ============ -->
+  <section class="demo-panel">
+    <p class="demo-label"><b>(f) Notifications, changed</b><span>Quiet hours 22:30 to 07:30. Collection problems off. Two services muted. Single alert types and the level list are open.</span></p>
+    <div class="frame">
+      <div class="card settings-section nt">
+        <h3 class="settings-section-title">Notifications</h3>
+        <p class="settings-section-desc">Choose what CashPilot tells you about, and when. These choices apply to the whole install. <a class="nt-link" href="#">Learn more</a></p>
+        <div class="nt-master">
+          <input type="checkbox" role="switch" class="nt-switch" id="nt-f-on" checked>
+          <div><label class="nt-master-title" for="nt-f-on">Notifications are on</label><div class="nt-master-desc">Turn this off to stop every alert, reminder and banner. CashPilot still records each problem in the bell and on the Dashboard.</div></div>
+        </div>
+
+        <fieldset class="nt-group">
+          <legend class="nt-legend">Pause</legend>
+          <div class="nt-row">
+            <select class="form-input nt-select" aria-label="Pause for"><option>3 days</option></select>
+            <button class="btn btn-secondary btn-sm" type="button">Pause everything</button>
+          </div>
+        </fieldset>
+
+        <fieldset class="nt-group">
+          <legend class="nt-legend">What to tell me about</legend>
+          <div class="nt-kinds">
+            <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="f1" checked><div><label class="nt-kind-title" for="f1">Money waiting reminders</label><div class="nt-kind-desc">Deadlines before a provider keeps your money. Balances ready to cash out.</div></div></div>
+            <div class="nt-kind is-off"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="f2"><div><label class="nt-kind-title" for="f2">Collection problems</label><div class="nt-kind-desc">CashPilot could not read a balance. For example, a provider rejected a saved login.</div></div><span class="nt-kind-state">Off</span></div>
+            <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="f3" checked><div><label class="nt-kind-title" for="f3">Payouts and quiet balances</label><div class="nt-kind-desc">A balance dropped, so it may be a payout. Or a balance stopped growing.</div></div></div>
+            <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="f4" checked><div><label class="nt-kind-title" for="f4">Earners and workers</label><div class="nt-kind-desc">An earner stopped or carries almost no traffic. A worker went offline.</div></div></div>
+            <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="f5" checked><div><label class="nt-kind-title" for="f5">Activity alerts</label><div class="nt-kind-desc">An earner sent mail, reached into your home network, or had an unusual hour. <span class="muted">Owner only.</span></div></div></div>
+            <div class="nt-kind"><input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="f6" checked><div><label class="nt-kind-title" for="f6">CashPilot updates</label><div class="nt-kind-desc">A new version is out. It shows as a banner at the top of the page.</div></div></div>
+          </div>
+          <details class="nt-more" open><summary>Choose single alert types (18)</summary>
+            <div class="nt-types">
+              <div><h4>Money waiting</h4>
+                <label><input type="checkbox" checked> Reminder reached a new stage <code>obligation</code></label></div>
+              <div><h4>Collection problems</h4>
+                <label class="is-off"><input type="checkbox"> A collector failed <code>collector</code></label>
+                <label class="is-off"><input type="checkbox"> A note on a reading <code>notice</code></label>
+                <label class="is-off"><input type="checkbox"> A saved login expires soon <code>credential</code></label></div>
+              <div><h4>Payouts and quiet balances</h4>
+                <label><input type="checkbox" checked> Balance dropped: payout? <code>payout</code></label>
+                <label><input type="checkbox" checked> Balance went quiet <code>flatline</code></label>
+                <label><input type="checkbox" checked> Account disabled by provider <code>account_disabled</code></label></div>
+              <div><h4>Earners and workers</h4>
+                <label><input type="checkbox" checked> Earner not running <code>container</code></label>
+                <label><input type="checkbox" checked> Earner missing from a box <code>missing</code></label>
+                <label><input type="checkbox" checked> Proxied copy or tunnel down <code>proxied</code></label>
+                <label><input type="checkbox" checked> Almost no traffic <code>stall</code></label>
+                <label><input type="checkbox" checked> Proxy traffic cap reached <code>proxy_cap</code></label>
+                <label><input type="checkbox" checked> Worker cannot reach Docker <code>docker</code></label>
+                <label><input type="checkbox" checked> Worker offline <code>worker</code></label></div>
+              <div><h4>Activity alerts</h4>
+                <label><input type="checkbox" checked> Earner sent mail <code>activity_mail</code></label>
+                <label><input type="checkbox" checked> Earner reached your home network <code>activity_lan</code></label>
+                <label><input type="checkbox" checked> Unusual hour of traffic, bell only <code>activity_spike</code></label></div>
+              <div><h4>CashPilot updates</h4>
+                <label><input type="checkbox" checked> New version, banner <code>update</code></label></div>
+            </div>
+          </details>
+        </fieldset>
+
+        <fieldset class="nt-group">
+          <legend class="nt-legend">Minimum level</legend>
+          <div class="nt-row">
+            <label class="nt-radio"><input type="radio" name="lv-f" checked> Everything</label>
+            <label class="nt-radio"><input type="radio" name="lv-f"> Warnings and problems</label>
+            <label class="nt-radio"><input type="radio" name="lv-f"> Problems only</label>
+          </div>
+          <details class="nt-more" open><summary>Which alert has which level</summary>
+            <dl class="nt-levels">
+              <dt>Problem</dt><dd>Money or earning is at risk now. A rejected login, an earner not running or missing, a worker offline, Docker unreachable, an account disabled, a proxy tunnel down, an overdue reminder.</dd>
+              <dt>Warning</dt><dd>Something may go wrong soon. A provider not reachable, a changed page, a quiet balance, almost no traffic, a traffic cap, a login that expires soon, a possible payout, a reminder with 7 days or fewer, mail or home-network activity.</dd>
+              <dt>Information</dt><dd>Good to know. A note on a reading, a device not on the account, an unusual hour, a reminder with more than 7 days, a balance ready to cash out, a new version.</dd>
+            </dl>
+          </details>
+        </fieldset>
+
+        <fieldset class="nt-group">
+          <legend class="nt-legend">Quiet hours</legend>
+          <div class="nt-row">
+            <input type="checkbox" role="switch" class="nt-switch nt-switch-sm" id="q-f" checked>
+            <label for="q-f">Hold pushes from</label>
+            <input type="time" class="form-input nt-time" value="22:30" aria-label="Quiet hours start">
+            <span>to</span>
+            <input type="time" class="form-input nt-time" value="07:30" aria-label="Quiet hours end">
+          </div>
+          <div class="nt-row">
+            <span class="nt-days" role="group" aria-label="Days">
+              <button class="nt-day" aria-pressed="true">Mon</button><button class="nt-day" aria-pressed="true">Tue</button><button class="nt-day" aria-pressed="true">Wed</button><button class="nt-day" aria-pressed="true">Thu</button><button class="nt-day" aria-pressed="true">Fri</button><button class="nt-day" aria-pressed="true">Sat</button><button class="nt-day" aria-pressed="true">Sun</button>
+            </span>
+          </div>
+          <div class="nt-row"><label class="nt-check"><input type="checkbox" checked> Let problems through. For example, a worker offline or an earner stopped.</label></div>
+          <p class="nt-hint">Times use your time zone, Europe/Madrid. Held pushes go out when quiet hours end. The bell always updates.</p>
+        </fieldset>
+
+        <fieldset class="nt-group">
+          <legend class="nt-legend">Muted</legend>
+          <p class="nt-group-desc">A muted service or reminder sends nothing. Its problems still show on the Dashboard.</p>
+          <div class="nt-mutes">
+            <div class="nt-mute"><b>Repocket</b><span>Reminders and alerts</span><button class="btn btn-ghost btn-sm">Unmute</button></div>
+            <div class="nt-mute"><b>Traffmonetizer</b><span>Alerts only</span><button class="btn btn-ghost btn-sm">Unmute</button></div>
+            <div class="nt-mute"><b>Honeygain</b><span>Reminder: Keep a Honeygain device sharing, or make a payout</span><button class="btn btn-ghost btn-sm">Remind me again</button></div>
+          </div>
+          <div class="nt-add">
+            <select class="form-input nt-select" aria-label="Service"><option>Choose a service</option></select>
+            <select class="form-input nt-select" aria-label="What to mute"><option>Reminders and alerts</option></select>
+            <button class="btn btn-ghost btn-sm" type="button">Mute</button>
+          </div>
+        </fieldset>
+
+        <div class="settings-actions">
+          <button class="btn btn-primary" type="button">Save notifications</button>
+          <span class="muted">Saved.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ (g) Everything off ============ -->
+  <section class="demo-panel">
+    <p class="demo-label"><b>(g) Everything off</b><span>The section, the bell and Money waiting when notifications are off. A pause looks the same, with an end date.</span></p>
+    <div class="frame">
+      <div class="card settings-section nt">
+        <h3 class="settings-section-title">Notifications</h3>
+        <div class="nt-master">
+          <input type="checkbox" role="switch" class="nt-switch" id="nt-g-on">
+          <div><label class="nt-master-title" for="nt-g-on">Notifications are off</label>
+            <div class="nt-master-desc">CashPilot sends nothing and shows no number on the bell. It still records each problem in the bell and on the Dashboard.</div></div>
+        </div>
+        <p class="nt-kept">Your other choices are kept. They come back when you turn notifications on.</p>
+        <div class="nt-paused" style="margin-top:12px"><span>The same state for a pause: <b>Paused until 1 Dec 2026, 18:40.</b></span><button class="btn btn-ghost btn-sm" type="button">Resume now</button></div>
+        <div class="settings-actions"><button class="btn btn-primary" type="button">Save notifications</button><span class="muted">Saved.</span></div>
+      </div>
+
+      <div class="bell-demo" style="margin-top:20px">
+        <div class="bell-demo-wrap">
+          <div class="bell-demo-bar">
+            <div class="topbar-earnings"><span>$52.07</span></div>
+            <div class="topbar-notifications">
+              <button class="topbar-icon-btn topbar-notify-btn" aria-label="Alerts, notifications off" aria-expanded="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.7 3A6 6 0 0118 8a21.3 21.3 0 00.6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 01.3-1.7"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/><path d="M2 2l20 20"/></svg>
+              </button>
+            </div>
+            <div class="notify-dropdown">
+              <div class="notify-header"><span>Alerts</span><a href="#">Notification settings</a></div>
+              <div class="notify-state">Notifications are off. Nothing is sent. <a class="nt-link" href="#" style="color:var(--text-primary)">Turn on</a></div>
+              <div class="notify-list">
+                <div class="notify-item"><span class="notify-item-icon">!</span><div class="notify-item-body"><div class="notify-item-platform">geiserback<span class="sfx"> — Docker unreachable</span></div><div class="notify-item-msg">The worker cannot reach Docker.</div></div></div>
+                <div class="notify-item"><span class="notify-item-icon">!</span><div class="notify-item-body"><div class="notify-item-platform">earnfm<span class="sfx"> — credential expired</span></div><div class="notify-item-msg">The provider rejected the saved login.</div></div></div>
+                <div class="notify-item"><span class="notify-item-icon">$</span><div class="notify-item-body"><div class="notify-item-platform">storj<span class="sfx"> — payout?</span></div><div class="notify-item-msg">The balance dropped by 41.20 STORJ.</div></div></div>
+                <div class="notify-item"><span class="notify-item-icon">!</span><div class="notify-item-body"><div class="notify-item-platform" style="text-transform:none">Worker 'OPPO CPH1951 (5bdadbc5)' went offline</div><div class="notify-item-msg">Last seen 42 minutes ago.</div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:1; min-width:280px">
+          <section class="attention money-waiting" aria-labelledby="mw-g-title">
+            <div class="block-head"><h2 class="block-title" id="mw-g-title">Money waiting <span class="count">5</span></h2></div>
+            <p class="mwx-quiet">Notifications are off, so no reminder is sent. The list still updates. <a class="nt-link" href="#" style="color:var(--text-primary)">Notification settings</a></p>
+            <div class="attn-list mwx-list">
+              <div class="attn-row attn-warn mwx-row">
+                <span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span>
+                <div class="mwx-main">
+                  <span class="mw-title">Claim last month's MystNodes rewards</span>
+                  <span class="mw-when">by 1 Dec 2026, 3 days left</span>
+                  <div class="mwx-bar">
+                    <a class="btn btn-primary btn-sm" href="#">Open MystNodes<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+                    <button class="btn btn-ghost btn-sm">Done</button>
+                    <button class="btn btn-ghost btn-sm mwx-stop mwx-end mwx-wide">Stop reminding me</button>
+                    <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm">More</summary><div class="mw-menu"><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+                  </div>
+                </div>
+              </div>
+              <div class="attn-row attn-ask mwx-row">
+                <span class="attn-tag">Cash out</span><span class="attn-what">Honeygain</span>
+                <div class="mwx-main">
+                  <span class="mw-title">Cash out your Honeygain balance: 20.76 USD</span>
+                  <div class="mwx-bar">
+                    <a class="btn btn-primary btn-sm" href="#">Open Honeygain<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a>
+                    <button class="btn btn-ghost btn-sm">Requested</button>
+                    <span class="mwx-seg mwx-wide" role="group" aria-label="Snooze"><span class="mwx-seg-label" aria-hidden="true">Snooze</span><button class="btn btn-ghost btn-sm" aria-label="Snooze a day">1 day</button><button class="btn btn-ghost btn-sm" aria-label="Snooze a week">1 week</button></span>
+                    <button class="btn btn-ghost btn-sm mwx-stop mwx-end mwx-wide">Stop reminding me</button>
+                    <details class="mwx-overflow"><summary class="btn btn-ghost btn-sm">More</summary><div class="mw-menu"><button class="btn btn-ghost btn-sm">Stop reminding me</button></div></details>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ (h) Other states ============ -->
+  <section class="demo-panel">
+    <p class="demo-label"><b>(h) Other states</b><span>A viewer's row: no write actions, the rules link stays. The failed check: never an all-clear.</span></p>
+    <section class="attention money-waiting" aria-label="Viewer">
+      <div class="attn-list mwx-list">
+        <div class="attn-row attn-ask mwx-row">
+          <span class="attn-tag">Keep active</span><span class="attn-what">PacketStream</span>
+          <div class="mwx-main">
+            <span class="mw-title">Log in to PacketStream to keep the balance</span>
+            <span class="mw-when">by 10 Dec 2026, 12 days left</span>
+            <div class="mwx-meta"><details class="mw-how"><summary>How</summary><span>Sign in once.</span></details><a class="mwx-rules" href="#">Inactivity rules at PacketStream, checked <span class="mwx-date">24 Nov 2026</span><span class="mwx-ext" aria-hidden="true"> ↗</span></a></div>
+            <div class="mwx-bar"><a class="btn btn-primary btn-sm" href="#">Open PacketStream<span class="mwx-ext" aria-hidden="true">&nbsp;↗</span></a></div>
+          </div>
+        </div>
+        <div class="attn-row attn-unknown mwx-row">
+          <span class="attn-tag">Unknown</span><span class="attn-what">Money waiting</span>
+          <div class="mwx-main"><span class="mw-title">Could not check. Reload the page to try again.</span></div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+</main>
+<footer class="page-foot"><span>CashPilot v3.1.0</span><a href="#">Source code</a><a href="#">Report a problem</a></footer>
+</div>
+</body>
+</html>

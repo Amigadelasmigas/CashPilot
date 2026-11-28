@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Design 3: Row opens detail (Money waiting and Notifications)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<style>
+/* ===== Mockup chrome (not part of the design) ===== */
+.mk-states { border-top: 1px solid var(--border-strong); margin-top: 36px; padding-top: 18px; }
+.mk-states > h2 { font-family: var(--font-mono); font-size: var(--fs-4); font-weight: 500; margin-bottom: 4px; }
+.mk-states > p { color: var(--text-secondary); font-size: var(--fs-2); margin-bottom: 18px; max-width: 90ch; }
+.mk-state { margin: 0 0 40px; }
+.mk-label { margin: 0 0 10px; }
+.mk-label b { margin-right: 8px; }
+.mk-label b { font-family: var(--font-mono); font-weight: 500; color: var(--accent); font-size: var(--fs-3); }
+.mk-label span { color: var(--text-secondary); font-size: var(--fs-2); }
+.mk-frame { border: 1px dashed var(--border-strong); padding: 16px; background: var(--bg-primary); position: relative; }
+.mk-scroll { overflow-x: auto; }
+.mk-scroll > .mk-frame { width: 1392px; }
+.mk-phones { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.mk-phone { width: 390px; max-width: 100%; border: 1px dashed var(--border-strong); background: var(--bg-primary); padding: 14px 12px; }
+.mk-phone-cap { font-size: var(--fs-1); color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 8px; }
+.mk-split { display: grid; grid-template-columns: minmax(0, 1fr) 480px; gap: 24px; align-items: start; }
+@media (max-width: 1100px) { .mk-split { grid-template-columns: minmax(0, 1fr); } }
+
+/* ===== New: Money waiting rows that open in place (rd-) =====
+   Container queries, so the same row draws right in a phone frame on a wide page. */
+.rd-scope { container-type: inline-size; --rd-head: 288px; }
+.rd-list { border-top: 0; }
+.rd-row { border-bottom: 1px solid var(--border-color); border-left: 2px solid var(--border-strong); }
+.rd-row.attn-warn { border-left-color: var(--warning); }
+.rd-row.attn-fail { border-left-color: var(--error); }
+.rd-row.attn-ask { border-left-color: var(--text-secondary); }
+.rd-row.attn-unknown { border-left-color: var(--text-muted); }
+.rd-row.attn-unknown .rd-line { cursor: default; }
+.rd-row.attn-unknown .rd-line:hover { background: none; }
+.rd-line {
+  display: grid; grid-template-columns: var(--rd-head) minmax(0, 1fr) max-content;
+  grid-template-areas: "head sum acts"; gap: 4px 14px; align-items: center;
+  padding: 7px 8px 7px 10px; cursor: pointer;
+}
+.rd-line:hover { background: var(--bg-hover); }
+.rd-row.open > .rd-line { background: var(--bg-tertiary); }
+.rd-head { grid-area: head; display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 0 14px; align-items: baseline; min-width: 0; }
+.rd-head .attn-tag { white-space: nowrap; }
+.rd-sum { grid-area: sum; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rd-sum .mw-title { color: var(--text-primary); }
+.rd-sum .mw-when { color: var(--text-secondary); }
+.rd-sum .rd-q { font-size: var(--fs-2); color: var(--warning); }
+.rd-acts { grid-area: acts; display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; justify-content: flex-end; }
+.rd-acts .btn { white-space: nowrap; }
+.rd-tog { gap: 4px; color: var(--text-secondary); }
+.rd-tog svg { transition: transform var(--transition); }
+.rd-row.open .rd-tog svg { transform: rotate(180deg); }
+.rd-row.open .rd-tog { color: var(--text-primary); border-color: var(--border-strong); }
+
+.rd-detail { display: none; padding: 10px 12px 14px calc(var(--rd-head) + 24px); background: var(--bg-secondary); border-top: 1px solid var(--border-color); }
+.rd-row.open > .rd-detail { display: block; }
+.rd-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 24px; max-width: 980px; }
+.rd-fact h4 { font-family: var(--font-mono); font-size: var(--fs-1); font-weight: 500; color: var(--text-muted); margin: 0 0 3px; letter-spacing: 0.02em; }
+.rd-fact p { font-size: var(--fs-2); color: var(--text-secondary); line-height: 1.45; }
+.rd-fact p + p { margin-top: 3px; }
+.rd-fact a { color: var(--accent-secondary); text-underline-offset: 2px; }
+.rd-fact .rd-checked { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-1); }
+.rd-bar { display: flex; flex-wrap: wrap; row-gap: 6px; align-items: center; gap: 6px; margin-top: 12px; }
+.rd-bar .btn { white-space: nowrap; }
+.rd-sep { width: 1px; align-self: stretch; background: var(--border-light); margin: 0 6px; }
+.rd-hint { font-size: var(--fs-2); color: var(--text-muted); margin-top: 6px; }
+.rd-hint a { color: var(--text-secondary); }
+.rd-nosnooze { font-size: var(--fs-2); color: var(--text-muted); }
+
+/* Just muted: the row folds to one line with its undo. */
+.rd-gone { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; padding: 7px 8px 7px 10px; border-bottom: 1px solid var(--border-color); border-left: 2px dashed var(--border-strong); color: var(--text-secondary); font-size: var(--fs-2); }
+.rd-gone > span { flex: 1; min-width: 0; }
+.rd-gone b { color: var(--text-primary); font-weight: 600; }
+.rd-gone .btn { margin-left: auto; }
+
+/* Foot: the muted list folds behind a count. */
+.rd-foot { padding: 6px 0 0 12px; font-size: var(--fs-2); color: var(--text-muted); }
+.rd-foot summary { cursor: pointer; color: var(--text-secondary); width: max-content; max-width: 100%; }
+.rd-foot ul { list-style: none; margin: 6px 0 4px; padding: 0; border-left: 1px solid var(--border-light); }
+.rd-foot li { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 3px 0 3px 10px; }
+.rd-foot li .rd-m-what { color: var(--text-secondary); }
+.rd-foot li .rd-m-when { font-family: var(--font-mono); font-size: var(--fs-1); }
+.rd-foot .btn-link { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; font-size: var(--fs-2); }
+.rd-foot .rd-foot-link { display: inline-block; margin: 4px 0 0 10px; color: var(--text-secondary); }
+
+.rd-headnote { font-size: var(--fs-2); color: var(--text-muted); }
+.rd-headnote a { color: var(--text-secondary); }
+
+/* Middle widths: tag above the service name, so the summary keeps its room. */
+@container (max-width: 1000px) {
+  .rd-scope, .rd-list { --rd-head: 132px; }
+  .rd-head { display: flex; flex-direction: column; gap: 0; }
+  .rd-detail { padding-left: 12px; }
+}
+/* Phones: three lines, actions under the text, secondary actions inside the detail as a menu. */
+@container (max-width: 560px) {
+  .rd-line { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "head tog" "sum sum" "acts acts"; padding-right: 0; }
+  .rd-head { flex-direction: row; gap: 10px; align-items: baseline; }
+  .rd-acts { justify-content: flex-start; }
+  .rd-acts .rd-tog { grid-area: tog; }
+  .rd-line > .rd-tog-slot { grid-area: tog; }
+  .rd-detail { padding: 10px 10px 12px 12px; }
+  .rd-facts { grid-template-columns: minmax(0, 1fr); }
+  .rd-bar { flex-direction: column; align-items: stretch; gap: 4px; }
+  .rd-bar .btn { justify-content: flex-start; height: 34px; font-size: var(--fs-3); }
+  .rd-sep { width: auto; height: 1px; margin: 4px 0; }
+  .rd-gone { flex-wrap: wrap; }
+  .rd-gone .btn { margin-left: 0; }
+}
+/* The toggle lives in the actions on wide rows, and moves to the top right on phones. */
+.rd-tog-slot { display: none; }
+@container (max-width: 560px) {
+  .rd-acts .rd-tog { display: none; }
+  .rd-tog-slot { display: block; }
+}
+
+/* A static toast, drawn where the real one would appear. */
+.mk-toast { position: static; transform: none; margin: 0 0 12px auto; width: max-content; max-width: 100%; }
+
+/* ===== New: Notifications settings (nt-) ===== */
+.nt-block { margin: 18px 0 0; }
+.nt-block > h4 { font-family: var(--font-mono); font-size: var(--fs-2); font-weight: 500; color: var(--text-primary); margin: 0 0 2px; }
+.nt-block > .nt-desc { font-size: var(--fs-2); color: var(--text-secondary); margin: 0 0 8px; max-width: 82ch; }
+.nt-desc a, .nt-more a { color: var(--accent-secondary); }
+
+/* Segmented choice: native radios, drawn as one strip. */
+.nt-seg { display: inline-flex; border: 1px solid var(--border-light); border-radius: 2px; flex: none; }
+.nt-seg label { position: relative; display: inline-flex; align-items: center; height: 26px; padding: 0 10px; font-size: var(--fs-2); color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+.nt-seg label + label { border-left: 1px solid var(--border-light); }
+.nt-seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.nt-seg label:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nt-seg label:has(input:checked) { background: var(--accent-soft); color: var(--text-primary); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+.nt-seg label:has(input:focus-visible) { outline: 2px solid var(--accent-secondary); outline-offset: 1px; z-index: 1; }
+.nt-seg label:has(input:disabled) { color: var(--text-muted); cursor: not-allowed; text-decoration: line-through; }
+.nt-seg.sm label { height: 24px; padding: 0 8px; justify-content: center; }
+.nt-gline > .nt-seg, .nt-kind > .nt-seg, .nt-row > .nt-seg { justify-self: end; }
+
+/* Master row */
+.nt-master { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 12px; border: 1px solid var(--border-light); background: var(--bg-secondary); }
+.nt-master .nt-master-label { font-weight: 600; }
+.nt-master .nt-master-state { font-size: var(--fs-2); color: var(--text-secondary); }
+.nt-master .nt-pause { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+.nt-master select.form-input { height: 26px; font-size: var(--fs-2); width: auto; }
+.nt-master .nt-pause label { white-space: nowrap; }
+.nt-master .nt-on-dot { width: 8px; height: 8px; background: var(--success); display: inline-block; margin-right: 6px; }
+.nt-master .nt-off-dot { width: 8px; height: 8px; background: var(--text-muted); display: inline-block; margin-right: 6px; }
+
+/* Groups (Money, Machines, App) */
+.nt-groups { border-top: 1px solid var(--border-light); }
+.nt-group { border-bottom: 1px solid var(--border-color); }
+.nt-gline { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 6px 18px; align-items: center; padding: 10px 0 6px; }
+.nt-gname { font-weight: 600; font-size: var(--fs-3); }
+.nt-gname .nt-mixed { font-weight: 400; font-size: var(--fs-1); font-family: var(--font-mono); color: var(--warning); margin-left: 6px; }
+.nt-gdesc { font-size: var(--fs-2); color: var(--text-secondary); }
+.nt-gmeta { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; padding: 0 0 10px; font-size: var(--fs-2); color: var(--text-muted); }
+.nt-gmeta .nt-qh { font-family: var(--font-mono); color: var(--text-secondary); }
+.nt-gmeta details > summary { cursor: pointer; color: var(--text-secondary); }
+.nt-gmeta .btn-link { color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; font-size: var(--fs-2); cursor: pointer; }
+.nt-kinds { margin: 0 0 12px; padding: 4px 0 4px 14px; border-left: 1px solid var(--border-light); }
+.nt-kind { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 2px 16px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--border-color); }
+.nt-kind:last-child { border-bottom: 0; }
+.nt-kname { font-size: var(--fs-2); color: var(--text-primary); font-weight: 500; }
+.nt-kname .nt-owner { font-weight: 400; font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); margin-left: 6px; }
+.nt-kdesc { font-size: var(--fs-2); color: var(--text-muted); }
+.nt-kind.off .nt-kname { color: var(--text-secondary); }
+.nt-summary-note { font-size: var(--fs-2); color: var(--text-muted); padding: 6px 0 0; }
+
+/* Quiet hours editor */
+.nt-quiet { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border-light); background: var(--bg-secondary); }
+.nt-quiet-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.nt-quiet-row + .nt-quiet-row { margin-top: 8px; }
+.nt-quiet input[type="time"] { width: 7.2rem; height: 26px; font-family: var(--font-mono); font-size: var(--fs-2); color-scheme: dark; }
+.nt-days { display: inline-flex; border: 1px solid var(--border-light); }
+.nt-days label { position: relative; width: 38px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-1); color: var(--text-secondary); cursor: pointer; }
+.nt-days label + label { border-left: 1px solid var(--border-light); }
+.nt-days input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.nt-days label:has(input:checked) { background: var(--accent-soft); color: var(--text-primary); font-weight: 600; }
+.nt-days label:has(input:focus-visible) { outline: 2px solid var(--accent-secondary); outline-offset: 1px; z-index: 1; }
+.nt-check { display: inline-flex; gap: 6px; align-items: center; font-size: var(--fs-2); color: var(--text-secondary); }
+.nt-quiet .nt-tz { font-size: var(--fs-2); color: var(--text-muted); }
+.nt-quiet .nt-tz select { height: 24px; font-size: var(--fs-2); width: auto; display: inline-block; }
+
+/* Simple rows (level, pause) */
+.nt-row { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 6px 18px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+.nt-row:first-of-type { border-top: 1px solid var(--border-light); }
+.nt-rname { font-weight: 500; }
+.nt-rdesc { font-size: var(--fs-2); color: var(--text-muted); }
+.nt-more { font-size: var(--fs-2); color: var(--text-secondary); }
+.nt-more summary { cursor: pointer; color: var(--text-secondary); width: max-content; }
+.nt-more > div { padding: 6px 0 2px 12px; border-left: 1px solid var(--border-light); margin-top: 4px; color: var(--text-muted); max-width: 82ch; }
+.nt-more > div p + p { margin-top: 4px; }
+.nt-more code { font-size: var(--fs-1); color: var(--text-secondary); }
+
+/* Channels */
+.nt-chan { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
+.nt-chan th { text-align: left; font-weight: 500; color: var(--text-muted); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border-light); white-space: nowrap; }
+.nt-chan td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+.nt-chan td:last-child, .nt-chan th:last-child { text-align: right; padding-right: 0; }
+.nt-chan .nt-cname { font-weight: 600; font-size: var(--fs-3); width: 16%; }
+.nt-chan td:nth-child(2) { width: 40%; }
+.nt-chan .nt-src { overflow-wrap: anywhere; }
+.nt-chan .nt-set { color: var(--success); }
+.nt-chan .nt-unset { color: var(--text-muted); }
+.nt-chan .nt-src { display: block; font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); }
+.nt-chan .nt-gets { display: flex; gap: 12px; flex-wrap: wrap; }
+.nt-warnbox { margin: 8px 0 0; padding: 8px 12px; border-left: 2px solid var(--warning); background: var(--warning-soft); font-size: var(--fs-2); color: var(--text-primary); }
+.nt-infobox { margin: 0 0 12px; padding: 8px 12px; border-left: 2px solid var(--text-secondary); background: var(--bg-secondary); font-size: var(--fs-2); color: var(--text-primary); }
+
+/* Muted list */
+.nt-mutes { width: 100%; border-collapse: collapse; font-size: var(--fs-2); }
+.nt-mutes th { text-align: left; font-weight: 500; color: var(--text-muted); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border-light); }
+.nt-mutes td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--border-color); vertical-align: baseline; }
+.nt-mutes td:last-child { text-align: right; padding-right: 0; }
+.nt-mutes .nt-msvc { font-weight: 600; font-size: var(--fs-3); }
+.nt-mutes .nt-mscope { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); display: block; }
+.nt-mutes .nt-mwhen { font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); white-space: nowrap; }
+.nt-addmute { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; font-size: var(--fs-2); color: var(--text-secondary); }
+.nt-addmute select { height: 26px; font-size: var(--fs-2); width: auto; max-width: 100%; }
+.nt-filter { display: inline-flex; gap: 0; margin: 0 0 8px; }
+.nt-empty { font-size: var(--fs-2); color: var(--text-muted); padding: 8px 0; border-top: 1px solid var(--border-light); }
+
+.nt-disabled { opacity: 0.45; pointer-events: none; }
+.settings-index a.nt-active { color: var(--text-primary); border-left-color: var(--accent); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .nt-gline, .nt-kind, .nt-row { grid-template-columns: minmax(0, 1fr); }
+  .nt-gline > .nt-seg, .nt-kind > .nt-seg, .nt-row > .nt-seg { justify-self: start; }
+  .nt-master .nt-pause { margin-left: 0; }
+  .nt-seg { max-width: 100%; }
+  .nt-chan thead { display: none; }
+  .nt-chan tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name act" "status status" "gets gets"; gap: 4px 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+  .nt-chan td { border: 0; padding: 0; width: auto !important; text-align: left !important; }
+  .nt-chan td:nth-child(1) { grid-area: name; }
+  .nt-chan td:nth-child(2) { grid-area: status; }
+  .nt-chan td:nth-child(3) { grid-area: gets; }
+  .nt-chan td:nth-child(4) { grid-area: act; }
+  .nt-mutes thead { display: none; }
+  .nt-mutes tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+  .nt-mutes td { border: 0; padding: 0; }
+  .nt-mutes td.nt-mwhat { grid-column: 1 / -1; }
+}
+
+/* Bell mock: the real dropdown classes, drawn open and in place. */
+.nt-bells { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.nt-bellbar { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; background: var(--gradient-sidebar); border: 1px solid var(--border-color); width: max-content; }
+.nt-bellbar .topbar-earnings { margin: 0; }
+.nt-bellwrap { position: relative; }
+.nt-bellwrap .notify-dropdown { position: static; display: block; width: 360px; max-width: 100%; margin-top: 6px; }
+.notify-footer { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 7px 12px; border-top: 1px solid var(--border-color); font-size: var(--fs-2); }
+.notify-footer a { color: var(--text-secondary); }
+.notify-off { padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: var(--fs-2); color: var(--text-secondary); background: var(--bg-tertiary); }
+.notify-off a { color: var(--accent-secondary); }
+.nt-badges { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: var(--fs-2); color: var(--text-muted); }
+.nt-badges .topbar-notify-btn { display: inline-flex; }
+.notify-badge.grey { background: var(--border-strong); }
+.nt-badge-item { display: inline-flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="main-content">
+  <header class="topbar">
+    <a href="#" class="topbar-brand" aria-label="CashPilot home">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD54F"/><stop offset=".4" stop-color="#FF9800"/><stop offset=".72" stop-color="#E91E63"/><stop offset="1" stop-color="#AB47BC"/></linearGradient></defs><circle cx="12" cy="12" r="9" fill="url(#sun)"/></svg>
+      <span>CashPilot</span>
+    </a>
+    <nav class="topnav" aria-label="Main">
+      <a href="#" class="sidebar-link active">Dashboard</a>
+      <a href="#" class="sidebar-link">Fleet</a>
+      <a href="#" class="sidebar-link">Catalog</a>
+      <a href="#" class="sidebar-link">Payouts</a>
+      <a href="#" class="sidebar-link">Activity</a>
+      <a href="#" class="sidebar-link">Settings</a>
+    </nav>
+    <div class="topbar-right">
+      <a href="#" class="btn btn-primary btn-sm topbar-add" aria-label="Add service"><span aria-hidden="true">+</span><span class="topbar-add-label" aria-hidden="true"> Add service</span></a>
+      <div class="topbar-earnings"><span>$52.07</span></div>
+      <div class="topbar-notifications">
+        <button class="topbar-icon-btn topbar-notify-btn" aria-label="Alerts, 4" aria-expanded="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <span class="notify-badge">4</span>
+        </button>
+      </div>
+      <div class="topbar-avatar-wrap"><button class="topbar-avatar" aria-label="User menu">S</button></div>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <div class="page-head">
+      <h1 class="page-title">Dashboard</h1>
+      <div class="page-actions"><button class="btn btn-ghost btn-sm">Refresh</button></div>
+    </div>
+
+    <section class="stats-grid money-strip" aria-label="Money">
+      <div class="stat-card stat-card-balance"><div class="stat-label">Balance</div><div class="stat-value">$52.07</div></div>
+      <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value">$0.41</div><div class="stat-change">+$0.03 vs yesterday</div></div>
+      <div class="stat-card"><div class="stat-label">This month</div><div class="stat-value">$11.86</div><div class="stat-change">+8% vs last month</div></div>
+      <div class="stat-card stat-card-ops"><div class="stat-label">Containers up</div><div class="stat-value">31 / 33</div></div>
+    </section>
+
+    <!-- ===== MAIN VIEW: Money waiting, one row open ===== -->
+    <section class="attention money-waiting rd-scope" aria-labelledby="mw-title-main">
+      <div class="block-head">
+        <h2 class="block-title" id="mw-title-main">Money waiting <span class="count">5</span></h2>
+        <span class="rd-headnote">Select a row to see what to do and the provider's rule.</span>
+      </div>
+      <div class="rd-list">
+
+        <div class="rd-row attn-warn open" data-obligation="mysterium:claim-monthly-rewards-pool">
+          <div class="rd-line">
+            <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span></div>
+            <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="true" aria-controls="d-myst">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+            <div class="rd-sum"><span class="mw-title">Claim last month's MystNodes rewards</span><span class="mw-when">by 1 Dec 2026, 3 days left</span></div>
+            <div class="rd-acts">
+              <a class="btn btn-primary btn-sm" href="#" target="_blank" rel="noopener noreferrer">Open MystNodes</a>
+              <button class="btn btn-ghost btn-sm">Done</button>
+              <button class="btn btn-ghost btn-sm rd-tog" aria-expanded="true" aria-controls="d-myst">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+          </div>
+          <div class="rd-detail" id="d-myst">
+            <div class="rd-facts">
+              <div class="rd-fact"><h4>What to do</h4><p>Open the Rewards page and swap your points for MYST.</p></div>
+              <div class="rd-fact"><h4>What you can lose</h4><p>Rewards not claimed within 30 days of the monthly distribution are forfeited. They go back into the next month's pool.</p></div>
+              <div class="rd-fact"><h4>The rule</h4><p>MystNodes states this rule on its own help site.</p><p><a href="#" target="_blank" rel="noopener noreferrer">Read the rule on help.mystnodes.com<span aria-hidden="true"> ↗</span></a></p><p class="rd-checked">We last checked it on 24 Nov 2026</p></div>
+            </div>
+            <div class="rd-bar">
+              <button class="btn btn-ghost btn-sm">Remind me tomorrow</button>
+              <button class="btn btn-ghost btn-sm">Remind me in a week</button>
+              <span class="rd-sep" aria-hidden="true"></span>
+              <button class="btn btn-ghost btn-sm">Mute this reminder</button>
+              <button class="btn btn-ghost btn-sm">Mute all MystNodes reminders</button>
+            </div>
+            <p class="rd-hint">Mute stops a reminder and its pushes, for everyone here. You can unmute it at the foot of this list.</p>
+          </div>
+        </div>
+
+        <div class="rd-row attn-warn" data-obligation="storj:cash-out">
+          <div class="rd-line">
+            <div class="rd-head"><span class="attn-tag">Arrived?</span><span class="attn-what">Storj</span></div>
+            <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+            <div class="rd-sum"><span class="mw-title">Cash out your Storj balance: 41.20 STORJ (≈ $9.15)</span><span class="rd-q">You marked this requested two weeks ago. Did the payout arrive?</span></div>
+            <div class="rd-acts">
+              <a class="btn btn-primary btn-sm" href="#">Open Storj</a>
+              <button class="btn btn-ghost btn-sm">It arrived</button>
+              <button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="rd-row attn-ask" data-obligation="honeygain:cash-out">
+          <div class="rd-line">
+            <div class="rd-head"><span class="attn-tag">Cash out</span><span class="attn-what">Honeygain</span></div>
+            <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+            <div class="rd-sum"><span class="mw-title">Cash out your Honeygain balance: 20.62 USD</span><span class="mw-when">Over the $20 minimum</span></div>
+            <div class="rd-acts">
+              <a class="btn btn-primary btn-sm" href="#">Open Honeygain</a>
+              <button class="btn btn-ghost btn-sm">Requested</button>
+              <button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="rd-row attn-ask" data-obligation="packetstream:keep-active">
+          <div class="rd-line">
+            <div class="rd-head"><span class="attn-tag">Keep active</span><span class="attn-what">PacketStream</span></div>
+            <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+            <div class="rd-sum"><span class="mw-title">Log in to PacketStream to keep the balance</span><span class="mw-when">by 10 Dec 2026, 12 days left</span></div>
+            <div class="rd-acts">
+              <a class="btn btn-primary btn-sm" href="#">Open PacketStream</a>
+              <button class="btn btn-ghost btn-sm">Done</button>
+              <button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="rd-row attn-ask" data-obligation="earnfm:claim">
+          <div class="rd-line">
+            <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">EarnFM</span></div>
+            <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+            <div class="rd-sum"><span class="mw-title">Claim your EarnFM balance</span><span class="mw-when">by 22 Dec 2026 or earlier, 24 days left</span></div>
+            <div class="rd-acts">
+              <a class="btn btn-primary btn-sm" href="#">Open EarnFM</a>
+              <button class="btn btn-ghost btn-sm">Done</button>
+              <button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <details class="rd-foot">
+        <summary>2 muted reminders</summary>
+        <ul>
+          <li><span>Honeygain</span><span class="rd-m-what">Keep a Honeygain device sharing, or make a payout</span><span class="rd-m-when">muted 12 Nov 2026 by sergio</span><button class="btn btn-link">Unmute</button></li>
+          <li><span>Repocket</span><span class="rd-m-what">Every reminder</span><span class="rd-m-when">muted 3 Nov 2026 by sergio</span><button class="btn btn-link">Unmute</button></li>
+        </ul>
+      </details>
+    </section>
+
+    <!-- ================= STATE PANELS ================= -->
+    <div class="mk-states">
+      <h2>State panels</h2>
+      <p>Design 3, "Row opens detail". Each panel below is one state of the same design. The phone frames are drawn at 390 px on every screen width. Panel (a) is drawn at 1392 px, the content width of a 1440 px window, and scrolls sideways on narrow screens.</p>
+
+      <!-- (a) -->
+      <div class="mk-state">
+        <div class="mk-label"><b>(a)</b><span>Money waiting at 1440 px, 5 rows, all closed. Each row has three controls on one line: Open {name}, the Done button for that row, and Details.</span></div>
+        <div class="mk-scroll"><div class="mk-frame">
+          <section class="attention money-waiting rd-scope" aria-label="Money waiting, sample a">
+            <div class="block-head">
+              <h2 class="block-title">Money waiting <span class="count">5</span></h2>
+              <span class="rd-headnote">Select a row to see what to do and the provider's rule.</span>
+            </div>
+            <div class="rd-list">
+              <div class="rd-row attn-warn"><div class="rd-line">
+                <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span></div>
+                <div class="rd-sum"><span class="mw-title">Claim last month's MystNodes rewards</span><span class="mw-when">by 1 Dec 2026, 3 days left</span></div>
+                <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open MystNodes</a><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+              </div></div>
+              <div class="rd-row attn-warn"><div class="rd-line">
+                <div class="rd-head"><span class="attn-tag">Arrived?</span><span class="attn-what">Storj</span></div>
+                <div class="rd-sum"><span class="mw-title">Cash out your Storj balance: 41.20 STORJ (≈ $9.15)</span><span class="rd-q">You marked this requested two weeks ago. Did the payout arrive?</span></div>
+                <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open Storj</a><button class="btn btn-ghost btn-sm">It arrived</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+              </div></div>
+              <div class="rd-row attn-ask"><div class="rd-line">
+                <div class="rd-head"><span class="attn-tag">Cash out</span><span class="attn-what">Honeygain</span></div>
+                <div class="rd-sum"><span class="mw-title">Cash out your Honeygain balance: 20.62 USD</span><span class="mw-when">Over the $20 minimum</span></div>
+                <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open Honeygain</a><button class="btn btn-ghost btn-sm">Requested</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+              </div></div>
+              <div class="rd-row attn-ask"><div class="rd-line">
+                <div class="rd-head"><span class="attn-tag">Keep active</span><span class="attn-what">PacketStream</span></div>
+                <div class="rd-sum"><span class="mw-title">Log in to PacketStream to keep the balance</span><span class="mw-when">by 10 Dec 2026, 12 days left</span></div>
+                <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open PacketStream</a><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+              </div></div>
+              <div class="rd-row attn-ask"><div class="rd-line">
+                <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">EarnFM</span></div>
+                <div class="rd-sum"><span class="mw-title">Claim your EarnFM balance</span><span class="mw-when">by 22 Dec 2026 or earlier, 24 days left</span></div>
+                <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open EarnFM</a><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+              </div></div>
+            </div>
+            <details class="rd-foot"><summary>2 muted reminders</summary></details>
+          </section>
+        </div></div>
+      </div>
+
+      <!-- (b) -->
+      <div class="mk-state">
+        <div class="mk-label"><b>(b)</b><span>The same rows at 390 px. Details moves to the top right. The open row is the menu: every other action is a full-width line, stacked.</span></div>
+        <div class="mk-phones">
+          <div class="mk-phone rd-scope">
+            <div class="mk-phone-cap">390 px, owner or writer, one row open</div>
+            <section class="attention money-waiting" aria-label="Money waiting, sample b1">
+              <div class="block-head"><h2 class="block-title">Money waiting <span class="count">5</span></h2></div>
+              <div class="rd-list">
+                <div class="rd-row attn-warn open"><div class="rd-line">
+                  <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span></div>
+                  <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="true">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  <div class="rd-sum"><span class="mw-title">Claim last month's MystNodes rewards</span><span class="mw-when">by 1 Dec 2026, 3 days left</span></div>
+                  <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open MystNodes</a><button class="btn btn-ghost btn-sm">Done</button></div>
+                </div>
+                <div class="rd-detail">
+                  <div class="rd-facts">
+                    <div class="rd-fact"><h4>What to do</h4><p>Open the Rewards page and swap your points for MYST.</p></div>
+                    <div class="rd-fact"><h4>What you can lose</h4><p>Rewards not claimed within 30 days of the monthly distribution are forfeited.</p></div>
+                    <div class="rd-fact"><h4>The rule</h4><p><a href="#">Read the rule on help.mystnodes.com<span aria-hidden="true"> ↗</span></a></p><p class="rd-checked">We last checked it on 24 Nov 2026</p></div>
+                  </div>
+                  <div class="rd-bar">
+                    <button class="btn btn-ghost btn-sm">Remind me tomorrow</button>
+                    <button class="btn btn-ghost btn-sm">Remind me in a week</button>
+                    <span class="rd-sep" aria-hidden="true"></span>
+                    <button class="btn btn-ghost btn-sm">Mute this reminder</button>
+                    <button class="btn btn-ghost btn-sm">Mute all MystNodes reminders</button>
+                  </div>
+                  <p class="rd-hint">Mute stops a reminder and its pushes, for everyone here.</p>
+                </div></div>
+                <div class="rd-row attn-warn"><div class="rd-line">
+                  <div class="rd-head"><span class="attn-tag">Arrived?</span><span class="attn-what">Storj</span></div>
+                  <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  <div class="rd-sum"><span class="mw-title">Cash out your Storj balance: 41.20 STORJ (≈ $9.15)</span><span class="rd-q">You marked this requested two weeks ago. Did the payout arrive?</span></div>
+                  <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open Storj</a><button class="btn btn-ghost btn-sm">It arrived</button></div>
+                </div></div>
+                <div class="rd-row attn-ask"><div class="rd-line">
+                  <div class="rd-head"><span class="attn-tag">Cash out</span><span class="attn-what">Honeygain</span></div>
+                  <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  <div class="rd-sum"><span class="mw-title">Cash out your Honeygain balance: 20.62 USD</span><span class="mw-when">Over the $20 minimum</span></div>
+                  <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open Honeygain</a><button class="btn btn-ghost btn-sm">Requested</button></div>
+                </div></div>
+                <div class="rd-row attn-ask"><div class="rd-line">
+                  <div class="rd-head"><span class="attn-tag">Keep active</span><span class="attn-what">PacketStream</span></div>
+                  <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  <div class="rd-sum"><span class="mw-title">Log in to PacketStream to keep the balance</span><span class="mw-when">by 10 Dec 2026, 12 days left</span></div>
+                  <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open PacketStream</a><button class="btn btn-ghost btn-sm">Done</button></div>
+                </div></div>
+                <div class="rd-row attn-ask"><div class="rd-line">
+                  <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">EarnFM</span></div>
+                  <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  <div class="rd-sum"><span class="mw-title">Claim your EarnFM balance</span><span class="mw-when">by 22 Dec 2026 or earlier, 24 days left</span></div>
+                  <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open EarnFM</a><button class="btn btn-ghost btn-sm">Done</button></div>
+                </div></div>
+              </div>
+              <details class="rd-foot"><summary>2 muted reminders</summary></details>
+            </section>
+          </div>
+
+          <div class="mk-phone rd-scope">
+            <div class="mk-phone-cap">390 px, viewer (read only), one row open</div>
+            <section class="attention money-waiting" aria-label="Money waiting, viewer">
+              <div class="block-head"><h2 class="block-title">Money waiting <span class="count">5</span></h2></div>
+              <div class="rd-list">
+                <div class="rd-row attn-warn open"><div class="rd-line">
+                  <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span></div>
+                  <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="true">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  <div class="rd-sum"><span class="mw-title">Claim last month's MystNodes rewards</span><span class="mw-when">by 1 Dec 2026, 3 days left</span></div>
+                  <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open MystNodes</a></div>
+                </div>
+                <div class="rd-detail">
+                  <div class="rd-facts">
+                    <div class="rd-fact"><h4>What to do</h4><p>Open the Rewards page and swap your points for MYST.</p></div>
+                    <div class="rd-fact"><h4>What you can lose</h4><p>Rewards not claimed within 30 days of the monthly distribution are forfeited.</p></div>
+                    <div class="rd-fact"><h4>The rule</h4><p><a href="#">Read the rule on help.mystnodes.com<span aria-hidden="true"> ↗</span></a></p><p class="rd-checked">We last checked it on 24 Nov 2026</p></div>
+                  </div>
+                  <p class="rd-hint">You can read reminders. The owner or a writer marks them done, snoozes or mutes them.</p>
+                </div></div>
+                <div class="rd-row attn-warn"><div class="rd-line">
+                  <div class="rd-head"><span class="attn-tag">Arrived?</span><span class="attn-what">Storj</span></div>
+                  <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  <div class="rd-sum"><span class="mw-title">Cash out your Storj balance: 41.20 STORJ (≈ $9.15)</span><span class="rd-q">You marked this requested two weeks ago. Did the payout arrive?</span></div>
+                  <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open Storj</a></div>
+                </div></div>
+              </div>
+              <p class="rd-foot">2 muted reminders: Honeygain, Keep a device sharing · Repocket, Every reminder</p>
+            </section>
+          </div>
+
+          <div class="mk-phone rd-scope">
+            <div class="mk-phone-cap">390 px, too close to the deadline to snooze</div>
+            <section class="attention money-waiting" aria-label="Money waiting, no snooze">
+              <div class="block-head"><h2 class="block-title">Money waiting <span class="count">1</span></h2></div>
+              <div class="rd-list">
+                <div class="rd-row attn-fail open"><div class="rd-line">
+                  <div class="rd-head"><span class="attn-tag">Overdue</span><span class="attn-what">Bitping</span></div>
+                  <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="true">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  <div class="rd-sum"><span class="mw-title">Withdraw your Bitping balance</span><span class="mw-when">by 25 Nov 2026, 3 days ago</span><span class="rd-q" style="color:var(--error)">The provider may already have written this off, and the balance may be gone.</span></div>
+                  <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open Bitping</a><button class="btn btn-ghost btn-sm">Requested</button></div>
+                </div>
+                <div class="rd-detail">
+                  <div class="rd-facts">
+                    <div class="rd-fact"><h4>What you can lose</h4><p>Bitping may close an account that has not withdrawn for a long time.</p></div>
+                    <div class="rd-fact"><h4>The rule</h4><p><a href="#">Read the rule on bitping.com<span aria-hidden="true"> ↗</span></a></p><p class="rd-checked">We last checked it on 24 Nov 2026</p></div>
+                  </div>
+                  <div class="rd-bar">
+                    <span class="rd-nosnooze">Too close to its deadline to snooze.</span>
+                    <span class="rd-sep" aria-hidden="true"></span>
+                    <button class="btn btn-ghost btn-sm">Mute this reminder</button>
+                    <button class="btn btn-ghost btn-sm">Mute all Bitping reminders</button>
+                  </div>
+                </div></div>
+              </div>
+            </section>
+            <div class="mk-phone-cap" style="margin-top:14px">390 px, the check failed (never an all-clear)</div>
+            <section class="attention money-waiting" aria-label="Money waiting, failed">
+              <div class="block-head"><h2 class="block-title">Money waiting</h2></div>
+              <div class="rd-list"><div class="rd-row attn-unknown"><div class="rd-line"><div class="rd-head"><span class="attn-tag">Unknown</span><span class="attn-what">Money waiting</span></div><div class="rd-sum"><span class="mw-title">Could not check. Reload the page to try again.</span></div></div></div></div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- (c) -->
+      <div class="mk-state">
+        <div class="mk-label"><b>(c)</b><span>A row just muted. It folds to one line, with Undo, in the same place. The toast says the same. The line stays until the page reloads.</span></div>
+        <div class="mk-frame rd-scope">
+          <div class="toast success show mk-toast" role="status">Reminder muted. Undo it here, or unmute it at the foot of this list.</div>
+          <section class="attention money-waiting" aria-label="Money waiting, sample c">
+            <div class="block-head"><h2 class="block-title">Money waiting <span class="count">4</span></h2></div>
+            <div class="rd-list">
+              <div class="rd-row attn-warn"><div class="rd-line">
+                <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span></div>
+                <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                <div class="rd-sum"><span class="mw-title">Claim last month's MystNodes rewards</span><span class="mw-when">by 1 Dec 2026, 3 days left</span></div>
+                <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open MystNodes</a><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+              </div></div>
+              <div class="rd-gone" role="status">
+                <span><b>PacketStream</b>: "Log in to PacketStream to keep the balance" is muted. No more reminders or pushes about it.</span>
+                <button class="btn btn-ghost btn-sm">Undo</button>
+              </div>
+              <div class="rd-row attn-ask"><div class="rd-line">
+                <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">EarnFM</span></div>
+                <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                <div class="rd-sum"><span class="mw-title">Claim your EarnFM balance</span><span class="mw-when">by 22 Dec 2026 or earlier, 24 days left</span></div>
+                <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open EarnFM</a><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+              </div></div>
+            </div>
+            <details class="rd-foot"><summary>3 muted reminders</summary></details>
+          </section>
+        </div>
+      </div>
+
+      <!-- (d) -->
+      <div class="mk-state">
+        <div class="mk-label"><b>(d)</b><span>Managing mutes. Left: the foot of Money waiting, open (owner and writers). Right: the one list of every mute, in Settings, Notifications (owner). Both call the same unmute.</span></div>
+        <div class="mk-split">
+          <div class="mk-frame rd-scope">
+            <section class="attention money-waiting" aria-label="Money waiting, sample d">
+              <div class="block-head"><h2 class="block-title">Money waiting <span class="count">4</span></h2></div>
+              <div class="rd-list">
+                <div class="rd-row attn-ask"><div class="rd-line">
+                  <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">EarnFM</span></div>
+                  <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  <div class="rd-sum"><span class="mw-title">Claim your EarnFM balance</span><span class="mw-when">by 22 Dec 2026 or earlier, 24 days left</span></div>
+                  <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open EarnFM</a><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                </div></div>
+              </div>
+              <details class="rd-foot" open>
+                <summary>3 muted reminders</summary>
+                <ul>
+                  <li><span>PacketStream</span><span class="rd-m-what">Log in to PacketStream to keep the balance</span><span class="rd-m-when">muted today by sergio</span><button class="btn btn-link">Unmute</button></li>
+                  <li><span>Honeygain</span><span class="rd-m-what">Keep a Honeygain device sharing, or make a payout</span><span class="rd-m-when">muted 12 Nov 2026 by sergio</span><button class="btn btn-link">Unmute</button></li>
+                  <li><span>Repocket</span><span class="rd-m-what">Every reminder</span><span class="rd-m-when">muted 3 Nov 2026 by sergio</span><button class="btn btn-link">Unmute</button></li>
+                </ul>
+                <a class="rd-foot-link" href="#">See every mute in Settings, Notifications</a>
+              </details>
+            </section>
+          </div>
+          <div class="mk-frame">
+            <div class="nt-block" style="margin-top:0">
+              <h4>Muted</h4>
+              <p class="nt-desc">A muted item shows no badge and sends no push. The Dashboard still lists it. This applies to everyone here.</p>
+              <div class="nt-filter tab-strip" role="group" aria-label="Show">
+                <button class="tab-btn active" aria-pressed="true">All 5</button>
+                <button class="tab-btn" aria-pressed="false">Reminders 3</button>
+                <button class="tab-btn" aria-pressed="false">Services 2</button>
+              </div>
+              <table class="nt-mutes">
+                <thead><tr><th>Service</th><th>What</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td class="nt-msvc">PacketStream</td><td class="nt-mwhat">Log in to keep the balance<span class="nt-mscope">Money reminder · today, sergio</span></td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                  <tr><td class="nt-msvc">proxylite</td><td class="nt-mwhat">All Machines alerts<span class="nt-mscope">Service · 26 Nov, sergio</span></td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                  <tr><td class="nt-msvc">bytelixir</td><td class="nt-mwhat">Everything<span class="nt-mscope">Service · 20 Nov, sergio</span></td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                  <tr><td class="nt-msvc">Honeygain</td><td class="nt-mwhat">Keep a device sharing, or make a payout<span class="nt-mscope">Money reminder · 12 Nov, sergio</span></td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                  <tr><td class="nt-msvc">Repocket</td><td class="nt-mwhat">Every reminder<span class="nt-mscope">Money reminders · 3 Nov, sergio</span></td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                </tbody>
+              </table>
+              <div class="nt-addmute">
+                <label for="d-svc">Mute a service:</label>
+                <select id="d-svc" class="form-input"><option>iproyal</option></select>
+                <select class="form-input" aria-label="What to mute"><option>Machines alerts</option><option>Money reminders</option><option>Everything</option></select>
+                <button class="btn btn-ghost btn-sm">Mute</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- (e) -->
+      <div class="mk-state">
+        <div class="mk-label"><b>(e)</b><span>Settings, Notifications: the defaults on a new install. They keep today's behaviour. No push channel is set yet.</span></div>
+        <div class="mk-frame">
+          <div class="settings-layout">
+            <nav class="settings-index" aria-label="Settings sections">
+              <a href="#">Earnings collection</a><a href="#">Device ids</a><a href="#" class="nt-active" aria-current="true">Notifications</a><a href="#">Restore</a><a href="#">Encryption key</a><a href="#">Earner credentials</a><a href="#">Environment</a><a href="#">About and updates</a><a href="#">Import</a>
+            </nav>
+            <div class="settings-body">
+              <section class="card settings-section" id="set-notifications-e" aria-labelledby="nt-title-e">
+                <h3 class="settings-section-title" id="nt-title-e">Notifications</h3>
+                <p class="settings-section-desc">Choose what CashPilot tells you about, and when. A push is a message to your phone or chat, through a channel such as Telegram. These choices apply to the whole household.</p>
+
+                <div class="nt-master">
+                  <span class="nt-master-label"><span class="nt-on-dot" aria-hidden="true"></span>Notifications are on</span>
+                  <div class="nt-seg" role="radiogroup" aria-label="Notifications">
+                    <label><input type="radio" name="m-e" checked> On</label>
+                    <label><input type="radio" name="m-e"> Off</label>
+                  </div>
+                  <div class="nt-pause">
+                    <label for="p-e" class="nt-master-state">Pause pushes for</label>
+                    <select id="p-e" class="form-input"><option>1 day</option><option>3 days</option><option>1 week</option><option>2 weeks</option></select>
+                    <button class="btn btn-ghost btn-sm">Pause</button>
+                  </div>
+                </div>
+
+                <div class="nt-block">
+                  <h4>What to tell you</h4>
+                  <p class="nt-desc"><b>Bell only</b> counts it on the bell in the top bar. <b>Bell and push</b> also sends a push. <b>Off</b> does neither. The Dashboard always lists what needs you.</p>
+                  <div class="nt-groups">
+                    <div class="nt-group">
+                      <div class="nt-gline">
+                        <div><div class="nt-gname">Money</div><div class="nt-gdesc">Payouts to request, rewards to claim, balances that can expire.</div></div>
+                        <div class="nt-seg" role="radiogroup" aria-label="Money">
+                          <label><input type="radio" name="g1e"> Off</label><label><input type="radio" name="g1e"> Bell only</label><label><input type="radio" name="g1e" checked> Bell and push</label>
+                        </div>
+                      </div>
+                      <div class="nt-gmeta"><span>Quiet hours <span class="nt-qh">21:00–09:00, every day</span></span><button class="btn-link">Change</button><details open><summary>Choose kinds (4)</summary></details></div>
+                      <div class="nt-kinds">
+                        <div class="nt-kind"><div><div class="nt-kname">Cash out ready</div><div class="nt-kdesc">A balance reached the provider's minimum payout.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Cash out ready"><label><input type="radio" name="mk1"> Off</label><label><input type="radio" name="mk1"> Bell only</label><label><input type="radio" name="mk1" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Deadlines</div><div class="nt-kdesc">A reward to claim, a payout to request, or a balance that expires unless you log in.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Deadlines"><label><input type="radio" name="mk2"> Off</label><label><input type="radio" name="mk2"> Bell only</label><label><input type="radio" name="mk2" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Did the payout arrive?</div><div class="nt-kdesc">Asks 14 days after you mark a payout requested.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Did the payout arrive?"><label><input type="radio" name="mk3"> Off</label><label><input type="radio" name="mk3"> Bell only</label><label><input type="radio" name="mk3" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Was this a payout?</div><div class="nt-kdesc">A balance dropped. Tell CashPilot if it was a payout.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Was this a payout?"><label><input type="radio" name="mk4"> Off</label><label><input type="radio" name="mk4"> Bell only</label><label><input type="radio" name="mk4" checked> Bell and push</label></div></div>
+                        <p class="nt-summary-note">When more than 3 reminders are due at once, you get one summary push.</p>
+                      </div>
+                    </div>
+                    <div class="nt-group">
+                      <div class="nt-gline">
+                        <div><div class="nt-gname">Machines</div><div class="nt-gdesc">Boxes, workers and earners that stopped, and balances CashPilot cannot read.</div></div>
+                        <div class="nt-seg" role="radiogroup" aria-label="Machines">
+                          <label><input type="radio" name="g2e"> Off</label><label><input type="radio" name="g2e"> Bell only</label><label><input type="radio" name="g2e" checked> Bell and push</label>
+                        </div>
+                      </div>
+                      <div class="nt-gmeta"><span>Quiet hours <span class="nt-qh">none</span></span><button class="btn-link">Set</button><details><summary>Choose kinds (12)</summary></details></div>
+                    </div>
+                    <div class="nt-group">
+                      <div class="nt-gline">
+                        <div><div class="nt-gname">App</div><div class="nt-gdesc">A new CashPilot version. "Bell" here means the update banner.</div></div>
+                        <div class="nt-seg" role="radiogroup" aria-label="App">
+                          <label><input type="radio" name="g3e"> Off</label><label><input type="radio" name="g3e" checked> Bell only</label><label><input type="radio" name="g3e"> Bell and push</label>
+                        </div>
+                      </div>
+                      <div class="nt-gmeta"><span>Quiet hours <span class="nt-qh">none</span></span><button class="btn-link">Set</button><details><summary>Choose kinds (1)</summary></details></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="nt-block">
+                  <h4>How urgent before a push</h4>
+                  <p class="nt-desc">The bell still counts everything you keep on.</p>
+                  <div class="nt-row">
+                    <div><div class="nt-rname">Push only when it is at least</div>
+                      <details class="nt-more"><summary>What each level means</summary><div>
+                        <p><b>Urgent</b>: money is lost or work stopped. Overdue reminders, a disabled account, a worker offline, a rejected credential.</p>
+                        <p><b>Warning</b>: act within 7 days, or something stopped. A deadline in 7 days or fewer, "Did the payout arrive?", a stopped earner, a proxy down.</p>
+                        <p><b>Info</b>: everything else. A balance ready to cash out, a collection note, a new version.</p>
+                      </div></details>
+                    </div>
+                    <div class="nt-seg" role="radiogroup" aria-label="Minimum level for a push">
+                      <label><input type="radio" name="sev-e" checked> Info</label><label><input type="radio" name="sev-e"> Warning</label><label><input type="radio" name="sev-e"> Urgent</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="nt-block">
+                  <h4>Where pushes go</h4>
+                  <p class="nt-desc">CashPilot can push to three channels. You set them with environment variables on the CashPilot container. <a href="#">How to set a channel</a></p>
+                  <table class="nt-chan">
+                    <thead><tr><th>Channel</th><th>Status</th><th>Gets</th><th></th></tr></thead>
+                    <tbody>
+                      <tr><td class="nt-cname">Telegram</td><td><span class="nt-unset">Not set</span><span class="nt-src">CASHPILOT_TELEGRAM_BOT_TOKEN, _CHAT_ID</span></td><td class="nt-gets-cell muted">—</td><td></td></tr>
+                      <tr><td class="nt-cname">ntfy</td><td><span class="nt-unset">Not set</span><span class="nt-src">CASHPILOT_NTFY_URL</span></td><td class="nt-gets-cell muted">—</td><td></td></tr>
+                      <tr><td class="nt-cname">Webhook</td><td><span class="nt-unset">Not set</span><span class="nt-src">CASHPILOT_WEBHOOK_URL</span></td><td class="nt-gets-cell muted">—</td><td></td></tr>
+                    </tbody>
+                  </table>
+                  <div class="nt-warnbox">No push channel is set. Alerts show only in the bell and on the Dashboard.</div>
+                </div>
+
+                <div class="nt-block">
+                  <h4>Muted</h4>
+                  <p class="nt-desc">A muted item shows no badge and sends no push. The Dashboard still lists it.</p>
+                  <p class="nt-empty">Nothing is muted. Mute a reminder from its row in Money waiting, or a service here.</p>
+                  <div class="nt-addmute">
+                    <label for="e-svc">Mute a service:</label>
+                    <select id="e-svc" class="form-input"><option>Choose a service</option></select>
+                    <select class="form-input" aria-label="What to mute"><option>Machines alerts</option></select>
+                    <button class="btn btn-ghost btn-sm" disabled>Mute</button>
+                  </div>
+                </div>
+
+                <div class="settings-actions">
+                  <button class="btn btn-primary">Save notifications</button>
+                  <span class="muted">No changes.</span>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- (f) -->
+      <div class="mk-state">
+        <div class="mk-label"><b>(f)</b><span>The owner's setup: Telegram and ntfy set, quiet hours on Money and Machines, collector alerts off, and two muted services (proxylite and bytelixir).</span></div>
+        <div class="mk-frame">
+          <div class="settings-layout">
+            <nav class="settings-index" aria-label="Settings sections">
+              <a href="#">Earnings collection</a><a href="#">Device ids</a><a href="#" class="nt-active" aria-current="true">Notifications</a><a href="#">Restore</a><a href="#">Encryption key</a><a href="#">Earner credentials</a><a href="#">Environment</a><a href="#">About and updates</a><a href="#">Import</a>
+            </nav>
+            <div class="settings-body">
+              <section class="card settings-section" aria-labelledby="nt-title-f">
+                <h3 class="settings-section-title" id="nt-title-f">Notifications</h3>
+                <p class="settings-section-desc">Choose what CashPilot tells you about, and when. A push is a message to your phone or chat, through a channel such as Telegram. These choices apply to the whole household.</p>
+
+                <div class="nt-master">
+                  <span class="nt-master-label"><span class="nt-on-dot" aria-hidden="true"></span>Notifications are on</span>
+                  <div class="nt-seg" role="radiogroup" aria-label="Notifications">
+                    <label><input type="radio" name="m-f" checked> On</label>
+                    <label><input type="radio" name="m-f"> Off</label>
+                  </div>
+                  <div class="nt-pause">
+                    <label for="p-f" class="nt-master-state">Pause pushes for</label>
+                    <select id="p-f" class="form-input"><option>1 day</option></select>
+                    <button class="btn btn-ghost btn-sm">Pause</button>
+                  </div>
+                </div>
+
+                <div class="nt-block">
+                  <h4>What to tell you</h4>
+                  <p class="nt-desc"><b>Bell only</b> counts it on the bell in the top bar. <b>Bell and push</b> also sends a push. <b>Off</b> does neither. The Dashboard always lists what needs you.</p>
+                  <div class="nt-groups">
+                    <div class="nt-group">
+                      <div class="nt-gline">
+                        <div><div class="nt-gname">Money</div><div class="nt-gdesc">Payouts to request, rewards to claim, balances that can expire.</div></div>
+                        <div class="nt-seg" role="radiogroup" aria-label="Money">
+                          <label><input type="radio" name="g1f"> Off</label><label><input type="radio" name="g1f"> Bell only</label><label><input type="radio" name="g1f" checked> Bell and push</label>
+                        </div>
+                      </div>
+                      <div class="nt-gmeta"><span>Quiet hours <span class="nt-qh">22:00–08:00, every day</span></span><button class="btn-link" aria-expanded="true">Change</button><details><summary>Choose kinds (4)</summary></details></div>
+                      <div class="nt-quiet" role="group" aria-label="Money quiet hours">
+                        <div class="nt-quiet-row">
+                          <label class="nt-check"><input type="checkbox" checked> No pushes from</label>
+                          <input type="time" class="form-input" value="22:00" aria-label="From">
+                          <span class="nt-check">to</span>
+                          <input type="time" class="form-input" value="08:00" aria-label="To">
+                          <span class="nt-check">on</span>
+                          <span class="nt-days" role="group" aria-label="Days">
+                            <label><input type="checkbox" checked>Mon</label><label><input type="checkbox" checked>Tue</label><label><input type="checkbox" checked>Wed</label><label><input type="checkbox" checked>Thu</label><label><input type="checkbox" checked>Fri</label><label><input type="checkbox" checked>Sat</label><label><input type="checkbox" checked>Sun</label>
+                          </span>
+                        </div>
+                        <div class="nt-quiet-row">
+                          <span class="nt-tz">Pushes held in quiet hours arrive together when they end. Times are in <select class="form-input" aria-label="Time zone"><option>Europe/Madrid</option></select>.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="nt-group">
+                      <div class="nt-gline">
+                        <div><div class="nt-gname">Machines <span class="nt-mixed">mixed</span></div><div class="nt-gdesc">Boxes, workers and earners that stopped, and balances CashPilot cannot read.</div></div>
+                        <div class="nt-seg" role="radiogroup" aria-label="Machines">
+                          <label><input type="radio" name="g2f"> Off</label><label><input type="radio" name="g2f"> Bell only</label><label><input type="radio" name="g2f" checked> Bell and push</label>
+                        </div>
+                      </div>
+                      <div class="nt-gmeta"><span>Quiet hours <span class="nt-qh">23:00–07:00, Mon–Fri · urgent ones still come</span></span><button class="btn-link">Change</button>
+                        <details open><summary>Choose kinds (12)</summary></details>
+                      </div>
+                      <div class="nt-kinds">
+                        <div class="nt-kind"><div><div class="nt-kname">Worker offline</div><div class="nt-kdesc">A box or phone stopped reporting. At most one push every 6 hours.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Worker offline"><label><input type="radio" name="k1"> Off</label><label><input type="radio" name="k1"> Bell only</label><label><input type="radio" name="k1" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Docker unreachable</div><div class="nt-kdesc">A worker cannot reach Docker.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Docker unreachable"><label><input type="radio" name="k2"> Off</label><label><input type="radio" name="k2"> Bell only</label><label><input type="radio" name="k2" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Earner stopped or missing</div><div class="nt-kdesc">A container stopped, or it is gone from its box.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Earner stopped"><label><input type="radio" name="k3"> Off</label><label><input type="radio" name="k3"> Bell only</label><label><input type="radio" name="k3" checked> Bell and push</label></div></div>
+                        <div class="nt-kind off"><div><div class="nt-kname">Collector alerts</div><div class="nt-kdesc">CashPilot could not read a balance: login rejected, provider unreachable, or its page changed.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Collector alerts"><label><input type="radio" name="k4" checked> Off</label><label><input type="radio" name="k4"> Bell only</label><label><input type="radio" name="k4"> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Proxy problem</div><div class="nt-kdesc">A proxied copy or its tunnel is down, or a proxy reached its traffic cap.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Proxy problem"><label><input type="radio" name="k5"> Off</label><label><input type="radio" name="k5"> Bell only</label><label><input type="radio" name="k5" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Low traffic</div><div class="nt-kdesc">A running copy carries almost no traffic.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Low traffic"><label><input type="radio" name="k6"> Off</label><label><input type="radio" name="k6" checked> Bell only</label><label><input type="radio" name="k6"> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Account disabled</div><div class="nt-kdesc">The provider disabled the account.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Account disabled"><label><input type="radio" name="k7"> Off</label><label><input type="radio" name="k7"> Bell only</label><label><input type="radio" name="k7" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Balance gone quiet</div><div class="nt-kdesc">A balance has not moved for longer than usual.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Balance gone quiet"><label><input type="radio" name="k8"> Off</label><label><input type="radio" name="k8"> Bell only</label><label><input type="radio" name="k8" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Collection notes</div><div class="nt-kdesc">A reading worked, with a caveat, or a device is not on the account.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Collection notes"><label><input type="radio" name="k9"> Off</label><label><input type="radio" name="k9" checked> Bell only</label><label><input type="radio" name="k9"> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Login about to expire</div><div class="nt-kdesc">A saved credential expires soon, or is past its usual life.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Login about to expire"><label><input type="radio" name="k10"> Off</label><label><input type="radio" name="k10"> Bell only</label><label><input type="radio" name="k10" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Earner sent mail or reached your network <span class="nt-owner">owner only</span></div><div class="nt-kdesc">From the Activity page.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Earner activity"><label><input type="radio" name="k11"> Off</label><label><input type="radio" name="k11"> Bell only</label><label><input type="radio" name="k11" checked> Bell and push</label></div></div>
+                        <div class="nt-kind"><div><div class="nt-kname">Unusual hour of traffic <span class="nt-owner">owner only</span></div><div class="nt-kdesc">Bell only. CashPilot never pushes this one.</div></div>
+                          <div class="nt-seg sm" role="radiogroup" aria-label="Unusual traffic"><label><input type="radio" name="k12"> Off</label><label><input type="radio" name="k12" checked> Bell only</label><label><input type="radio" name="k12" disabled> Bell and push</label></div></div>
+                      </div>
+                    </div>
+                    <div class="nt-group">
+                      <div class="nt-gline">
+                        <div><div class="nt-gname">App</div><div class="nt-gdesc">A new CashPilot version. "Bell" here means the update banner.</div></div>
+                        <div class="nt-seg" role="radiogroup" aria-label="App">
+                          <label><input type="radio" name="g3f"> Off</label><label><input type="radio" name="g3f"> Bell only</label><label><input type="radio" name="g3f" checked> Bell and push</label>
+                        </div>
+                      </div>
+                      <div class="nt-gmeta"><span>Quiet hours <span class="nt-qh">none</span></span><button class="btn-link">Set</button><details><summary>Choose kinds (1)</summary></details></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="nt-block">
+                  <h4>How urgent before a push</h4>
+                  <p class="nt-desc">The bell still counts everything you keep on.</p>
+                  <div class="nt-row">
+                    <div><div class="nt-rname">Push only when it is at least</div><details class="nt-more"><summary>What each level means</summary></details></div>
+                    <div class="nt-seg" role="radiogroup" aria-label="Minimum level for a push">
+                      <label><input type="radio" name="sev-f"> Info</label><label><input type="radio" name="sev-f" checked> Warning</label><label><input type="radio" name="sev-f"> Urgent</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="nt-block">
+                  <h4>Where pushes go</h4>
+                  <p class="nt-desc">You set channels with environment variables on the CashPilot container. Choose here which groups each one gets. <a href="#">How to set a channel</a></p>
+                  <table class="nt-chan">
+                    <thead><tr><th>Channel</th><th>Status</th><th>Gets</th><th></th></tr></thead>
+                    <tbody>
+                      <tr><td class="nt-cname">Telegram</td><td><span class="nt-set">Set</span><span class="nt-src">CASHPILOT_TELEGRAM_BOT_TOKEN, _CHAT_ID</span></td>
+                        <td class="nt-gets-cell"><span class="nt-gets"><label class="nt-check"><input type="checkbox" checked> Money</label><label class="nt-check"><input type="checkbox" checked> Machines</label><label class="nt-check"><input type="checkbox" checked> App</label></span></td>
+                        <td><button class="btn btn-ghost btn-sm">Send a test</button></td></tr>
+                      <tr><td class="nt-cname">ntfy</td><td><span class="nt-set">Set</span><span class="nt-src">CASHPILOT_NTFY_URL</span></td>
+                        <td class="nt-gets-cell"><span class="nt-gets"><label class="nt-check"><input type="checkbox" checked> Money</label><label class="nt-check"><input type="checkbox"> Machines</label><label class="nt-check"><input type="checkbox"> App</label></span></td>
+                        <td><button class="btn btn-ghost btn-sm">Send a test</button></td></tr>
+                      <tr><td class="nt-cname">Webhook</td><td><span class="nt-unset">Not set</span><span class="nt-src">CASHPILOT_WEBHOOK_URL</span></td><td class="nt-gets-cell muted">—</td><td></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="nt-block">
+                  <h4>Muted</h4>
+                  <p class="nt-desc">A muted item shows no badge and sends no push. The Dashboard still lists it.</p>
+                  <table class="nt-mutes">
+                    <thead><tr><th>Service</th><th>What</th><th></th></tr></thead>
+                    <tbody>
+                      <tr><td class="nt-msvc">proxylite</td><td class="nt-mwhat">All Machines alerts<span class="nt-mscope">Service · 26 Nov, sergio</span></td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                      <tr><td class="nt-msvc">bytelixir</td><td class="nt-mwhat">Everything<span class="nt-mscope">Service · 20 Nov, sergio</span></td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                      <tr><td class="nt-msvc">Honeygain</td><td class="nt-mwhat">Keep a device sharing, or make a payout<span class="nt-mscope">Money reminder · 12 Nov, sergio</span></td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                      <tr><td class="nt-msvc">Repocket</td><td class="nt-mwhat">Every reminder<span class="nt-mscope">Money reminders · 3 Nov, sergio</span></td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                    </tbody>
+                  </table>
+                  <div class="nt-addmute">
+                    <label for="f-svc">Mute a service:</label>
+                    <select id="f-svc" class="form-input"><option>Choose a service</option></select>
+                    <select class="form-input" aria-label="What to mute"><option>Machines alerts</option></select>
+                    <button class="btn btn-ghost btn-sm" disabled>Mute</button>
+                  </div>
+                </div>
+
+                <div class="settings-actions">
+                  <button class="btn btn-primary">Save notifications</button>
+                  <span class="muted">Saved at 10:42.</span>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- (g) -->
+      <div class="mk-state">
+        <div class="mk-label"><b>(g)</b><span>Everything off. Settings, then the bell and Money waiting as they look then. Nothing counts on the badge and nothing is pushed. The facts stay on the page.</span></div>
+        <div class="mk-frame">
+          <section class="card settings-section" aria-labelledby="nt-title-g" style="margin-bottom:24px">
+            <h3 class="settings-section-title" id="nt-title-g">Notifications</h3>
+            <p class="settings-section-desc">Choose what CashPilot tells you about, and when. These choices apply to the whole household.</p>
+            <div class="nt-master">
+              <span class="nt-master-label"><span class="nt-off-dot" aria-hidden="true"></span>Notifications are off</span>
+              <div class="nt-seg" role="radiogroup" aria-label="Notifications">
+                <label><input type="radio" name="m-g"> On</label>
+                <label><input type="radio" name="m-g" checked> Off</label>
+              </div>
+              <span class="nt-master-state">No badge, no update banner, no push. Your choices below are kept for when you turn it back on.</span>
+            </div>
+            <div class="nt-block nt-disabled" aria-disabled="true">
+              <h4>What to tell you</h4>
+              <div class="nt-groups">
+                <div class="nt-group"><div class="nt-gline"><div><div class="nt-gname">Money</div></div><div class="nt-seg"><label><input type="radio" name="g1g"> Off</label><label><input type="radio" name="g1g"> Bell only</label><label><input type="radio" name="g1g" checked> Bell and push</label></div></div></div>
+                <div class="nt-group"><div class="nt-gline"><div><div class="nt-gname">Machines</div></div><div class="nt-seg"><label><input type="radio" name="g2g"> Off</label><label><input type="radio" name="g2g"> Bell only</label><label><input type="radio" name="g2g" checked> Bell and push</label></div></div></div>
+              </div>
+            </div>
+          </section>
+
+          <div class="mk-split">
+            <div class="rd-scope">
+              <section class="attention money-waiting" aria-label="Money waiting, all off">
+                <div class="block-head">
+                  <h2 class="block-title">Money waiting <span class="count">5</span></h2>
+                  <span class="rd-headnote">Notifications are off: no pushes go out. <a href="#">Settings</a></span>
+                </div>
+                <div class="rd-list">
+                  <div class="rd-row attn-warn"><div class="rd-line">
+                    <div class="rd-head"><span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span></div>
+                    <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                    <div class="rd-sum"><span class="mw-title">Claim last month's MystNodes rewards</span><span class="mw-when">by 1 Dec 2026, 3 days left</span></div>
+                    <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open MystNodes</a><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  </div></div>
+                  <div class="rd-row attn-warn"><div class="rd-line">
+                    <div class="rd-head"><span class="attn-tag">Arrived?</span><span class="attn-what">Storj</span></div>
+                    <div class="rd-tog-slot"><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                    <div class="rd-sum"><span class="mw-title">Cash out your Storj balance: 41.20 STORJ (≈ $9.15)</span><span class="rd-q">You marked this requested two weeks ago. Did the payout arrive?</span></div>
+                    <div class="rd-acts"><a class="btn btn-primary btn-sm" href="#">Open Storj</a><button class="btn btn-ghost btn-sm">It arrived</button><button class="btn btn-ghost btn-sm rd-tog" aria-expanded="false">Details <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div>
+                  </div></div>
+                </div>
+              </section>
+            </div>
+            <div>
+              <div class="nt-bellbar">
+                <div class="topbar-earnings"><span>$52.07</span></div>
+                <button class="topbar-icon-btn topbar-notify-btn" aria-label="Alerts, notifications off" aria-expanded="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 01-3.46 0"/><path d="M18.63 13A17.9 17.9 0 0118 8"/><path d="M6.26 6.26A5.86 5.86 0 006 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 00-9.33-5"/><path d="M1 1l22 22"/></svg>
+                </button>
+                <button class="topbar-avatar" aria-label="User menu">S</button>
+              </div>
+              <div class="nt-bellwrap">
+                <div class="notify-dropdown">
+                  <div class="notify-header">Alerts</div>
+                  <div class="notify-off">Notifications are off. The bell shows no count, but this list still shows what is wrong. <a href="#">Turn them on</a></div>
+                  <div class="notify-list">
+                    <div class="notify-item"><div class="notify-item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div><div class="notify-item-body"><div class="notify-item-platform">geiserback — Docker unreachable</div><div class="notify-item-msg">The worker cannot reach the Docker socket.</div></div></div>
+                    <div class="notify-item"><div class="notify-item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div><div class="notify-item-body"><div class="notify-item-platform">earnfm — credential expired</div><div class="notify-item-msg">Paste a fresh token under Settings, Earnings collection.</div></div></div>
+                    <div class="notify-item"><div class="notify-item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h4.5a1.5 1.5 0 010 3h-3a1.5 1.5 0 000 3H15"/></svg></div><div class="notify-item-body"><div class="notify-item-platform">storj — payout?</div><div class="notify-item-msg">The balance dropped by 41.20 STORJ.</div></div></div>
+                    <div class="notify-item"><div class="notify-item-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div><div class="notify-item-body"><div class="notify-item-platform" style="text-transform:none">worker 'OPPO CPH1951 (5bdadbc5)' went offline</div><div class="notify-item-msg">Last seen 2 hours ago.</div></div></div>
+                  </div>
+                  <div class="notify-footer"><a href="#">Notification settings</a><span class="muted">4 alerts</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="nt-block">
+            <h4>The bell badge in every state</h4>
+            <div class="nt-badges">
+              <span class="nt-badge-item"><span class="topbar-icon-btn topbar-notify-btn" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="notify-badge">4</span></span>Count (as today)</span>
+              <span class="nt-badge-item"><span class="topbar-icon-btn topbar-notify-btn" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="notify-badge grey">1</span></span>Grey: only login forecasts (as today)</span>
+              <span class="nt-badge-item"><span class="topbar-icon-btn topbar-notify-btn" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span class="notify-badge">?</span></span>"?": could not reach the server (as today, also when off)</span>
+              <span class="nt-badge-item"><span class="topbar-icon-btn topbar-notify-btn" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></span>No badge: all collectors healthy</span>
+              <span class="nt-badge-item"><span class="topbar-icon-btn topbar-notify-btn" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13.73 21a2 2 0 01-3.46 0"/><path d="M18.63 13A17.9 17.9 0 0118 8"/><path d="M6.26 6.26A5.86 5.86 0 006 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 00-9.33-5"/><path d="M1 1l22 22"/></svg></span>Crossed bell: notifications off, or paused</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+// Show and hide only: a row opens when it, or its Details button, is selected.
+document.querySelectorAll('.rd-row').forEach((row) => {
+  const line = row.querySelector('.rd-line');
+  if (!line) return;
+  const toggle = () => {
+    const open = row.classList.toggle('open');
+    row.querySelectorAll('.rd-tog').forEach((b) => b.setAttribute('aria-expanded', String(open)));
+  };
+  line.addEventListener('click', (e) => {
+    if (e.target.closest('a, button:not(.rd-tog)')) return;
+    toggle();
+  });
+  row.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && row.classList.contains('open')) { toggle(); row.querySelector('.rd-tog').focus(); }
+  });
+});
+</script>
+</body>
+</html>

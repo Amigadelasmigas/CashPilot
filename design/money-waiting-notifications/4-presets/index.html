@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Design 4: Presets first. Money waiting and Notifications</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<style>
+/* ===== Mockup annotations (not part of the app) ===== */
+.mock-intro { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--text-muted); margin: 0 0 12px; }
+.mock-intro b { color: var(--accent); font-weight: 500; }
+.state-label {
+  font-family: var(--font-mono); font-size: var(--fs-2); font-weight: 500; color: var(--accent);
+  margin: 44px 0 4px; padding-top: 14px; border-top: 1px dashed var(--border-strong);
+}
+.state-note { color: var(--text-secondary); font-size: var(--fs-2); margin: 0 0 14px; max-width: 92ch; }
+.mock-frame { border: 1px solid var(--border-light); padding: 14px 16px 4px; background: var(--bg-primary); }
+.mock-phone { max-width: 390px; width: 100%; border: 1px solid var(--border-light); padding: 12px 12px 4px; }
+.mock-reserve-menu { padding-bottom: 268px; }
+.mock-reserve-pop { padding-bottom: 196px; }
+/* On a phone the open caret menu is in panel (b); here only the rule panel stays open. */
+@media (max-width: 640px) { .mock-open-panel #menu-ef { display: none; } .mock-open-panel .mock-reserve-menu { padding-bottom: 150px; } }
+.mock-reserve-bell { min-height: 430px; }
+
+/* ===== Money waiting, design 4 =====
+   The list is one grid and every row is a subgrid, so the tag, the service,
+   the detail and both buttons line up across rows. Container queries, not
+   media queries: the panel stacks when IT is narrow, wherever it sits. */
+.mw4 { container-type: inline-size; }
+.mw4 .block-head { align-items: center; }
+.mw4-head-link { font-size: var(--fs-2); color: var(--text-secondary); }
+.mw4 .attn-list {
+  display: grid;
+  grid-template-columns: minmax(92px, max-content) minmax(120px, 180px) minmax(0, 1fr) max-content max-content;
+}
+.mw4 .attn-row {
+  grid-column: 1 / -1; grid-template-columns: subgrid;
+  align-items: start; gap: 4px 14px; padding: 8px 0 8px 10px;
+}
+.mw4 .attn-tag, .mw4 .attn-what { padding-top: 3px; }
+.mw4 .mw-why { gap: 3px; }
+.mw4 .attn-actions { display: contents; }
+.mw4 .btn-open { justify-self: stretch; justify-content: center; gap: 6px; }
+.mw4 .btn-open svg, .chip svg, .pop .btn svg { flex: none; }
+
+/* Split button: the one thing you did, plus a caret for "later" and "stop". */
+.split-wrap { position: relative; justify-self: stretch; display: flex; }
+.split { display: inline-flex; flex: 1; }
+.split > .btn:first-child { flex: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; justify-content: center; }
+.split > .btn-caret { margin-left: -1px; padding: 0 6px; border-top-left-radius: 0; border-bottom-left-radius: 0; color: var(--text-secondary); }
+.split > .btn-caret[aria-expanded="true"] { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-strong); }
+.split-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; width: 300px;
+  background: var(--bg-secondary); border: 1px solid var(--border-light); padding: 4px 0;
+}
+.split-menu[hidden] { display: none; }
+.menu-group, .menu-foot, .menu-sep { display: block; }
+.menu-group { font-size: var(--fs-1); color: var(--text-muted); padding: 6px 12px 2px; }
+.menu-item {
+  display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  color: var(--text-primary); font: inherit; font-size: var(--fs-3); padding: 5px 12px;
+}
+.menu-item:hover:not(:disabled) { background: var(--bg-hover); }
+.menu-item:disabled { color: var(--text-muted); cursor: not-allowed; }
+.menu-item .mi-hint { display: block; font-size: var(--fs-2); color: var(--text-muted); line-height: 1.35; }
+.menu-sep { border-top: 1px solid var(--border-color); margin: 4px 0; }
+.menu-foot { font-size: var(--fs-2); color: var(--text-muted); padding: 6px 12px 4px; line-height: 1.35; }
+
+/* The meta line under the title: when, then two small chips. */
+.mw4 .mw-when { white-space: nowrap; }
+.mw4-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; position: relative; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px;
+  border: 1px solid var(--border-light); border-radius: 2px; background: none; cursor: pointer;
+  color: var(--text-secondary); font: inherit; font-size: var(--fs-1); line-height: 1;
+}
+.chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.chip[aria-expanded="true"] { color: var(--text-primary); border-color: var(--accent-secondary); }
+.chip .chip-date { font-family: var(--font-mono); color: var(--text-muted); }
+.mw4-how-text { font-size: var(--fs-2); color: var(--text-secondary); max-width: 70ch; padding: 2px 0 2px 8px; border-left: 2px solid var(--border-light); }
+.mw4-how-text[hidden] { display: none; }
+.pop {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: 330px; max-width: calc(100vw - 40px);
+  background: var(--bg-secondary); border: 1px solid var(--border-light); padding: 10px 12px; line-height: 1.4;
+}
+.pop[hidden] { display: none; }
+.pop-title { font-weight: 600; font-size: var(--fs-3); color: var(--text-primary); margin: 0 0 4px; }
+.pop p { font-size: var(--fs-2); color: var(--text-secondary); margin: 0 0 8px; }
+.pop .btn { gap: 6px; }
+.pop-meta { font-size: var(--fs-2); color: var(--text-muted); margin: 8px 0 0 !important; }
+.pop-meta .num { font-size: var(--fs-2); }
+
+/* Just muted: the row stays one beat, with Undo. */
+.attn-row.attn-gone { border-left-color: var(--border-light); background: var(--bg-secondary); }
+.attn-gone .attn-tag { color: var(--text-muted); }
+.attn-gone .attn-why { grid-column: 3 / 5; }
+.attn-gone .btn-undo { grid-column: 5; justify-self: stretch; }
+
+/* Foot: a count, a disclosure, and the way to the one place mutes live. */
+.mw4-foot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 8px 0 0 12px; }
+.mw4-foot details { min-width: 0; }
+.mw4-foot:has(details[open]) { flex-direction: column; align-items: flex-start; }
+.mw4-foot summary { cursor: pointer; color: var(--text-secondary); }
+.mw4-foot ul { list-style: none; margin: 6px 0 2px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.mw4-foot li { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.mw4-foot li .btn-link { color: var(--text-primary); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; font-size: var(--fs-2); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px; border-radius: 2px;
+  font-size: var(--fs-1); font-weight: 500; border: 1px solid var(--border-light); color: var(--text-secondary); text-decoration: none;
+}
+.pill-off { border-color: var(--warning); color: var(--warning); }
+
+/* A static toast for the mockup (the real one is fixed top right). */
+.toast-static { position: static; transform: none; display: inline-flex; margin: 10px 0 0; }
+.toast-static .btn-link { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; font-size: var(--fs-3); }
+
+/* Mid widths (a 900 px window): the service name moves under the tag, so the
+   detail column keeps room to read. */
+@container (min-width: 641px) and (max-width: 1060px) {
+  .mw4 .attn-list { grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) max-content max-content; }
+  .mw4 .attn-row { grid-template-rows: auto 1fr; }
+  .mw4 .attn-tag { grid-column: 1; grid-row: 1; }
+  .mw4 .attn-what { grid-column: 1; grid-row: 2; padding-top: 0; }
+  .mw4 .attn-why { grid-column: 2; grid-row: 1 / span 2; }
+  .mw4 .btn-open { grid-column: 3; grid-row: 1; }
+  .mw4 .split-wrap { grid-column: 4; grid-row: 1; }
+  .mw4 .attn-gone .attn-why { grid-column: 2 / 4; }
+  .mw4 .attn-gone .btn-undo { grid-column: 4; grid-row: 1; }
+  .mw4 .attn-unknown .attn-why { grid-column: 2 / -1; }
+}
+
+/* Phone: the panel stacks when it is narrow. Same two buttons, side by side. */
+@container (max-width: 640px) {
+  .mw4 .attn-list { display: block; }
+  .mw4 .attn-row {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "tag what what" "why why why" "open open split";
+    gap: 6px 10px; padding: 10px 0 10px 10px;
+  }
+  .mw4 .attn-tag { grid-area: tag; padding-top: 0; }
+  .mw4 .attn-what { grid-area: what; padding-top: 0; }
+  .mw4 .attn-why { grid-area: why; }
+  .mw4 .btn-open { grid-area: open; height: 32px; }
+  .mw4 .split-wrap { grid-area: split; min-width: 132px; }
+  .mw4 .split > .btn { height: 32px; }
+  .mw4 .split > .btn-caret { padding: 0 10px; }
+  .mw4 .split-menu { width: min(320px, calc(100cqw - 10px)); }
+  .mw4 .attn-row.attn-gone { grid-template-areas: "tag what what" "why why why" "undo undo undo"; }
+  .mw4 .attn-gone .attn-why { grid-area: why; }
+  .mw4 .attn-gone .btn-undo { grid-area: undo; justify-self: start; }
+  .mw4 .mw4-meta .mw-when { flex-basis: 100%; }
+  .mw4-head-link { display: none; }
+  .pop { width: min(330px, calc(100cqw - 10px)); }
+}
+
+@media (max-width: 480px) { .mock-frame { padding: 10px 10px 2px; } }
+
+/* ===== Settings frame ===== */
+.settings-index a.is-current { color: var(--text-primary); border-left-color: var(--accent); font-weight: 600; }
+@media (max-width: 1100px) { .settings-index a.is-current { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; } }
+
+/* ===== Notifications section (self-contained: drops into any Settings layout) ===== */
+.nset { container-type: inline-size; }
+.nset fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.nset legend { padding: 0; }
+.n-label { display: block; font-size: var(--fs-2); font-weight: 600; color: var(--text-secondary); margin: 16px 0 6px; }
+.n-hint { font-size: var(--fs-2); color: var(--text-muted); margin: 4px 0 0; max-width: 78ch; }
+.n-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.n-preset {
+  position: relative; display: flex; flex-direction: column; gap: 4px; cursor: pointer;
+  border: 1px solid var(--border-light); padding: 10px 12px 10px 36px; background: var(--bg-secondary);
+}
+.n-preset:hover { border-color: var(--border-strong); }
+.n-preset input { position: absolute; left: 12px; top: 13px; margin: 0; accent-color: var(--accent); width: 15px; height: 15px; }
+.n-preset:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.n-preset:has(input:focus-visible) { outline: 2px solid var(--accent-secondary); outline-offset: 1px; }
+.n-preset-name { font-weight: 600; color: var(--text-primary); }
+.n-preset-desc { font-size: var(--fs-2); color: var(--text-secondary); line-height: 1.35; }
+.n-preset-get { font-size: var(--fs-1); color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; line-height: 1.45; }
+.n-preset-tag { font-size: var(--fs-1); color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+.n-custom { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 0; font-size: var(--fs-2); color: var(--text-secondary); }
+.n-custom .pill { border-color: var(--accent); color: var(--text-primary); border-style: dashed; }
+
+.n-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 14px; }
+.n-line .n-key { font-size: var(--fs-2); font-weight: 600; color: var(--text-secondary); min-width: 150px; }
+.seg { display: inline-flex; border: 1px solid var(--border-light); }
+.seg button { font: inherit; font-size: var(--fs-2); min-height: 26px; line-height: 1.25; padding: 3px 10px; background: none; border: 0; color: var(--text-secondary); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border-light); }
+.seg button:hover { background: var(--bg-hover); color: var(--text-primary); }
+.seg button[aria-pressed="true"] { background: var(--bg-hover); color: var(--text-primary); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+.ch-list { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-2); color: var(--text-secondary); }
+.dot { display: inline-block; width: 8px; height: 8px; margin-right: 5px; vertical-align: 1px; }
+.dot-on { background: var(--success); }
+.dot-off { background: none; box-shadow: inset 0 0 0 1px var(--text-muted); }
+
+.n-status {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 12px 0 0;
+  padding: 8px 12px; border-left: 2px solid var(--warning); background: var(--warning-soft); font-size: var(--fs-3);
+}
+.n-status.is-info { border-left-color: var(--accent-secondary); background: var(--accent-secondary-soft); }
+
+.n-adv { margin-top: 18px; border: 1px solid var(--border-color); }
+.n-adv[open] { border-color: var(--border-light); }
+.n-adv > summary { cursor: pointer; padding: 8px 12px; font-weight: 600; color: var(--text-primary); }
+.n-adv > summary .n-adv-sum { font-weight: 400; font-size: var(--fs-2); color: var(--text-muted); margin-left: 8px; }
+.n-adv-body { padding: 4px 12px 14px; border-top: 1px solid var(--border-color); }
+.n-adv-body h4 { font-size: var(--fs-3); font-weight: 600; margin: 18px 0 4px; }
+.n-adv-body h4:first-child { margin-top: 10px; }
+
+.n-matrix { width: 100%; border-collapse: collapse; }
+.n-matrix th, .n-matrix td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); text-align: center; vertical-align: middle; }
+.n-matrix thead th { font-size: var(--fs-2); font-weight: 500; color: var(--text-muted); white-space: nowrap; }
+.n-matrix thead tr:first-child th { font-size: var(--fs-1); color: var(--text-secondary); border-bottom: 0; padding-bottom: 0; }
+.n-matrix .grp { border-bottom: 1px solid var(--border-strong) !important; }
+.n-matrix th:first-child, .n-matrix td:first-child { text-align: left; padding-left: 0; }
+.n-matrix td:first-child { width: 100%; }
+.n-kind { font-weight: 500; color: var(--text-primary); }
+.n-kind .owner { font-size: var(--fs-1); color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+.n-eg { display: block; font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-muted); }
+.n-matrix input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; vertical-align: middle; }
+.n-na { color: var(--text-muted); font-size: var(--fs-2); }
+.n-matrix tr.is-off .n-kind { color: var(--text-secondary); }
+.n-matrix tr.is-off .n-kind::after { content: attr(data-off); margin-left: 6px; font-size: var(--fs-1); font-weight: 500; color: var(--warning); }
+.n-more { margin-top: 8px; font-size: var(--fs-2); color: var(--text-secondary); }
+.n-more summary { cursor: pointer; }
+.n-more dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 14px; margin: 6px 0 0; }
+.n-more dt { color: var(--text-primary); }
+.n-more dd { margin: 0; color: var(--text-muted); }
+
+.n-grid { display: grid; grid-template-columns: 130px minmax(0, 1fr) max-content max-content; gap: 6px 12px; align-items: center; }
+.n-grid > .n-rowline { display: contents; }
+.n-grid .n-name { font-weight: 500; }
+.n-grid .n-meta { font-size: var(--fs-2); color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
+.n-grid .n-meta code { font-size: var(--fs-1); color: var(--text-secondary); }
+.n-grid select.form-input { height: 26px; font-size: var(--fs-2); padding: 0 6px; }
+.n-grid hr { grid-column: 1 / -1; border: 0; border-top: 1px solid var(--border-color); margin: 0; }
+
+.n-quiet { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.n-quiet label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-3); }
+.n-quiet input[type="checkbox"], .n-quiet input[type="radio"] { accent-color: var(--accent); }
+.n-quiet .form-input[type="time"] { width: 104px; height: 28px; font-family: var(--font-mono); color-scheme: dark; }
+.days { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.days button {
+  font: inherit; font-size: var(--fs-2); width: 40px; height: 26px; cursor: pointer;
+  border: 1px solid var(--border-light); background: none; color: var(--text-muted); border-radius: 2px;
+}
+.days button[aria-pressed="true"] { border-color: var(--accent); color: var(--text-primary); background: var(--accent-soft); }
+.n-sub-opts.n-quiet { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 8px; padding-left: 2px; }
+
+.n-mutes { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.n-mutes th, .n-mutes td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border-color); vertical-align: baseline; }
+.n-mutes th { font-size: var(--fs-2); font-weight: 500; color: var(--text-muted); }
+.n-mutes td.num { font-size: var(--fs-2); color: var(--text-secondary); white-space: nowrap; }
+.n-mutes .what-kind { display: block; font-size: var(--fs-1); color: var(--text-muted); }
+.n-mutes td:last-child { text-align: right; padding-right: 0; }
+.n-add { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-top: 10px; }
+.n-add .form-input { height: 28px; font-size: var(--fs-2); width: auto; max-width: 100%; }
+
+@container (max-width: 960px) { .n-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 520px) {
+  .n-presets { grid-template-columns: minmax(0, 1fr); }
+  .n-preset-get { display: none; }
+  .n-line .n-key { min-width: 0; flex-basis: 100%; }
+  .n-grid { grid-template-columns: minmax(0, 1fr) max-content; }
+  .n-grid .n-meta { grid-column: 1 / -1; order: 0; }
+  .n-matrix thead { display: none; }
+  .n-matrix, .n-matrix tbody { display: block; }
+  .n-matrix tr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 6px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+  .n-matrix td { border: 0; padding: 0; text-align: left; display: flex; align-items: center; gap: 6px; font-size: var(--fs-2); color: var(--text-secondary); }
+  .n-matrix td:first-child { grid-column: 1 / -1; display: block; width: auto; }
+  .n-matrix td[data-col]::before { content: attr(data-col); order: 2; }
+  .n-matrix td:has(> .n-na:only-child) { display: none; }
+  .n-matrix td .n-na { display: none; }
+  .n-mutes thead { display: none; }
+  .n-mutes, .n-mutes tbody, .n-mutes tr, .n-mutes td { display: block; }
+  .n-mutes tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; padding: 6px 0; border-bottom: 1px solid var(--border-color); }
+  .n-mutes td { border: 0; padding: 1px 0; }
+  .n-mutes td:last-child { grid-row: 1 / span 3; grid-column: 2; align-self: center; }
+  .n-mutes td.num { grid-column: 1; }
+}
+
+/* ===== Topbar in the state panels ===== */
+.topbar.topbar-static { position: relative; z-index: 5; }
+.topbar-notify-btn.is-off { color: var(--text-muted); }
+.notify-dropdown.static-open { display: block; }
+.notify-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.notify-header a { font-weight: 400; font-size: var(--fs-2); color: var(--text-secondary); }
+.notify-off-line { padding: 8px 12px; font-size: var(--fs-2); color: var(--text-secondary); background: var(--warning-soft); border-bottom: 1px solid var(--border-color); }
+.mock-reserve-bell .notify-item-platform { text-transform: none; }
+.notify-item-icon.i-info { color: var(--text-secondary); }
+.mock-reserve-bell .topbar-notifications { position: static; }
+.mock-reserve-bell .notify-dropdown { width: min(360px, 100%); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M8 13h8M8 17h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.73 21a2 2 0 01-3.46 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-bell-off" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.9 17.9 0 0 1 18 8"/><path d="M6.26 6.26A5.9 5.9 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><path d="M2 2l20 20"/></g></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></g></symbol>
+  <symbol id="i-coin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h4a1.5 1.5 0 0 1 0 3h-3a1.5 1.5 0 0 0 0 3h4"/></g></symbol>
+</svg>
+
+<div class="main-content">
+  <header class="topbar">
+    <a href="#" class="topbar-brand" aria-label="CashPilot home">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#f472b6"/></svg>
+      <span>CashPilot</span>
+    </a>
+    <nav class="topnav" aria-label="Main">
+      <a href="#" class="sidebar-link active">Dashboard</a>
+      <a href="#" class="sidebar-link">Fleet</a>
+      <a href="#" class="sidebar-link">Catalog</a>
+      <a href="#" class="sidebar-link">Payouts</a>
+      <a href="#" class="sidebar-link">Activity</a>
+      <a href="#set-notify-e" class="sidebar-link">Settings</a>
+    </nav>
+    <div class="topbar-right">
+      <a href="#" class="btn btn-primary btn-sm topbar-add" aria-label="Add service"><span aria-hidden="true">+</span><span class="topbar-add-label" aria-hidden="true"> Add service</span></a>
+      <div class="topbar-earnings"><span>$52.07</span><select class="topbar-currency-select" aria-label="Display currency"><option>USD</option></select></div>
+      <div class="topbar-notifications">
+        <button class="topbar-icon-btn topbar-notify-btn" aria-label="Alerts, 4 open" aria-expanded="false"><svg width="16" height="16" aria-hidden="true"><use href="#i-bell"/></svg><span class="notify-badge">4</span></button>
+      </div>
+      <div class="topbar-avatar-wrap"><button class="topbar-avatar" aria-label="User menu">S</button></div>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <p class="mock-intro"><b>Design 4 of 4 · Presets first.</b> CashPilot v3.1.0 mockup, classic theme, sample data from the owner's fleet. Today is 28 Nov 2026.</p>
+    <div class="page-head"><h1 class="page-title">Dashboard</h1><div class="page-actions"><button class="btn btn-ghost btn-sm">Refresh</button></div></div>
+
+    <section class="stats-grid money-strip" aria-label="Money">
+      <div class="stat-card stat-card-balance"><div class="stat-label">Balance</div><div class="stat-value highlight">$52.07</div></div>
+      <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value">$0.84</div><div class="stat-change">+12% vs yesterday</div></div>
+      <div class="stat-card"><div class="stat-label">This month</div><div class="stat-value">$21.36</div><div class="stat-change">+4% vs last month</div></div>
+      <div class="stat-card stat-card-ops"><div class="stat-label">Containers up</div><div class="stat-value">38 / 39</div></div>
+    </section>
+
+    <!-- ================= (a) ================= -->
+    <p class="state-label">(a) Money waiting on a desktop. Five rows. Every action on one line, and the columns line up.</p>
+    <p class="state-note">Each row: one pink link to the provider, one split button. The button says what you did there (Done, Requested, It arrived). Its caret holds Snooze and Mute. The provider's rule is a small chip next to the date.</p>
+
+    <section class="attention money-waiting mw4" aria-labelledby="mw-a-title">
+      <div class="block-head">
+        <h2 class="block-title" id="mw-a-title">Money waiting <span class="count">5</span></h2>
+        <a href="#set-notify-f" class="mw4-head-link">Notification settings</a>
+      </div>
+      <div class="attn-list">
+        <!-- MystNodes -->
+        <div class="attn-row attn-warn mw-row" data-obligation="mysterium:monthly-claim">
+          <span class="attn-tag">Claim</span>
+          <span class="attn-what">MystNodes</span>
+          <span class="attn-why mw-why">
+            <span class="mw-title">Claim last month's MystNodes rewards</span>
+            <span class="mw4-meta">
+              <span class="mw-when">by 1 Dec 2026, 3 days left</span>
+              <button class="chip" aria-expanded="false">How</button>
+              <button class="chip" aria-expanded="false" aria-haspopup="dialog"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button>
+            </span>
+            <span class="mw-loss">Rewards you do not claim in the window are lost.</span>
+          </span>
+          <span class="attn-actions">
+            <a class="btn btn-primary btn-sm btn-open" href="#" target="_blank" rel="noopener">Open MystNodes<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a>
+            <span class="split-wrap"><span class="split" role="group" aria-label="MystNodes claim"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span>
+          </span>
+        </div>
+        <!-- Honeygain -->
+        <div class="attn-row attn-ask mw-row" data-obligation="honeygain:cash-out">
+          <span class="attn-tag">Cash out</span>
+          <span class="attn-what">Honeygain</span>
+          <span class="attn-why mw-why">
+            <span class="mw-title">Cash out your Honeygain balance: 20.76 USD</span>
+            <span class="mw4-meta"><button class="chip" aria-expanded="false">How</button></span>
+            <span class="mw-loss">Money left at a provider can be lost if it bans the account, stalls payouts or closes.</span>
+          </span>
+          <span class="attn-actions">
+            <a class="btn btn-primary btn-sm btn-open" href="#" target="_blank" rel="noopener">Open Honeygain<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a>
+            <span class="split-wrap"><span class="split" role="group" aria-label="Honeygain cash out"><button class="btn btn-ghost btn-sm">Requested</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span>
+          </span>
+        </div>
+        <!-- Storj -->
+        <div class="attn-row attn-warn mw-row" data-obligation="storj:cash-out">
+          <span class="attn-tag">Arrived?</span>
+          <span class="attn-what">Storj</span>
+          <span class="attn-why mw-why">
+            <span class="mw-title">Cash out your Storj balance: 14.20 STORJ (≈ $3.41)</span>
+            <span class="mw-loss" style="color:var(--text-secondary)">You marked this requested two weeks ago. Did the payout arrive?</span>
+            <span class="mw-loss">Money left at a provider can be lost if it bans the account, stalls payouts or closes.</span>
+          </span>
+          <span class="attn-actions">
+            <a class="btn btn-primary btn-sm btn-open" href="#" target="_blank" rel="noopener">Open Storj<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a>
+            <span class="split-wrap"><span class="split" role="group" aria-label="Storj payout"><button class="btn btn-ghost btn-sm">It arrived</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span>
+          </span>
+        </div>
+        <!-- PacketStream -->
+        <div class="attn-row attn-ask mw-row" data-obligation="packetstream:keep-active">
+          <span class="attn-tag">Keep active</span>
+          <span class="attn-what">PacketStream</span>
+          <span class="attn-why mw-why">
+            <span class="mw-title">Log in to PacketStream to keep the balance</span>
+            <span class="mw4-meta">
+              <span class="mw-when">by 10 Dec 2026, 12 days left</span>
+              <button class="chip" aria-expanded="false">How</button>
+              <button class="chip" aria-expanded="false" aria-haspopup="dialog"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button>
+            </span>
+            <span class="mw-loss">An account with no login for a long time loses its balance.</span>
+          </span>
+          <span class="attn-actions">
+            <a class="btn btn-primary btn-sm btn-open" href="#" target="_blank" rel="noopener">Open PacketStream<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a>
+            <span class="split-wrap"><span class="split" role="group" aria-label="PacketStream keep active"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span>
+          </span>
+        </div>
+        <!-- EarnFM -->
+        <div class="attn-row attn-ask mw-row" data-obligation="earnfm:claim">
+          <span class="attn-tag">Claim</span>
+          <span class="attn-what">EarnFM</span>
+          <span class="attn-why mw-why">
+            <span class="mw-title">Claim your EarnFM balance</span>
+            <span class="mw4-meta">
+              <span class="mw-when">by 16 Dec 2026, 18 days left</span>
+              <button class="chip" aria-expanded="false">How</button>
+              <button class="chip" aria-expanded="false" aria-haspopup="dialog"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button>
+            </span>
+            <span class="mw-loss">A balance you do not claim expires.</span>
+          </span>
+          <span class="attn-actions">
+            <a class="btn btn-primary btn-sm btn-open" href="#" target="_blank" rel="noopener">Open EarnFM<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a>
+            <span class="split-wrap"><span class="split" role="group" aria-label="EarnFM claim"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span>
+          </span>
+        </div>
+      </div>
+      <div class="attn-foot mw4-foot">
+        <details><summary>2 reminders are muted</summary>
+          <ul>
+            <li><span>Honeygain, Keep a Honeygain device sharing, or make a payout</span><button class="btn btn-link">Unmute</button></li>
+            <li><span>Repocket, every reminder</span><button class="btn btn-link">Unmute</button></li>
+          </ul>
+        </details>
+        <a href="#set-notify-d">Manage mutes in Settings</a>
+      </div>
+    </section>
+
+    <!-- open states -->
+    <p class="state-label">(a, open) The caret menu, the rule chip and How, drawn open.</p>
+    <p class="state-note">The caret menu groups two choices: "Later" and "Stop reminding me". Each mute says in one line what it stops. The rule chip opens a small panel: whose rule it is, a link to the provider's own page, and the date we last read it.</p>
+    <section class="attention money-waiting mw4 mock-open-panel" aria-label="Money waiting, open states">
+      <div class="attn-list mock-reserve-menu">
+        <div class="attn-row attn-ask mw-row">
+          <span class="attn-tag">Keep active</span>
+          <span class="attn-what">PacketStream</span>
+          <span class="attn-why mw-why">
+            <span class="mw-title">Log in to PacketStream to keep the balance</span>
+            <span class="mw4-meta">
+              <span class="mw-when">by 10 Dec 2026, 12 days left</span>
+              <button class="chip" aria-expanded="true" aria-controls="how-ps">How</button>
+              <button class="chip" aria-expanded="false" aria-haspopup="dialog" aria-controls="pop-ps"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button>
+              <span class="pop" id="pop-ps" role="dialog" aria-label="Provider's rule, PacketStream" hidden>
+                <span class="pop-title" style="display:block">Where this rule comes from</span>
+                <p>PacketStream states this rule on its own site. Read it there to check it.</p>
+                <a class="btn btn-secondary btn-sm" href="#" target="_blank" rel="noopener">Read it on packetstream.io<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a>
+                <p class="pop-meta">We last read that page on <span class="num">24 Nov 2026</span>.</p>
+              </span>
+            </span>
+            <span class="mw4-how-text" id="how-ps">Sign in at app.packetstream.io once. A login resets the clock. You do not need to cash out.</span>
+            <span class="mw-loss">An account with no login for a long time loses its balance.</span>
+          </span>
+          <span class="attn-actions">
+            <a class="btn btn-primary btn-sm btn-open" href="#">Open PacketStream<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a>
+            <span class="split-wrap"><span class="split" role="group" aria-label="PacketStream keep active"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-ps" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span>
+              <span class="split-menu" id="menu-ps" role="menu" aria-label="PacketStream keep active" hidden>
+                <span class="menu-group" role="presentation">Later</span>
+                <button class="menu-item" role="menuitem">Snooze a day</button>
+                <button class="menu-item" role="menuitem">Snooze a week</button>
+                <span class="menu-sep" role="separator"></span>
+                <span class="menu-group" role="presentation">Stop reminding me</span>
+                <button class="menu-item" role="menuitem">Mute this reminder<span class="mi-hint">Only "keep active" for PacketStream.</span></button>
+                <button class="menu-item" role="menuitem">Mute all PacketStream reminders<span class="mi-hint">Every reminder for this service.</span></button>
+                <span class="menu-foot">A mute is for everyone in this household. Undo it in Settings, Notifications.</span>
+              </span>
+            </span>
+          </span>
+        </div>
+        <div class="attn-row attn-ask mw-row">
+          <span class="attn-tag">Claim</span>
+          <span class="attn-what">EarnFM</span>
+          <span class="attn-why mw-why">
+            <span class="mw-title">Claim your EarnFM balance</span>
+            <span class="mw4-meta">
+              <span class="mw-when">by 16 Dec 2026, 18 days left</span>
+              <button class="chip" aria-expanded="false" aria-controls="how-ef">How</button>
+              <button class="chip" aria-expanded="true" aria-haspopup="dialog" aria-controls="pop-ef"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button>
+              <span class="pop" id="pop-ef" role="dialog" aria-label="Provider's rule, EarnFM">
+                <span class="pop-title" style="display:block">Where this rule comes from</span>
+                <p>EarnFM states this rule on its own site. Read it there to check it.</p>
+                <a class="btn btn-secondary btn-sm" href="#" target="_blank" rel="noopener">Read it on earn.fm<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a>
+                <p class="pop-meta">We last read that page on <span class="num">24 Nov 2026</span>.</p>
+              </span>
+            </span>
+            <span class="mw4-how-text" id="how-ef" hidden>Open the EarnFM dashboard and press Claim.</span>
+            <span class="mw-loss">A balance you do not claim expires.</span>
+          </span>
+          <span class="attn-actions">
+            <a class="btn btn-primary btn-sm btn-open" href="#">Open EarnFM<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a>
+            <span class="split-wrap"><span class="split" role="group" aria-label="EarnFM claim"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="true" aria-controls="menu-ef" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span>
+              <span class="split-menu" id="menu-ef" role="menu" aria-label="EarnFM claim">
+                <span class="menu-group" role="presentation">Later</span>
+                <button class="menu-item" role="menuitem">Snooze a day</button>
+                <button class="menu-item" role="menuitem">Snooze a week</button>
+                <span class="menu-sep" role="separator"></span>
+                <span class="menu-group" role="presentation">Stop reminding me</span>
+                <button class="menu-item" role="menuitem">Mute this reminder<span class="mi-hint">Only "claim" for EarnFM.</span></button>
+                <button class="menu-item" role="menuitem">Mute all EarnFM reminders<span class="mi-hint">Every reminder for this service.</span></button>
+                <span class="menu-foot">A mute is for everyone in this household. Undo it in Settings, Notifications.</span>
+              </span>
+            </span>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= (b) ================= -->
+    <p class="state-label">(b) The same rows at 390 px. The panel stacks. The caret menu is the only menu.</p>
+    <p class="state-note">Same two buttons as on a desktop, so nothing moves to a new place. They grow to 32 px for a thumb. The menu opens below the caret, inside the screen.</p>
+    <div class="mock-phone">
+      <section class="attention money-waiting mw4" aria-labelledby="mw-b-title" style="margin-bottom:0">
+        <div class="block-head"><h2 class="block-title" id="mw-b-title">Money waiting <span class="count">5</span></h2></div>
+        <div class="attn-list">
+          <div class="attn-row attn-warn mw-row">
+            <span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span>
+            <span class="attn-why mw-why"><span class="mw-title">Claim last month's MystNodes rewards</span>
+              <span class="mw4-meta"><span class="mw-when">by 1 Dec 2026, 3 days left</span><button class="chip" aria-expanded="false">How</button><button class="chip" aria-expanded="false"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button></span>
+              <span class="mw-loss">Rewards you do not claim in the window are lost.</span></span>
+            <span class="attn-actions"><a class="btn btn-primary btn-sm btn-open" href="#">Open MystNodes<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a><span class="split-wrap"><span class="split"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span></span>
+          </div>
+          <div class="attn-row attn-ask mw-row">
+            <span class="attn-tag">Cash out</span><span class="attn-what">Honeygain</span>
+            <span class="attn-why mw-why"><span class="mw-title">Cash out your Honeygain balance: 20.76 USD</span>
+              <span class="mw4-meta"><button class="chip" aria-expanded="false">How</button></span>
+              <span class="mw-loss">Money left at a provider can be lost if it bans the account, stalls payouts or closes.</span></span>
+            <span class="attn-actions"><a class="btn btn-primary btn-sm btn-open" href="#">Open Honeygain<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a><span class="split-wrap"><span class="split"><button class="btn btn-ghost btn-sm">Requested</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span></span>
+          </div>
+          <div class="attn-row attn-warn mw-row">
+            <span class="attn-tag">Arrived?</span><span class="attn-what">Storj</span>
+            <span class="attn-why mw-why"><span class="mw-title">Cash out your Storj balance: 14.20 STORJ (≈ $3.41)</span>
+              <span class="mw-loss" style="color:var(--text-secondary)">You marked this requested two weeks ago. Did the payout arrive?</span></span>
+            <span class="attn-actions"><a class="btn btn-primary btn-sm btn-open" href="#">Open Storj<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a><span class="split-wrap"><span class="split"><button class="btn btn-ghost btn-sm">It arrived</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span></span>
+          </div>
+          <div class="attn-row attn-ask mw-row">
+            <span class="attn-tag">Keep active</span><span class="attn-what">PacketStream</span>
+            <span class="attn-why mw-why"><span class="mw-title">Log in to PacketStream to keep the balance</span>
+              <span class="mw4-meta"><span class="mw-when">by 10 Dec 2026, 12 days left</span><button class="chip" aria-expanded="false">How</button><button class="chip" aria-expanded="false"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button></span></span>
+            <span class="attn-actions"><a class="btn btn-primary btn-sm btn-open" href="#">Open PacketStream<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a><span class="split-wrap"><span class="split"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span></span>
+          </div>
+          <div class="attn-row attn-ask mw-row">
+            <span class="attn-tag">Claim</span><span class="attn-what">EarnFM</span>
+            <span class="attn-why mw-why"><span class="mw-title">Claim your EarnFM balance</span>
+              <span class="mw4-meta"><span class="mw-when">by 16 Dec 2026, 18 days left</span><button class="chip" aria-expanded="false">How</button><button class="chip" aria-expanded="false"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button></span></span>
+            <span class="attn-actions"><a class="btn btn-primary btn-sm btn-open" href="#">Open EarnFM<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a><span class="split-wrap"><span class="split"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="true" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span>
+              <span class="split-menu" role="menu" aria-label="EarnFM claim">
+                <span class="menu-group">Later</span>
+                <button class="menu-item" role="menuitem">Snooze a day</button>
+                <button class="menu-item" role="menuitem">Snooze a week</button>
+                <span class="menu-sep"></span>
+                <span class="menu-group">Stop reminding me</span>
+                <button class="menu-item" role="menuitem">Mute this reminder<span class="mi-hint">Only "claim" for EarnFM.</span></button>
+                <button class="menu-item" role="menuitem">Mute all EarnFM reminders<span class="mi-hint">Every reminder for this service.</span></button>
+                <span class="menu-foot">A mute is for everyone in this household.</span>
+              </span></span></span>
+          </div>
+        </div>
+        <div style="height:300px"></div>
+        <div class="attn-foot mw4-foot"><details><summary>2 reminders are muted</summary></details><a href="#">Manage mutes</a></div>
+      </section>
+    </div>
+
+    <!-- ================= (c) ================= -->
+    <p class="state-label">(c) A row just muted. It stays in place until the next reload, with Undo.</p>
+    <p class="state-note">The row keeps its place, so the list does not jump. The toast also has Undo. Undo calls the same unmute the Settings list uses.</p>
+    <section class="attention money-waiting mw4" aria-label="Money waiting, just muted">
+      <div class="block-head"><h2 class="block-title">Money waiting <span class="count">4</span></h2><a href="#" class="mw4-head-link">Notification settings</a></div>
+      <div class="attn-list">
+        <div class="attn-row attn-ask mw-row">
+          <span class="attn-tag">Keep active</span><span class="attn-what">PacketStream</span>
+          <span class="attn-why mw-why"><span class="mw-title">Log in to PacketStream to keep the balance</span>
+            <span class="mw4-meta"><span class="mw-when">by 10 Dec 2026, 12 days left</span><button class="chip" aria-expanded="false">How</button><button class="chip" aria-expanded="false"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button></span></span>
+          <span class="attn-actions"><a class="btn btn-primary btn-sm btn-open" href="#">Open PacketStream<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a><span class="split-wrap"><span class="split"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="false" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span></span>
+        </div>
+        <div class="attn-row attn-gone mw-row" role="status">
+          <span class="attn-tag">Muted</span><span class="attn-what">EarnFM</span>
+          <span class="attn-why mw-why"><span class="mw-title">You will get no more EarnFM claim reminders, here or as pushes.</span></span>
+          <button class="btn btn-secondary btn-sm btn-undo">Undo</button>
+        </div>
+      </div>
+      <div class="attn-foot mw4-foot"><details><summary>3 reminders are muted</summary></details><a href="#">Manage mutes in Settings</a></div>
+      <div class="toast success show toast-static" role="status">Muted the EarnFM claim reminder. <button class="btn btn-link">Undo</button></div>
+    </section>
+
+    <!-- ================= (d) ================= -->
+    <p class="state-label">(d) Muted items: one list in Settings, plus the short list at the foot of Money waiting.</p>
+    <p class="state-note">Money waiting mutes and the new per-service alert mutes sit in one table. It says who muted each one and when. You can add a mute here too, for a set time or until you undo it.</p>
+    <section class="attention money-waiting mw4" aria-label="Money waiting foot, open">
+      <div class="attn-foot mw4-foot" style="padding-top:0">
+        <details open><summary>3 reminders are muted</summary>
+          <ul>
+            <li><span>Honeygain, Keep a Honeygain device sharing, or make a payout</span><button class="btn btn-link">Unmute</button></li>
+            <li><span>Repocket, every reminder</span><button class="btn btn-link">Unmute</button></li>
+            <li><span>EarnFM, Claim your EarnFM balance</span><button class="btn btn-link">Unmute</button></li>
+          </ul>
+        </details>
+        <a href="#set-notify-d">Manage mutes in Settings</a>
+      </div>
+    </section>
+    <div class="mock-frame">
+      <div class="nset" id="set-notify-d">
+        <h4 style="font-size:var(--fs-3);font-weight:600;margin:0 0 2px">Muted services and reminders <span class="count">5</span></h4>
+        <p class="n-hint" style="margin-top:0">A mute is for everyone in this household. The Dashboard still shows a muted service's problems. Only reminders, the badge and pushes stop.</p>
+        <table class="n-mutes">
+          <thead><tr><th>Service</th><th>What is muted</th><th>Ends</th><th><span class="sr-only">Action</span></th></tr></thead>
+          <tbody>
+            <tr><td>Honeygain</td><td>Keep a Honeygain device sharing, or make a payout<span class="what-kind">Money waiting reminder. Muted by sergio, 12 Nov 2026.</span></td><td class="num">When you unmute it</td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+            <tr><td>Repocket</td><td>Every reminder<span class="what-kind">Money waiting, all rules. Muted by sergio, 3 Nov 2026.</span></td><td class="num">When you unmute it</td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+            <tr><td>EarnFM</td><td>Claim your EarnFM balance<span class="what-kind">Money waiting reminder. Muted by sergio, today.</span></td><td class="num">When you unmute it</td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+            <tr><td>proxylite</td><td>Every alert<span class="what-kind">Earner and earnings reading problems. Muted by sergio, 27 Nov 2026.</span></td><td class="num">5 Dec 2026</td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+            <tr><td>OPPO CPH1951 (5bdadbc5)</td><td>Box offline alerts<span class="what-kind">Box problems. Muted by sergio, 20 Nov 2026.</span></td><td class="num">When you unmute it</td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+          </tbody>
+        </table>
+        <div class="n-add" role="group" aria-label="Add a mute">
+          <select class="form-input" aria-label="Service or box"><option>bytelixir</option></select>
+          <select class="form-input" aria-label="What to mute"><option>Reminders and alerts</option><option>Reminders only</option><option>Alerts only</option></select>
+          <select class="form-input" aria-label="For how long"><option>Until I unmute it</option><option>1 day</option><option>1 week</option><option>30 days</option></select>
+          <button class="btn btn-secondary btn-sm">Mute</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= (e) ================= -->
+    <p class="state-label">(e) Settings, Notifications: the defaults. Four presets, and everything else behind "Advanced".</p>
+    <p class="state-note">"Everything" is what CashPilot does today, so nobody loses an alert on upgrade. The section is one block. The settings-page lane can move it anywhere.</p>
+    <div class="mock-frame">
+      <div class="page-head"><h1 class="page-title">Settings</h1></div>
+      <div class="settings-layout">
+        <nav class="settings-index" aria-label="Settings sections">
+          <a href="#">Earnings collection</a><a href="#">Credential health</a><a href="#set-notify-e" class="is-current" aria-current="true">Notifications</a><a href="#">Device ids</a><a href="#">Restore</a><a href="#">Encryption key</a><a href="#">Earner credentials</a><a href="#">Environment</a><a href="#">About and updates</a><a href="#">Import</a>
+        </nav>
+        <div class="settings-body">
+          <div class="card settings-section nset" id="set-notify-e">
+            <h3 class="settings-section-title">Notifications</h3>
+            <p class="settings-section-desc">Choose what interrupts you, and where. The Dashboard and the bell list always show every problem and reminder. These choices only change the badge, pop-ups and pushes.</p>
+            <fieldset>
+              <legend class="n-label" style="margin-top:0">Choose a preset</legend>
+              <div class="n-presets">
+                <label class="n-preset"><input type="radio" name="pe" checked><span class="n-preset-name">Everything <span class="n-preset-tag">as today</span></span><span class="n-preset-desc">Every alert and every reminder.</span><span class="n-preset-get">Badge: all<br>Push: all</span></label>
+                <label class="n-preset"><input type="radio" name="pe"><span class="n-preset-name">Only money</span><span class="n-preset-desc">Money waiting reminders and payout questions.</span><span class="n-preset-get">Badge: money<br>Push: money</span></label>
+                <label class="n-preset"><input type="radio" name="pe"><span class="n-preset-name">Only problems</span><span class="n-preset-desc">Earners, boxes and earnings reading that stop working.</span><span class="n-preset-get">Badge: problems<br>Push: problems</span></label>
+                <label class="n-preset"><input type="radio" name="pe"><span class="n-preset-name">Nothing</span><span class="n-preset-desc">No badge, no pop-ups, no pushes. You check the Dashboard.</span><span class="n-preset-get">Badge: off<br>Push: off</span></label>
+              </div>
+            </fieldset>
+            <div class="n-line">
+              <span class="n-key">Pause for a while</span>
+              <span class="seg" role="group" aria-label="Pause all notifications"><button aria-pressed="false">1 day</button><button aria-pressed="false">3 days</button><button aria-pressed="false">1 week</button></span>
+              <span class="n-hint" style="margin:0">Stops the badge and every push until then.</span>
+            </div>
+            <div class="n-line">
+              <span class="n-key">Push channels</span>
+              <span class="ch-list"><span><span class="dot dot-on"></span>ntfy</span><span><span class="dot dot-on"></span>Telegram</span><span><span class="dot dot-off"></span>Webhook: not set</span></span>
+              <a href="#" style="font-size:var(--fs-2)">Learn more</a>
+            </div>
+            <details class="n-adv">
+              <summary>Advanced <span class="n-adv-sum">Each kind and channel, quiet hours, minimum level. Now: reminders push only 09:00 to 21:00.</span></summary>
+            </details>
+            <div class="n-line">
+              <span class="n-key">Muted</span>
+              <span class="n-hint" style="margin:0">2 reminders. <a href="#set-notify-d">Show and manage</a></span>
+            </div>
+            <div class="settings-actions"><button class="btn btn-primary">Save notifications</button><span class="muted">No changes.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= (f) ================= -->
+    <p class="state-label">(f) Customised: quiet hours set, collector alerts off, two services muted. The preset turns to "Custom".</p>
+    <p class="state-note">A change under Advanced clears the preset and shows "Custom". Picking a preset again sets every choice below to that preset.</p>
+    <div class="mock-frame">
+      <div class="settings-body" style="max-width:1080px">
+        <div class="card settings-section nset" id="set-notify-f" style="margin-bottom:12px">
+          <h3 class="settings-section-title">Notifications</h3>
+          <p class="settings-section-desc">Choose what interrupts you, and where. The Dashboard and the bell list always show every problem and reminder. These choices only change the badge, pop-ups and pushes.</p>
+          <fieldset>
+            <legend class="n-label" style="margin-top:0">Choose a preset</legend>
+            <div class="n-presets">
+              <label class="n-preset"><input type="radio" name="pf"><span class="n-preset-name">Everything <span class="n-preset-tag">as today</span></span><span class="n-preset-desc">Every alert and every reminder.</span></label>
+              <label class="n-preset"><input type="radio" name="pf"><span class="n-preset-name">Only money</span><span class="n-preset-desc">Money waiting reminders and payout questions.</span></label>
+              <label class="n-preset"><input type="radio" name="pf"><span class="n-preset-name">Only problems</span><span class="n-preset-desc">Earners, boxes and earnings reading that stop working.</span></label>
+              <label class="n-preset"><input type="radio" name="pf"><span class="n-preset-name">Nothing</span><span class="n-preset-desc">No badge, no pop-ups, no pushes. You check the Dashboard.</span></label>
+            </div>
+            <p class="n-custom" role="status"><span class="pill">Custom</span> You changed choices under Advanced, so no preset fits. Pick one to start again from it.</p>
+          </fieldset>
+          <div class="n-line">
+            <span class="n-key">Pause for a while</span>
+            <span class="seg" role="group" aria-label="Pause all notifications"><button aria-pressed="false">1 day</button><button aria-pressed="false">3 days</button><button aria-pressed="false">1 week</button></span>
+          </div>
+
+          <details class="n-adv" open>
+            <summary>Advanced</summary>
+            <div class="n-adv-body">
+              <h4>What tells you, and how</h4>
+              <div class="table-scroll">
+              <table class="n-matrix">
+                <thead>
+                  <tr><th></th><th colspan="3" class="grp">On your account</th><th class="grp">Household</th></tr>
+                  <tr><th>Kind</th><th>Badge</th><th>Pop-up</th><th>Browser</th><th>Push</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td><span class="n-kind">Money waiting reminders</span><span class="n-eg">EarnFM: claim within 3 days</span></td><td data-col="Badge"><input type="checkbox" checked aria-label="Money waiting: badge"></td><td data-col="Pop-up"><input type="checkbox" aria-label="Money waiting: pop-up"></td><td data-col="Browser"><input type="checkbox" aria-label="Money waiting: browser"></td><td data-col="Push"><input type="checkbox" checked aria-label="Money waiting: push"></td></tr>
+                  <tr><td><span class="n-kind">Payout questions</span><span class="n-eg">storj — payout?</span></td><td data-col="Badge"><input type="checkbox" checked aria-label="Payout questions: badge"></td><td data-col="Pop-up"><input type="checkbox" aria-label="Payout questions: pop-up"></td><td data-col="Browser"><input type="checkbox" aria-label="Payout questions: browser"></td><td data-col="Push"><input type="checkbox" checked aria-label="Payout questions: push"></td></tr>
+                  <tr class="is-off" ><td><span class="n-kind" data-off="Off">Earnings reading problems</span><span class="n-eg">earnfm — credential expired</span></td><td data-col="Badge"><input type="checkbox" aria-label="Earnings reading problems: badge"></td><td data-col="Pop-up"><input type="checkbox" aria-label="Earnings reading problems: pop-up"></td><td data-col="Browser"><input type="checkbox" aria-label="Earnings reading problems: browser"></td><td data-col="Push"><input type="checkbox" aria-label="Earnings reading problems: push"></td></tr>
+                  <tr><td><span class="n-kind">Earner problems</span><span class="n-eg">honeygain — not running</span></td><td data-col="Badge"><input type="checkbox" checked aria-label="Earner problems: badge"></td><td data-col="Pop-up"><input type="checkbox" checked aria-label="Earner problems: pop-up"></td><td data-col="Browser"><input type="checkbox" aria-label="Earner problems: browser"></td><td data-col="Push"><input type="checkbox" checked aria-label="Earner problems: push"></td></tr>
+                  <tr><td><span class="n-kind">Box problems</span><span class="n-eg">geiserback — Docker unreachable</span></td><td data-col="Badge"><input type="checkbox" checked aria-label="Box problems: badge"></td><td data-col="Pop-up"><input type="checkbox" checked aria-label="Box problems: pop-up"></td><td data-col="Browser"><input type="checkbox" checked aria-label="Box problems: browser"></td><td data-col="Push"><input type="checkbox" checked aria-label="Box problems: push"></td></tr>
+                  <tr><td><span class="n-kind">Activity alerts<span class="owner">owner only</span></span><span class="n-eg">an earner reached into the LAN</span></td><td data-col="Badge"><input type="checkbox" checked aria-label="Activity alerts: badge"></td><td data-col="Pop-up"><input type="checkbox" aria-label="Activity alerts: pop-up"></td><td data-col="Browser"><input type="checkbox" aria-label="Activity alerts: browser"></td><td data-col="Push"><input type="checkbox" checked aria-label="Activity alerts: push"></td></tr>
+                  <tr><td><span class="n-kind">Update notices</span><span class="n-eg">CashPilot 3.2.0 is out</span></td><td data-col="Banner"><input type="checkbox" checked aria-label="Update notices: banner"> <span class="n-na">banner</span></td><td data-col="Pop-up"><span class="n-na" aria-label="Not available">—</span></td><td data-col="Browser"><span class="n-na" aria-label="Not available">—</span></td><td data-col="Push"><input type="checkbox" aria-label="Update notices: push"></td></tr>
+                </tbody>
+              </table>
+              </div>
+              <p class="n-hint">"Earnings reading problems" is what the bell calls collector alerts: CashPilot could not read a balance. Off means no badge and no push. They still show in the bell list and in Needs attention.</p>
+              <details class="n-more"><summary>Learn more: what each kind holds</summary>
+                <dl>
+                  <dt>Money waiting reminders</dt><dd>A reminder reached a new warning stage. More than 3 at once arrive as one summary.</dd>
+                  <dt>Payout questions</dt><dd>A balance dropped. Was it a payout? (payout)</dd>
+                  <dt>Earnings reading problems</dt><dd>collector, notice, flatline, account disabled, credential forecast</dd>
+                  <dt>Earner problems</dt><dd>container stopped, missing, proxied copy down, stall, proxy cap</dd>
+                  <dt>Box problems</dt><dd>worker offline (at most once in 6 h), Docker unreachable</dd>
+                  <dt>Activity alerts</dt><dd>activity mail, activity LAN, activity spike. A spike never pushes.</dd>
+                  <dt>Update notices</dt><dd>A newer release exists. You can still dismiss each version in this browser.</dd>
+                </dl>
+              </details>
+
+              <h4>Minimum level for pushes</h4>
+              <div class="n-line" style="margin-top:4px">
+                <span class="seg" role="group" aria-label="Minimum level for pushes"><button aria-pressed="false">Info and up</button><button aria-pressed="true">Warnings and up</button><button aria-pressed="false">Urgent only</button></span>
+                <details class="n-more" style="margin:0"><summary>What is urgent?</summary>
+                  <dl>
+                    <dt>Urgent</dt><dd>Money lost within 3 days or overdue, account disabled, credential rejected, box offline, Docker unreachable, an earner sent mail or reached the LAN.</dd>
+                    <dt>Warning</dt><dd>A reminder inside 7 days, "Arrived?", earner stopped or stalled, payout question, reading failed for a while.</dd>
+                    <dt>Info</dt><dd>Everything else: a balance ready to cash out, notices, forecasts, spikes, updates.</dd>
+                  </dl>
+                </details>
+              </div>
+
+              <h4>Channels</h4>
+              <div class="n-grid">
+                <span class="n-name"><span class="dot dot-on"></span>ntfy</span>
+                <span class="n-meta">On. Set by <code>CASHPILOT_NTFY_URL</code>.</span>
+                <select class="form-input" aria-label="ntfy sends"><option>All chosen kinds</option></select>
+                <button class="btn btn-ghost btn-sm">Send a test</button>
+                <hr>
+                <span class="n-name"><span class="dot dot-on"></span>Telegram</span>
+                <span class="n-meta">On. Set by <code>CASHPILOT_TELEGRAM_BOT_TOKEN</code> and <code>…_CHAT_ID</code>.</span>
+                <select class="form-input" aria-label="Telegram sends"><option>Urgent only</option></select>
+                <button class="btn btn-ghost btn-sm">Send a test</button>
+                <hr>
+                <span class="n-name"><span class="dot dot-off"></span>Webhook</span>
+                <span class="n-meta">Not set. Set <code>CASHPILOT_WEBHOOK_URL</code>, then restart. <a href="#">Learn more</a></span>
+                <span></span><span></span>
+              </div>
+              <p class="n-hint">Every push hides tokens and device ids, and is cut to 400 characters.</p>
+
+              <h4>Quiet hours</h4>
+              <div class="n-quiet">
+                <label><input type="checkbox" checked> Hold pushes from</label>
+                <input type="time" class="form-input" value="22:00" aria-label="Quiet from">
+                <span>to</span>
+                <input type="time" class="form-input" value="08:00" aria-label="Quiet until">
+                <span class="days" role="group" aria-label="Days"><button aria-pressed="true">Mon</button><button aria-pressed="true">Tue</button><button aria-pressed="true">Wed</button><button aria-pressed="true">Thu</button><button aria-pressed="true">Fri</button><button aria-pressed="true">Sat</button><button aria-pressed="true">Sun</button></span>
+              </div>
+              <div class="n-sub-opts n-quiet">
+                <label><input type="radio" name="qh" checked> Send one summary when quiet hours end</label>
+                <label><input type="radio" name="qh"> Drop them</label>
+                <label><input type="checkbox" checked> Urgent ones still come through</label>
+              </div>
+              <p class="n-hint">Time zone: Europe/Madrid, from your account. <a href="#">Change</a>. This replaces the fixed 09:00 to 21:00 window for reminders.</p>
+
+              <h4>Muted services and reminders <span class="count">4</span></h4>
+              <table class="n-mutes">
+                <thead><tr><th>Service</th><th>What is muted</th><th>Ends</th><th><span class="sr-only">Action</span></th></tr></thead>
+                <tbody>
+                  <tr><td>Repocket</td><td>Every reminder and alert<span class="what-kind">Muted by sergio, 3 Nov 2026</span></td><td class="num">When you unmute it</td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                  <tr><td>proxylite</td><td>Every alert<span class="what-kind">Muted by sergio, 27 Nov 2026</span></td><td class="num">5 Dec 2026</td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                  <tr><td>Honeygain</td><td>Keep a Honeygain device sharing, or make a payout<span class="what-kind">Money waiting reminder</span></td><td class="num">When you unmute it</td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                  <tr><td>EarnFM</td><td>Claim your EarnFM balance<span class="what-kind">Money waiting reminder</span></td><td class="num">When you unmute it</td><td><button class="btn btn-ghost btn-sm">Unmute</button></td></tr>
+                </tbody>
+              </table>
+              <div class="n-add" role="group" aria-label="Add a mute">
+                <select class="form-input" aria-label="Service or box"><option>Choose a service or box</option></select>
+                <select class="form-input" aria-label="What to mute"><option>Reminders and alerts</option></select>
+                <select class="form-input" aria-label="For how long"><option>Until I unmute it</option></select>
+                <button class="btn btn-secondary btn-sm">Mute</button>
+              </div>
+            </div>
+          </details>
+          <div class="settings-actions"><button class="btn btn-primary">Save notifications</button><span class="muted">3 changes not saved.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= (g) ================= -->
+    <p class="state-label">(g) "Nothing": how the section, the bell and Money waiting look.</p>
+    <p class="state-note">The bell shows a crossed-out icon and no badge. Its list still opens, so a fault is never hidden. Money waiting keeps its rows and says that reminders do not push.</p>
+    <div class="mock-frame">
+      <div class="card settings-section nset" style="margin-bottom:14px">
+        <h3 class="settings-section-title">Notifications</h3>
+        <fieldset>
+          <legend class="sr-only">Choose a preset</legend>
+          <div class="n-presets">
+            <label class="n-preset"><input type="radio" name="pg"><span class="n-preset-name">Everything <span class="n-preset-tag">as today</span></span><span class="n-preset-desc">Every alert and every reminder.</span></label>
+            <label class="n-preset"><input type="radio" name="pg"><span class="n-preset-name">Only money</span><span class="n-preset-desc">Money waiting reminders and payout questions.</span></label>
+            <label class="n-preset"><input type="radio" name="pg"><span class="n-preset-name">Only problems</span><span class="n-preset-desc">Earners, boxes and earnings reading that stop working.</span></label>
+            <label class="n-preset"><input type="radio" name="pg" checked><span class="n-preset-name">Nothing</span><span class="n-preset-desc">No badge, no pop-ups, no pushes. You check the Dashboard.</span></label>
+          </div>
+        </fieldset>
+        <div class="n-status" role="status"><span>Notifications are off. Nothing interrupts you. The Dashboard still shows everything.</span><button class="btn btn-ghost btn-sm">Turn on everything</button></div>
+      </div>
+
+      <section class="attention money-waiting mw4" aria-label="Money waiting, notifications off" style="margin:14px 0 18px">
+          <div class="block-head"><h2 class="block-title">Money waiting <span class="count">5</span></h2><a href="#set-notify-e" class="pill pill-off">Reminders do not push</a></div>
+          <div class="attn-list">
+            <div class="attn-row attn-warn mw-row">
+              <span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span>
+              <span class="attn-why mw-why"><span class="mw-title">Claim last month's MystNodes rewards</span><span class="mw4-meta"><span class="mw-when">by 1 Dec 2026, 3 days left</span></span></span>
+              <span class="attn-actions"><a class="btn btn-primary btn-sm btn-open" href="#">Open MystNodes<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a><span class="split-wrap"><span class="split"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span></span></span>
+            </div>
+          </div>
+        </section>
+      <div class="mock-reserve-bell">
+        <header class="topbar topbar-static">
+          <a href="#" class="topbar-brand"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#f472b6"/></svg><span>CashPilot</span></a>
+          <div class="topbar-right">
+            <div class="topbar-earnings"><span>$52.07</span></div>
+            <div class="topbar-notifications">
+              <button class="topbar-icon-btn topbar-notify-btn is-off" aria-label="Alerts, notifications off, 4 open" aria-expanded="true" title="Notifications are off"><svg width="16" height="16" aria-hidden="true"><use href="#i-bell-off"/></svg></button>
+              <div class="notify-dropdown static-open">
+                <div class="notify-header"><span>Alerts</span><a href="#set-notify-e">Notification settings</a></div>
+                <div class="notify-off-line">Notifications are off. These alerts stay here without a badge or push.</div>
+                <div class="notify-list">
+                  <div class="notify-item"><span class="notify-item-icon"><svg width="16" height="16" aria-hidden="true"><use href="#i-warn"/></svg></span><div class="notify-item-body"><div class="notify-item-platform">geiserback — Docker unreachable</div><div class="notify-item-msg">The worker cannot reach Docker. How to fix</div></div></div>
+                  <div class="notify-item"><span class="notify-item-icon"><svg width="16" height="16" aria-hidden="true"><use href="#i-warn"/></svg></span><div class="notify-item-body"><div class="notify-item-platform">earnfm — credential expired</div><div class="notify-item-msg">Sign in again and paste a fresh token.</div></div></div>
+                  <div class="notify-item"><span class="notify-item-icon i-info"><svg width="16" height="16" aria-hidden="true"><use href="#i-coin"/></svg></span><div class="notify-item-body"><div class="notify-item-platform">storj — payout?</div><div class="notify-item-msg">The balance dropped by 14.20 STORJ.</div></div></div>
+                  <div class="notify-item"><span class="notify-item-icon"><svg width="16" height="16" aria-hidden="true"><use href="#i-warn"/></svg></span><div class="notify-item-body"><div class="notify-item-platform" style="text-transform:none">worker 'OPPO CPH1951 (5bdadbc5)' went offline</div><div class="notify-item-msg">No heartbeat for 40 minutes.</div></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="topbar-avatar-wrap"><button class="topbar-avatar" aria-label="User menu">S</button></div>
+          </div>
+        </header>
+        
+      </div>
+      <p class="state-note" style="margin-top:8px">The update banner does not show while notifications are off. The version is still on Settings, About and updates.</p>
+    </div>
+
+    <!-- ================= (h) ================= -->
+    <p class="state-label">(h) Other states: a viewer, a failed check, no snooze left, paused, no channel, an error toast.</p>
+    <div class="mock-frame">
+      <section class="attention money-waiting mw4" aria-label="Viewer and failed check">
+        <div class="block-head"><h2 class="block-title">Money waiting <span class="count">1</span> <span class="muted" style="font-weight:400;font-size:var(--fs-2)">(as a viewer)</span></h2></div>
+        <div class="attn-list">
+          <div class="attn-row attn-ask mw-row">
+            <span class="attn-tag">Keep active</span><span class="attn-what">PacketStream</span>
+            <span class="attn-why mw-why"><span class="mw-title">Log in to PacketStream to keep the balance</span>
+              <span class="mw4-meta"><span class="mw-when">by 10 Dec 2026, 12 days left</span><button class="chip" aria-expanded="false">How</button><button class="chip" aria-expanded="false"><svg width="12" height="12" aria-hidden="true"><use href="#i-doc"/></svg>Provider's rule</button></span></span>
+            <span class="attn-actions"><a class="btn btn-primary btn-sm btn-open" href="#">Open PacketStream<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a><span></span></span>
+          </div>
+        </div>
+        <div class="attn-foot mw4-foot"><details><summary>2 reminders are muted</summary></details></div>
+      </section>
+      <section class="attention money-waiting mw4" aria-label="Check failed">
+        <div class="block-head"><h2 class="block-title">Money waiting <span class="count"></span></h2></div>
+        <div class="attn-list">
+          <div class="attn-row attn-unknown mw-row"><span class="attn-tag">Unknown</span><span class="attn-what">Money waiting</span><span class="attn-why">Could not check. Reload the page to try again.</span></div>
+        </div>
+      </section>
+      <section class="attention money-waiting mw4 mock-reserve-pop" aria-label="Snooze not possible">
+        <div class="attn-list">
+          <div class="attn-row attn-warn mw-row">
+            <span class="attn-tag">Claim</span><span class="attn-what">MystNodes</span>
+            <span class="attn-why mw-why"><span class="mw-title">Claim last month's MystNodes rewards</span><span class="mw4-meta"><span class="mw-when">by 1 Dec 2026, 3 days left</span></span></span>
+            <span class="attn-actions"><a class="btn btn-primary btn-sm btn-open" href="#">Open MystNodes<svg width="12" height="12" aria-hidden="true"><use href="#i-ext"/></svg></a><span class="split-wrap"><span class="split"><button class="btn btn-ghost btn-sm">Done</button><button class="btn btn-ghost btn-sm btn-caret" aria-haspopup="menu" aria-expanded="true" aria-label="Snooze or mute this reminder"><svg width="14" height="14" aria-hidden="true"><use href="#i-caret"/></svg></button></span>
+              <span class="split-menu" role="menu" aria-label="MystNodes claim">
+                <span class="menu-group">Later</span>
+                <button class="menu-item" role="menuitem" disabled aria-describedby="ns-why">Snooze<span class="mi-hint" id="ns-why">Too close to the deadline to snooze.</span></button>
+                <span class="menu-sep"></span>
+                <span class="menu-group">Stop reminding me</span>
+                <button class="menu-item" role="menuitem">Mute this reminder<span class="mi-hint">Only "claim" for MystNodes.</span></button>
+                <button class="menu-item" role="menuitem">Mute all MystNodes reminders<span class="mi-hint">Every reminder for this service.</span></button>
+              </span></span></span>
+          </div>
+        </div>
+      </section>
+      <div class="nset">
+        <div class="n-status is-info" role="status"><span>Paused until Mon 1 Dec 2026, 09:00. No badge and no pushes until then.</span><button class="btn btn-ghost btn-sm">Resume now</button></div>
+        <div class="n-line">
+          <span class="n-key">Push channels</span>
+          <span class="n-hint" style="margin:0">No push channel is set. Alerts show only in the bell and on the Dashboard. <a href="#">How to set one</a></span>
+        </div>
+      </div>
+      <div class="toast error show toast-static" role="alert">Too close to its deadline to snooze</div>
+      <div style="height:10px"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// Show/hide only, for clicking around the mockup. Escape closes any open menu or popover.
+document.addEventListener('click', (e) => {
+  const caret = e.target.closest('.btn-caret');
+  const chip = e.target.closest('.chip');
+  const btn = caret || chip;
+  if (!btn) return;
+  const id = btn.getAttribute('aria-controls');
+  const panel = id ? document.getElementById(id) : null;
+  const open = btn.getAttribute('aria-expanded') !== 'true';
+  btn.setAttribute('aria-expanded', String(open));
+  if (panel) panel.hidden = !open;
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('[aria-expanded="true"][aria-controls]').forEach((b) => {
+    b.setAttribute('aria-expanded', 'false');
+    const p = document.getElementById(b.getAttribute('aria-controls'));
+    if (p) p.hidden = true;
+  });
+});
+</script>
+</body>
+</html>
