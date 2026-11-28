@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet, lower half: recommended design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<style>
+/* ===== Only the new parts. Everything else is app/static/css/style.css. ===== */
+
+/* Mockup chrome: not part of the design. */
+.mock-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 6px 0 14px; }
+.mock-head h1 { font-size: var(--fs-5); font-weight: 600; margin: 0; }
+.mock-skip { border: 1px dashed var(--border-light); color: var(--text-muted); font-size: var(--fs-2); padding: 10px 12px; margin-bottom: 28px; }
+.mock-note { border-left: 2px dashed var(--accent-secondary); color: var(--accent-secondary); font-size: var(--fs-1); padding: 2px 10px; margin: 8px 0 0; max-width: 110ch; }
+.state-head { margin: 48px 0 6px; padding-top: 18px; border-top: 2px solid var(--border-strong); }
+.state-head h2 { font-size: var(--fs-4); font-weight: 600; margin: 0 0 4px; }
+.state-panel { border: 1px dashed var(--border-light); padding: 14px 16px 10px; margin: 18px 0; }
+.state-label { display: inline-block; font-family: var(--font-mono); font-size: var(--fs-1); color: var(--accent-secondary);
+  border: 1px solid var(--accent-secondary); padding: 0 6px; margin-bottom: 10px; }
+.state-panel > section { margin-bottom: 8px; }
+
+/* ----- Shared: aligned tables. They keep their head under 1100 px (style.css:2257 hides it for the Boxes cards). ----- */
+.fleet-table.tidy { display: table; }
+.fleet-table.tidy thead { display: table-header-group; }
+.fleet-table.tidy tbody { display: table-row-group; }
+.fleet-table.tidy td { vertical-align: middle; padding-top: 6px; padding-bottom: 6px; overflow-wrap: normal; }
+.fleet-table.tidy .c-num { text-align: right; font-family: var(--font-mono); font-size: var(--fs-2); white-space: nowrap; }
+.fleet-table.tidy th.c-num { font-family: var(--font-ui); }
+.fleet-table.tidy .c-act { text-align: right; white-space: nowrap; width: 1%; padding-right: 4px; }
+.fleet-table.tidy .c-name { font-family: var(--font-mono); font-size: var(--fs-2); font-weight: 600; white-space: nowrap; }
+.fleet-table.tidy .c-dim { color: var(--text-muted); }
+.sub-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  font-size: var(--fs-2); font-weight: 600; color: var(--text-secondary); margin: 0 0 2px; }
+.sub-title .muted { font-weight: 400; }
+.tidy-note { font-size: var(--fs-2); color: var(--text-muted); margin: 8px 0 0; max-width: 76ch; }
+.tidy-note + .tidy-note { margin-top: 4px; }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); color: var(--text-secondary); }
+
+/* ----- Running costs ----- */
+.costs-settings { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 10px; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
+.costs-settings .btn { height: 30px; }
+.costs-settings .form-hint { flex-basis: 100%; margin: 0; }
+.costs-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 40px; margin-top: 16px; align-items: start; }
+.power-missing { color: var(--text-muted); font-size: var(--fs-2); white-space: nowrap; }
+.power-missing .btn-link { color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; margin-left: 8px; font-size: var(--fs-2); }
+.svc-block { max-width: 640px; }
+.mach-table th:first-child { width: 40%; }
+.verdict { min-width: 30ch; }
+.heat-toggle { font-size: var(--fs-2); color: var(--text-secondary); gap: 4px; }
+.heat-toggle::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px); margin-left: 6px; }
+.heat-toggle[aria-expanded="true"]::after { transform: rotate(-135deg) translateY(-1px); }
+.heat-row > td { background: var(--bg-secondary); padding: 12px 14px 14px !important; }
+.heat-grid { display: grid; grid-template-columns: 260px 220px minmax(0, 1fr); gap: 10px 16px; align-items: end; }
+.heat-grid .form-input { width: 100%; }
+.heat-months-grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(12, auto); justify-content: start; gap: 4px 14px; border: 0; padding: 0; margin: 0; }
+.heat-months-grid legend { font-size: var(--fs-2); color: var(--text-secondary); font-weight: 500; padding: 0; margin-bottom: 4px; }
+.heat-months-grid label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-2); color: var(--text-secondary); }
+.heat-actions { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.verdict { display: block; font-family: var(--font-ui); font-weight: 400; font-size: var(--fs-1); color: var(--text-muted); white-space: normal; }
+.dev-watts { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.dev-watts .form-input { width: 6rem; height: 26px; }
+.dev-watts label { font-size: var(--fs-2); color: var(--text-muted); }
+
+/* ----- Proxies: block head with its add button ----- */
+.head-actions { display: inline-flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+
+/* What is a copy? Open until the owner hides it once (localStorage). */
+.explain { border: 1px solid var(--border-color); background: var(--bg-input); padding: 10px 14px 12px; margin: 12px 0 14px; }
+.explain-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.explain-head h3 { font-size: var(--fs-2); font-weight: 600; margin: 0; color: var(--text-primary); }
+.explain-head .btn-link, .explain-show { font-size: var(--fs-2); color: var(--text-secondary); text-decoration: underline; text-underline-offset: 2px; }
+.loading-line { display: flex; align-items: center; font-size: var(--fs-2); }
+.explain-body { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 12px 32px; align-items: start; }
+.lanes { display: grid; grid-template-columns: max-content max-content 14px max-content 14px max-content 14px max-content; gap: 6px 8px; align-items: center; justify-content: start; font-size: var(--fs-2); }
+.lanes .hd { font-size: var(--fs-1); color: var(--text-muted); }
+.lanes .lab { font-size: var(--fs-1); color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; padding-right: 4px; }
+.chip { font-family: var(--font-mono); font-size: var(--fs-2); padding: 1px 7px; border: 1px solid var(--border-light); white-space: nowrap; color: var(--text-primary); }
+.chip.ui { font-family: var(--font-ui); }
+.chip.copy { border-color: var(--accent); }
+.arr { color: var(--text-muted); text-align: center; }
+.lanes .end { color: var(--text-secondary); white-space: nowrap; }
+.lanes .end .mono { color: var(--text-primary); }
+.facts { margin: 0; padding: 0 0 0 16px; font-size: var(--fs-2); color: var(--text-secondary); }
+.facts li { margin: 0 0 3px; }
+.facts strong { color: var(--text-primary); font-weight: 600; }
+
+/* One card per proxy: a head with the proxy's facts and actions, then a table of its copies. */
+.px-card { border: 1px solid var(--border-color); margin-bottom: 14px; }
+.px-head { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1.15fr) auto;
+  grid-template-areas: "name exit traffic acts"; gap: 8px 24px; align-items: start; padding: 10px 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); }
+.px-head .a-name { grid-area: name; } .px-head .a-exit { grid-area: exit; } .px-head .a-traffic { grid-area: traffic; } .px-head .a-acts { grid-area: acts; }
+.px-name { font-weight: 600; display: block; }
+.px-sub { display: block; font-size: var(--fs-2); color: var(--text-muted); }
+.px-k { display: block; font-size: var(--fs-1); color: var(--text-muted); margin-bottom: 1px; }
+.px-v { font-family: var(--font-mono); font-size: var(--fs-2); white-space: nowrap; }
+.px-sub.warn { color: var(--warning); }
+.px-acts { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; }
+.px-acts .lbl { font-size: var(--fs-2); color: var(--text-muted); white-space: nowrap; }
+.px-acts select.form-input { height: 24px; width: 9.5rem; font-size: var(--fs-2); padding: 0 4px; }
+.px-acts .sep { width: 1px; align-self: stretch; background: var(--border-light); margin: 0 4px; }
+.px-acts .btn { min-width: 58px; justify-content: center; }
+.traffic-line { font-size: var(--fs-2); }
+.meter-line { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+.meter { position: relative; display: block; width: 160px; height: 6px; background: var(--bg-tertiary); border: 1px solid var(--border-light); }
+.meter > i { display: block; height: 100%; background: var(--text-muted); }
+.meter.warn > i { background: var(--warning); }
+.meter.fail > i { background: var(--error); }
+.meter > b { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--text-primary); }
+
+.cp-table { table-layout: fixed; }
+.cp-table col.k1 { width: 26%; } .cp-table col.k2 { width: 15%; } .cp-table col.k4 { width: 196px; }
+.cp-table th:first-child, .cp-table td:first-child { padding-left: 12px !important; }
+.cp-table th:last-child, .cp-table td:last-child { padding-right: 12px !important; }
+.cp-table td { font-size: var(--fs-2); }
+.cp-table .slug { font-family: var(--font-mono); }
+.cp-table .flag { display: inline-block; white-space: nowrap; margin-top: 2px; }
+.net-sub { display: block; font-family: var(--font-ui); font-size: var(--fs-1); color: var(--text-muted); }
+.cp-table .status-dot { margin-right: 8px; vertical-align: 1px; }
+.status-dot.idle { background: var(--text-muted); }
+.status-dot.fail { background: var(--error); }
+.st-word { color: var(--text-primary); }
+.st-word.fail { color: var(--error); font-weight: 500; }
+.st-word.idle { color: var(--text-secondary); }
+.st-word.unk { color: var(--warning); }
+.why { display: block; font-size: var(--fs-1); color: var(--text-muted); white-space: normal; }
+.why.warn { color: var(--warning); }
+.cp-acts { display: inline-flex; gap: 6px; }
+.cp-acts .btn { min-width: 86px; justify-content: center; }
+.cp-acts .btn.hold { visibility: hidden; }
+.cp-foot td { border-bottom: 0 !important; padding-top: 8px !important; padding-bottom: 10px !important; }
+.cp-foot .btn { gap: 6px; }
+.cp-none { color: var(--text-muted); }
+
+/* Exit IPs that providers see */
+.exits { margin-top: 18px; }
+.exits-table col.e1 { width: 19%; } .exits-table col.e2 { width: 36%; }
+.exits-table td { font-size: var(--fs-2); }
+.exits-table td.ip { font-family: var(--font-mono); white-space: nowrap; }
+.exits-table .own { display: block; color: var(--text-muted); }
+.exits-table .meaning.warn { color: var(--warning); }
+
+/* ----- Forms: grouped fieldsets on a 2-column grid ----- */
+.add-worker-body.wide { max-width: none; }
+.pf-layout { display: grid; grid-template-columns: minmax(0, 760px) minmax(0, 1fr); gap: 36px; align-items: start; }
+.fs { border: 1px solid var(--border-color); border-radius: 2px; padding: 8px 14px 14px; margin: 0 0 12px; min-width: 0; }
+.fs > legend { padding: 0 6px; margin-left: -6px; font-size: var(--fs-2); font-weight: 600; color: var(--text-secondary); }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.form-grid .form-input { width: 100%; }
+.form-grid .span-2 { grid-column: 1 / -1; }
+.form-grid .form-hint { margin-top: 4px; }
+.field-check { display: flex; align-items: center; height: 30px; margin-top: 21px; }
+.stored { font-weight: 400; color: var(--text-muted); margin-left: 6px; }
+.form-actions { display: flex; gap: 10px; align-items: center; margin-top: 4px; }
+.aside { border-left: 1px solid var(--border-color); padding-left: 18px; font-size: var(--fs-2); color: var(--text-muted); max-width: 52ch; margin: 0; }
+.aside dt { color: var(--text-secondary); font-weight: 600; margin-top: 10px; }
+.aside dt:first-child { margin-top: 0; }
+.aside dd { margin: 2px 0 0; }
+
+/* ----- Run a copy ----- */
+.copy-lead { color: var(--text-secondary); margin: 0 0 12px; max-width: 90ch; }
+.copy-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 280px)); gap: 12px 16px; align-items: end; }
+.copy-form-grid .form-input { width: 100%; }
+.copy-form-grid .form-hint { grid-column: 1 / -1; margin: -4px 0 0; }
+.copy-check { margin-top: 12px; max-width: 1000px; font-size: var(--fs-2); padding: 10px 14px; border: 1px solid var(--border-color); border-left-width: 3px; background: var(--bg-card); }
+.copy-check.ok { border-left-color: var(--success); }
+.copy-check.warn { border-left-color: var(--warning); }
+.copy-check.fail { border-left-color: var(--error); }
+.copy-check.busy { border-left-color: var(--border-strong); }
+.copy-check .head { font-weight: 600; color: var(--text-primary); }
+.copy-check .mark-ok { color: var(--success); font-weight: 600; margin-right: 4px; }
+.copy-check .mark-fail { color: var(--error); font-weight: 600; margin-right: 4px; }
+.copy-check .say { margin: 6px 0 0; color: var(--text-secondary); }
+.copy-check .say .mono { color: var(--text-primary); }
+.copy-check dl { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr); gap: 4px 14px; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--border-color); }
+.copy-check dt { color: var(--text-muted); }
+.copy-check dd { margin: 0; color: var(--text-primary); }
+.copy-check dd .muted { font-size: var(--fs-1); }
+.copy-check ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.copy-check li { margin-top: 6px; }
+.copy-check li .check { align-items: flex-start; color: var(--text-primary); }
+.copy-check li .check input { margin-top: 3px; flex: none; }
+.copy-check .side { margin: 8px 0 0; color: var(--text-muted); }
+.copy-check .ipwarn { margin: 8px 0 0; color: var(--warning); }
+.copy-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+.copy-foot .muted { font-size: var(--fs-2); }
+.copy-foot .count { font-family: var(--font-ui); color: var(--warning); font-size: var(--fs-2); margin: 0; }
+.copy-check .ack-title { margin: 10px 0 0; color: var(--text-primary); font-weight: 600; }
+.spin { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--border-strong); border-top-color: var(--text-secondary); border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+
+/* ----- Add a box ----- */
+.addbox-layout { display: grid; grid-template-columns: minmax(0, 62ch) minmax(0, 1fr); gap: 36px; align-items: start; }
+.ways { list-style: none; padding: 0; margin: 0; }
+.ways li { padding: 8px 0; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); }
+.ways li:first-child { padding-top: 0; }
+.ways li:last-child { border-bottom: 0; }
+.way { display: block; font-weight: 600; color: var(--text-primary); font-size: var(--fs-2); margin-bottom: 2px; }
+.env-actions .push-right { margin-left: auto; }
+.env-code { display: block; white-space: pre-wrap; word-break: break-all; font-size: var(--fs-2); color: var(--text-primary); }
+.env-fallback textarea { width: 100%; height: auto; padding: 6px 8px; margin-top: 8px; font-size: var(--fs-2); }
+
+/* ----- Narrow ----- */
+@media (max-width: 1100px) {
+  .costs-grid, .pf-layout, .addbox-layout, .explain-body { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .aside { border-left: 0; padding-left: 0; border-top: 1px solid var(--border-color); padding-top: 12px; }
+  .heat-months-grid { grid-template-columns: repeat(6, auto); }
+  .fleet-table.tidy .c-name { white-space: normal; }
+  .px-head { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "name acts" "exit traffic"; }
+  .copy-check dl { grid-template-columns: max-content minmax(0, 1fr); }
+}
+@media (max-width: 1000px) {
+  .heat-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .exits-table col.e1 { width: 26%; } .exits-table col.e2 { width: 34%; }
+  .cp-table col.k1 { width: 30%; } .cp-table col.k2 { width: 17%; }
+  .fleet-table.tidy .c-act { white-space: normal; }
+  .heat-toggle { white-space: normal; text-align: right; }
+  .dev-watts { flex-wrap: wrap; white-space: normal; }
+  .verdict { min-width: 22ch; }
+}
+</style>
+</head>
+<body>
+<main class="page-content">
+
+<div class="mock-head">
+  <h1>Fleet</h1>
+  <span class="muted">Recommended design: design 1 as the base, with the grafts the judges agreed on.</span>
+</div>
+<div class="mock-skip">The four stats and the Boxes table stay as they are. They are not shown here.</div>
+
+<!-- =========================================================
+     1. RUNNING COSTS
+     ========================================================= -->
+<section class="fleet-economics" id="fleet-economics-card">
+  <div class="block-head">
+    <h2 class="block-title">Running costs</h2>
+    <span class="block-meta" id="fleet-economics-quality">Costs are known for 0 of 5 machines.</span>
+  </div>
+
+  <div class="costs-settings" id="power-settings">
+    <div>
+      <label for="power-price" class="form-label">Electricity price per kWh</label>
+      <input id="power-price" class="form-input form-input-price" type="number" step="0.001" min="0" value="0.17">
+    </div>
+    <div>
+      <label for="power-currency" class="form-label">Currency</label>
+      <input id="power-currency" class="form-input form-input-code" type="text" maxlength="4" value="EUR">
+    </div>
+    <button class="btn btn-primary" id="power-save">Save</button>
+    <p class="form-hint" id="power-help">Your tariff, as it appears on your bill. Figures below are converted to USD.</p>
+  </div>
+
+  <div class="costs-grid" id="fleet-economics-body">
+    <div>
+      <div class="sub-title"><span>By machine, per month</span></div>
+      <div class="table-scroll">
+      <table class="fleet-table tidy mach-table">
+        <thead><tr>
+          <th>Machine</th><th class="c-num">Earned</th><th>Power draw</th>
+          <th class="c-num">Electricity</th><th class="c-num">Net</th><th class="c-act">Heat</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="c-name">OPPO CPH1951 (5bdadbc5)</td><td class="c-num">$1.90</td>
+            <td><span class="power-missing"><span class="c-dim" aria-hidden="true">—</span><button class="btn btn-link" type="button" aria-label="Set the power draw of OPPO CPH1951 (5bdadbc5) in the Boxes table">Set in Boxes</button></span></td>
+            <td class="c-num c-dim">—</td><td class="c-num c-dim">—</td>
+            <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false" aria-controls="heat-0" aria-label="Heat of OPPO CPH1951 (5bdadbc5): none">None</button></td></tr>
+          <tr><td class="c-name">geiserback</td><td class="c-num">$15.95</td>
+            <td><span class="power-missing"><span class="c-dim" aria-hidden="true">—</span><button class="btn btn-link" type="button" aria-label="Set the power draw of geiserback in the Boxes table">Set in Boxes</button></span></td>
+            <td class="c-num c-dim">—</td><td class="c-num c-dim">—</td>
+            <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false" aria-controls="heat-1" aria-label="Heat of geiserback: none">None</button></td></tr>
+          <tr><td class="c-name">geiserct</td><td class="c-num">$15.38</td>
+            <td><span class="power-missing"><span class="c-dim" aria-hidden="true">—</span><button class="btn btn-link" type="button" aria-label="Set the power draw of geiserct in the Boxes table">Set in Boxes</button></span></td>
+            <td class="c-num c-dim">—</td><td class="c-num c-dim">—</td>
+            <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false" aria-controls="heat-2" aria-label="Heat of geiserct: none">None</button></td></tr>
+          <tr><td class="c-name">motorola one fusion+ (1414f972)</td><td class="c-num">$1.90</td>
+            <td><span class="power-missing"><span class="c-dim" aria-hidden="true">—</span><button class="btn btn-link" type="button" aria-label="Set the power draw of motorola one fusion+ (1414f972) in the Boxes table">Set in Boxes</button></span></td>
+            <td class="c-num c-dim">—</td><td class="c-num c-dim">—</td>
+            <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false" aria-controls="heat-3" aria-label="Heat of motorola one fusion+ (1414f972): none">None</button></td></tr>
+          <tr><td class="c-name">watchtower</td><td class="c-num">$15.95</td>
+            <td><span class="power-missing"><span class="c-dim" aria-hidden="true">—</span><button class="btn btn-link" type="button" aria-label="Set the power draw of watchtower in the Boxes table">Set in Boxes</button></span></td>
+            <td class="c-num c-dim">—</td><td class="c-num c-dim">—</td>
+            <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false" aria-controls="heat-4" aria-label="Heat of watchtower: none">None</button></td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="tidy-note">CashPilot needs the power draw of a machine to show its electricity cost. <strong>Set in Boxes</strong> opens the watts field of that machine in the Boxes table.</p>
+    </div>
+
+    <div class="svc-block">
+      <div class="sub-title"><span>By service, where the cost can be attributed</span><span class="muted">6 of 11 earn more than their electricity</span></div>
+      <div class="table-scroll">
+      <table class="fleet-table tidy">
+        <thead><tr><th>Service</th><th class="c-num">Earned</th><th class="c-num">Electricity</th><th class="c-num">Net</th></tr></thead>
+        <tbody>
+          <tr><td class="c-name">honeygain</td><td class="c-num">$18.76</td><td class="c-num">$0.88</td><td class="c-num">$17.88</td></tr>
+          <tr><td class="c-name">traffmonetizer</td><td class="c-num">$6.72</td><td class="c-num">$0.88</td><td class="c-num">$5.84</td></tr>
+          <tr><td class="c-name">mysterium</td><td class="c-num">$6.40</td><td class="c-num">$1.04</td><td class="c-num">$5.36</td></tr>
+          <tr><td class="c-name">earnfm</td><td class="c-num">$4.32</td><td class="c-num">$0.88</td><td class="c-num">$3.43</td></tr>
+          <tr><td class="c-name">packetstream</td><td class="c-num">$1.62</td><td class="c-num">$0.88</td><td class="c-num">$0.74</td></tr>
+          <tr><td class="c-name">storj</td><td class="c-num">$1.12</td><td class="c-num">$0.79</td><td class="c-num">$0.33</td></tr>
+          <tr><td class="c-name">proxyrack</td><td class="c-num">$0.60</td><td class="c-num">$0.91</td><td class="c-num text-fail">−$0.31</td></tr>
+          <tr><td class="c-name">repocket</td><td class="c-num">$0.15</td><td class="c-num">$0.88</td><td class="c-num text-fail">−$0.72</td></tr>
+          <tr><td class="c-name">bitping</td><td class="c-num">$0.08</td><td class="c-num">$0.88</td><td class="c-num text-fail">−$0.80</td></tr>
+          <tr><td class="c-name">iproyal</td><td class="c-num">$0.03</td><td class="c-num">$0.88</td><td class="c-num text-fail">−$0.86</td></tr>
+          <tr><td class="c-name">bytelixir</td><td class="c-num">$1.12</td><td class="c-num">$2.03</td><td class="c-num text-fail">−$0.92</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="tidy-note">Sorted by net, highest first. A machine with no watts set counts as 65 W, or as the rated power of its processor. These costs are an estimate until you set the watts.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     2. PROXIES
+     ========================================================= -->
+<section class="fleet-proxies" id="fleet-proxies">
+  <div class="block-head">
+    <h2 class="block-title" id="proxies-title">Proxies</h2>
+    <span class="head-actions">
+      <span class="block-meta">Copies of a service that leave through a proxy instead of the box's own connection. <a href="#">How it works</a></span>
+      <button class="btn btn-ghost btn-sm" type="button">+ Add a proxy</button>
+    </span>
+  </div>
+
+  <div class="explain" id="copy-explain">
+    <div class="explain-head"><h3>What is a copy?</h3><button class="btn btn-link" type="button" aria-controls="copy-explain" aria-expanded="true">Hide</button></div>
+    <div class="explain-body">
+      <div class="lanes" role="img" aria-label="The original earnfm leaves from watchtower's own IP as device watchtower. Its copy leaves through the geiserct exit node from 203.0.113.71 as device watchtower-p1.">
+        <span></span><span class="hd">Service</span><span></span><span class="hd">Leaves through</span><span></span><span class="hd">Exit IP</span><span></span><span class="hd">Provider sees</span>
+        <span class="lab">Original</span><span class="chip">earnfm</span><span class="arr">→</span><span class="chip ui">watchtower's own line</span><span class="arr">→</span><span class="chip ui">watchtower's own IP</span><span class="arr">→</span><span class="end">device <span class="mono">watchtower</span></span>
+        <span class="lab">Copy</span><span class="chip copy">earnfm</span><span class="arr">→</span><span class="chip ui copy">geiserct exit node (Tailscale)</span><span class="arr">→</span><span class="chip copy">203.0.113.71 · ES</span><span class="arr">→</span><span class="end">device <span class="mono">watchtower-p1</span></span>
+      </div>
+      <ul class="facts">
+        <li><strong>A copy is a second container</strong> of a service that already runs on a box.</li>
+        <li>Its traffic leaves through the proxy. The provider sees <strong>one more device on another IP</strong>, and pays it as one more device.</li>
+        <li><strong>The original does not change.</strong> It keeps running on the box's own line.</li>
+        <li>If the proxy stops, the copy stops. <strong>It never uses the box's own IP.</strong></li>
+        <li>Some providers forbid proxies. CashPilot refuses those services, or asks you to accept the risk first.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="proxy-list">
+    <article class="px-card">
+      <div class="px-head">
+        <div class="a-name"><span class="px-name">geiserct exit node (Tailscale)</span><span class="px-sub">Tailscale exit 100.64.0.22</span></div>
+        <div class="a-exit"><span class="px-k">Exit IP providers see</span><span class="px-v">203.0.113.71 · ES</span><span class="px-sub">Same IP as geiserct's own line</span></div>
+        <div class="a-traffic"><span class="px-k">Traffic</span><span class="traffic-line">No cap</span></div>
+        <div class="a-acts px-acts">
+          <label class="lbl" for="test-on-1">Test on</label>
+          <select class="form-input" id="test-on-1"><option>watchtower</option><option>geiserback</option><option>geiserct</option></select>
+          <button class="btn btn-ghost btn-sm" type="button" aria-label="Test geiserct exit node (Tailscale)">Test</button><span class="sep"></span>
+          <button class="btn btn-ghost btn-sm" type="button" aria-label="Edit geiserct exit node (Tailscale)">Edit</button>
+          <button class="btn btn-danger btn-sm" type="button" aria-label="Delete geiserct exit node (Tailscale)">Delete</button>
+        </div>
+      </div>
+      <table class="fleet-table tidy cp-table">
+        <colgroup><col class="k1"><col class="k2"><col class="k3"><col class="k4"></colgroup>
+        <thead><tr><th>Copy (7)</th><th>Box</th><th>State</th><th class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody>
+          <tr><td><span class="status-dot running"></span><span class="slug">earnfm</span></td><td>watchtower</td><td><span class="st-word">running</span></td>
+            <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop earnfm">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove earnfm">Remove</button></span></td></tr>
+          <tr><td><span class="status-dot running"></span><span class="slug">packetstream</span></td><td>watchtower</td><td><span class="st-word">running</span></td>
+            <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop packetstream">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove packetstream">Remove</button></span></td></tr>
+          <tr><td><span class="status-dot running"></span><span class="slug">proxybase</span></td><td>watchtower</td><td><span class="st-word">running</span></td>
+            <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop proxybase">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove proxybase">Remove</button></span></td></tr>
+          <tr><td><span class="status-dot running"></span><span class="slug">proxylite</span></td><td>watchtower</td><td><span class="st-word">running</span></td>
+            <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop proxylite">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove proxylite">Remove</button></span></td></tr>
+          <tr><td><span class="status-dot running"></span><span class="slug">proxyrack</span></td><td>watchtower</td><td><span class="st-word">running</span></td>
+            <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop proxyrack">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove proxyrack">Remove</button></span></td></tr>
+          <tr><td><span class="status-dot running"></span><span class="slug">repocket</span></td><td>watchtower</td><td><span class="st-word">running</span></td>
+            <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop repocket">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove repocket">Remove</button></span></td></tr>
+          <tr><td><span class="status-dot running"></span><span class="slug">traffmonetizer</span></td><td>watchtower</td><td><span class="st-word">running</span></td>
+            <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop traffmonetizer">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove traffmonetizer">Remove</button></span></td></tr>
+          <tr class="cp-foot"><td colspan="4"><button class="btn btn-ghost btn-sm" type="button">+ Add a copy through this proxy</button></td></tr>
+        </tbody>
+      </table>
+    </article>
+  </div>
+
+  <div class="exits" id="proxy-exits">
+    <div class="sub-title"><span>Exit IPs that providers see</span><span class="muted">Running copies, and box lines that share an exit with a proxy</span></div>
+    <table class="fleet-table tidy exits-table">
+      <colgroup><col class="e1"><col class="e2"><col></colgroup>
+      <thead><tr><th>Exit IP</th><th>Who leaves from it</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td class="ip">203.0.113.71 · ES</td>
+          <td>7 copies on watchtower: earnfm, packetstream, proxybase, proxylite, proxyrack, repocket, traffmonetizer<span class="own">and geiserct's own line</span></td>
+          <td class="meaning">7 different services leave from this IP. None of them also runs on geiserct, so no provider sees two of its own devices here. They share the bandwidth of this IP.</td></tr>
+      </tbody>
+    </table>
+    <p class="mock-note">Mockup: the page computes "also runs on geiserct" from the services that the Boxes data lists for geiserct. The owner's screenshots do not show that list, so the main view shows the case with no clash. Panel (d) shows a clash.</p>
+  </div>
+
+  <details class="add-worker" id="proxy-form-box" style="margin-top:20px;">
+    <summary id="proxy-form-title">Add a proxy</summary>
+  </details>
+
+  <details class="add-worker" id="proxy-copy-box" open>
+    <summary>Run a copy through a proxy</summary>
+    <div class="add-worker-body wide">
+      <p class="copy-lead">Pick a box, a service that runs on it and a proxy. CashPilot checks the service before you run the copy.</p>
+      <form id="proxy-copy-form" onsubmit="return false">
+        <div class="copy-form-grid">
+          <div><label class="form-label" for="copy-worker">Box</label>
+            <select class="form-input" id="copy-worker"><option>watchtower</option><option>geiserback</option><option>geiserct</option></select></div>
+          <div><label class="form-label" for="copy-slug">Service deployed there</label>
+            <select class="form-input" id="copy-slug">
+              <optgroup label="No copy through this proxy yet"><option>bitping</option><option>honeygain</option><option selected>iproyal</option><option>mysterium</option><option>storj</option></optgroup>
+              <optgroup label="Has a copy through this proxy"><option>earnfm</option><option>packetstream</option><option>proxybase</option><option>proxylite</option><option>proxyrack</option><option>repocket</option><option>traffmonetizer</option></optgroup>
+            </select></div>
+          <div><label class="form-label" for="copy-proxy">Proxy</label>
+            <select class="form-input" id="copy-proxy"><option>geiserct exit node (Tailscale)</option></select></div>
+          <p class="form-hint">The list holds only the services deployed on watchtower. A service that uses the host's network, publishes ports, keeps data in a host folder or needs a GPU cannot run through a proxy.</p>
+        </div>
+
+        <div class="copy-check ok" id="copy-needs" aria-live="polite">
+          <span class="mark-ok">✓</span><span class="head">iproyal can run through this proxy.</span> <span class="muted">It needs no tick.</span>
+          <dl>
+            <dt>New container</dt><dd class="mono">cashpilot-iproyal-p1</dd>
+            <dt>Leaves from</dt><dd><span class="mono">203.0.113.71 · ES</span> <span class="muted">(geiserct's own line)</span></dd>
+            <dt>Provider sees</dt><dd>a new device, <span class="mono">watchtower-p1</span></dd>
+            <dt>The original</dt><dd>keeps running on watchtower's own line</dd>
+          </dl>
+          <div class="copy-foot">
+            <button class="btn btn-primary" id="copy-run" type="submit">Run the copy</button>
+            <span class="muted">CashPilot starts the tunnel first. This can take up to a minute. Then the copy shows under its proxy.</span>
+          </div>
+        </div>
+      </form>
+    </div>
+  </details>
+</section>
+
+<!-- =========================================================
+     3. ADD A BOX (text kept word for word)
+     ========================================================= -->
+<details class="add-worker" id="add-worker" open>
+  <summary>Add a box</summary>
+  <div class="add-worker-body wide">
+    <div class="addbox-layout">
+      <ul class="ways">
+        <li><span class="way">Server or phone</span><span class="add-worker-text">Deploy <code>drumsergio/cashpilot-worker:3.1</code> on each server, or install the <a href="#">Android app</a> on your phone.</span></li>
+        <li><span class="way">Computer with CashPilot Desktop</span><span class="add-worker-text">On a computer with <a href="#">CashPilot Desktop</a>, pick <strong>Join my CashPilot</strong> (on first run, or in Settings under <strong>How this computer runs</strong>). Press <strong>Copy</strong> and paste the block into <strong>Paste from Add a box</strong>.</span></li>
+      </ul>
+      <div>
+        <span class="way">Docker</span>
+        <p class="add-worker-text">For Docker workers, set these environment variables:</p>
+        <div class="env-block">
+          <code id="worker-env">CASHPILOT_UI_URL=https://cashpilot.example.lan
+CASHPILOT_API_KEY=••••••••
+CASHPILOT_WORKER_NAME=server-name</code>
+          <div class="env-actions">
+            <span class="badge badge-deployed" id="api-key-status">Generated in /fleet/.fleet_key</span>
+            <span class="push-right"></span>
+            <button class="btn btn-ghost btn-sm" id="reveal-btn">Reveal API Key</button>
+            <button class="btn btn-ghost btn-sm">Copy</button>
+          </div>
+        </div>
+        <p class="muted add-worker-text">This is the enrolment key. It is <code>CASHPILOT_API_KEY</code> on the UI container when that is set. Otherwise CashPilot generates it in <code>/fleet/.fleet_key</code>. Use the same key on all workers. Each worker uses it only to join, then gets its own key.</p>
+      </div>
+    </div>
+  </div>
+</details>
+
+<!-- =========================================================
+     STATES
+     ========================================================= -->
+<div class="state-head">
+  <h2>States</h2>
+  <span class="muted">Each panel shows one block in one state. Values are the owner's, or labelled examples.</span>
+</div>
+
+<!-- (a1) SOCKS5 edit -->
+<div class="state-panel">
+  <span class="state-label">(a1) Edit a proxy: SOCKS5, with a stored user and password (example proxy)</span>
+  <details class="add-worker" open style="border-top:0;margin-bottom:8px;">
+    <summary>Edit residential gate</summary>
+    <div class="add-worker-body wide">
+      <div class="pf-layout">
+        <form onsubmit="return false">
+          <fieldset class="fs"><legend>Proxy</legend>
+            <div class="form-grid">
+              <div><label class="form-label">Name</label><input class="form-input" value="residential gate"></div>
+              <div><label class="form-label">Type</label><select class="form-input"><option selected>SOCKS5</option><option>HTTP CONNECT</option><option>Tailscale exit node</option></select>
+                <p class="form-hint">Carries TCP only. Not encrypted.</p></div>
+            </div>
+          </fieldset>
+          <fieldset class="fs"><legend>Connection</legend>
+            <div class="form-grid">
+              <div><label class="form-label">Host</label><input class="form-input" value="gate.example.net"></div>
+              <div><label class="form-label">Port</label><input class="form-input" type="number" value="7000"></div>
+              <div><label class="form-label">User <span class="stored">A user is stored.</span></label><input class="form-input" placeholder="kept if empty, unless the host or port changes">
+                <label class="check" style="margin-top:6px;"><input type="checkbox"> Remove the stored user</label></div>
+              <div><label class="form-label">Password <span class="stored">A password is stored.</span></label><input class="form-input" type="password" placeholder="kept if empty, unless the host or port changes">
+                <label class="check" style="margin-top:6px;"><input type="checkbox"> Remove the stored password</label></div>
+            </div>
+          </fieldset>
+          <fieldset class="fs"><legend>Traffic</legend>
+            <div class="form-grid">
+              <div><label class="form-label">Traffic cap (GB)</label><input class="form-input" type="number" value="50"></div>
+              <div><label class="form-label">Stop at (%)</label><input class="form-input" type="number" value="95"></div>
+              <div><label class="form-label">Resets on day</label><input class="form-input" type="number" value="1"></div>
+              <div class="field-check"><label class="check"><input type="checkbox" checked> Rotating exit IP</label></div>
+            </div>
+          </fieldset>
+          <div class="form-actions"><button class="btn btn-primary">Save</button><button class="btn btn-ghost" type="button">Cancel</button></div>
+        </form>
+        <dl class="aside">
+          <dt>SOCKS5 and HTTP CONNECT</dt>
+          <dd>They carry TCP only. They are not encrypted. A service that needs UDP cannot use them.</dd>
+          <dt>Stored secrets</dt>
+          <dd>CashPilot never shows a stored user or password. Leave the box empty to keep it. If you change the host or port, type it again or tick Remove.</dd>
+          <dt>Rotating exit IP</dt>
+          <dd>Tick it when the provider gives a new exit IP for each connection. CashPilot then does not group these copies by IP.</dd>
+          <dt>Traffic cap</dt>
+          <dd>At the stop percentage, every copy through this proxy stops. They start again on the reset day, or when you press Reset.</dd>
+        </dl>
+      </div>
+    </div>
+  </details>
+</div>
+
+<!-- (a2) Tailscale add -->
+<div class="state-panel">
+  <span class="state-label">(a2) Add a proxy: Tailscale exit node</span>
+  <details class="add-worker" open style="border-top:0;margin-bottom:8px;">
+    <summary>Add a proxy</summary>
+    <div class="add-worker-body wide">
+      <div class="pf-layout">
+        <form onsubmit="return false">
+          <fieldset class="fs"><legend>Proxy</legend>
+            <div class="form-grid">
+              <div><label class="form-label">Name</label><input class="form-input" value="geiserct exit node (Tailscale)"></div>
+              <div><label class="form-label">Type</label><select class="form-input"><option>SOCKS5</option><option>HTTP CONNECT</option><option selected>Tailscale exit node</option></select>
+                <p class="form-hint">Carries TCP and UDP.</p></div>
+            </div>
+          </fieldset>
+          <fieldset class="fs"><legend>Connection</legend>
+            <div class="form-grid">
+              <div class="span-2"><label class="form-label">Auth key (reusable, ephemeral, tagged)</label><input class="form-input" type="password" required></div>
+              <div><label class="form-label">Exit node</label><input class="form-input" placeholder="100.x address, not the name"></div>
+              <div><label class="form-label">Login server</label><input class="form-input" placeholder="empty for Tailscale's own"></div>
+            </div>
+          </fieldset>
+          <fieldset class="fs"><legend>Traffic</legend>
+            <div class="form-grid">
+              <div><label class="form-label">Traffic cap (GB)</label><input class="form-input" type="number" placeholder="none"></div>
+              <div><label class="form-label">Stop at (%)</label><input class="form-input" type="number" value="90"></div>
+              <div><label class="form-label">Resets on day</label><input class="form-input" type="number" placeholder="by hand"></div>
+              <div class="field-check"><label class="check"><input type="checkbox"> Rotating exit IP</label></div>
+            </div>
+          </fieldset>
+          <div class="form-actions"><button class="btn btn-primary">Save</button></div>
+        </form>
+        <dl class="aside">
+          <dt>Tailscale exit node</dt>
+          <dd>It carries UDP too. Use it for services that need UDP, such as mysterium.</dd>
+          <dt>Auth key</dt>
+          <dd>Make the key reusable, ephemeral and tagged. If your tailnet asks to approve new devices, pre-approve the key.</dd>
+          <dt>Exit node</dt>
+          <dd>Type its 100.x address. A name does not work.</dd>
+          <dt>An exit node on one of your boxes</dt>
+          <dd>Its exit IP is the line of that box. A service that already runs on that box gains nothing from a copy here. The Proxies list says when this is so.</dd>
+        </dl>
+      </div>
+    </div>
+  </details>
+</div>
+
+<!-- (b) run a copy -->
+<div class="state-panel">
+  <span class="state-label">(b1) Run a copy: honeygain needs the account-risk tick</span>
+  <form class="copy-form-grid" onsubmit="return false">
+    <div><label class="form-label">Box</label><select class="form-input"><option>watchtower</option></select></div>
+    <div><label class="form-label">Service deployed there</label><select class="form-input"><option>honeygain</option></select></div>
+    <div><label class="form-label">Proxy</label><select class="form-input"><option>geiserct exit node (Tailscale)</option></select></div>
+  </form>
+  <div class="copy-check warn">
+    <span class="head">honeygain can run through this proxy after you accept one risk.</span>
+    <dl>
+      <dt>New container</dt><dd class="mono">cashpilot-honeygain-p1</dd>
+      <dt>Leaves from</dt><dd><span class="mono">203.0.113.71 · ES</span> <span class="muted">(geiserct's own line)</span></dd>
+      <dt>Provider sees</dt><dd>a new device, <span class="mono">watchtower-p1</span></dd>
+      <dt>The original</dt><dd>keeps running on watchtower's own line</dd>
+    </dl>
+    <p class="ack-title" id="ack-honeygain">Read each risk. Tick it to accept it and run the copy:</p>
+    <ul aria-labelledby="ack-honeygain" class="ack-list">
+      <li><label class="check"><input type="checkbox" data-ack="account_risk"> <span>Your Honeygain account may be suspended. Honeygain's help centre strictly prohibits VPNs and wants your regular home or mobile connection. It does not support data-center IPs, and one shared IP can get several accounts suspended at once: <a href="#">https://support.honeygain.com/hc/en-us/articles/30688484350492-Does-Honeygain-work-with-VPNs</a></span></label></li>
+    </ul>
+    <div class="copy-foot">
+      <button class="btn btn-primary run-gated" disabled aria-describedby="count-honeygain">Run the copy</button>
+      <p class="count" id="count-honeygain">Tick 1 more line to run the copy.</p>
+    </div>
+  </div>
+  <p class="tidy-note">This panel works: tick the line and Run turns on. Untick it and Run turns off again.</p>
+</div>
+
+<div class="state-panel">
+  <span class="state-label">(b2) Run a copy: storj cannot run behind a proxy</span>
+  <form class="copy-form-grid" onsubmit="return false">
+    <div><label class="form-label">Box</label><select class="form-input"><option>watchtower</option></select></div>
+    <div><label class="form-label">Service deployed there</label><select class="form-input"><option>storj</option></select></div>
+    <div><label class="form-label">Proxy</label><select class="form-input"><option>geiserct exit node (Tailscale)</option></select></div>
+  </form>
+  <div class="copy-check fail">
+    <span class="mark-fail">✕</span><span class="head">storj cannot run through a proxy.</span>
+    <p class="say">storj needs inbound connections on a published port. Those reach this box, never the proxy's address, so it cannot work behind a proxy. Run it directly on the box instead.</p>
+    <div class="copy-foot"><button class="btn btn-primary" disabled>Run the copy</button></div>
+  </div>
+</div>
+
+<div class="state-panel">
+  <span class="state-label">(b3) Run a copy: mysterium through a SOCKS5 proxy (example proxy), refused because of UDP</span>
+  <form class="copy-form-grid" onsubmit="return false">
+    <div><label class="form-label">Box</label><select class="form-input"><option>watchtower</option></select></div>
+    <div><label class="form-label">Service deployed there</label><select class="form-input"><option>mysterium</option></select></div>
+    <div><label class="form-label">Proxy</label><select class="form-input"><option>residential gate</option></select></div>
+  </form>
+  <div class="copy-check fail">
+    <span class="mark-fail">✕</span><span class="head">mysterium cannot run through this proxy.</span>
+    <p class="say">mysterium carries its traffic over UDP, which a SOCKS5 or HTTP proxy does not pass. Use a Tailscale exit node instead.</p>
+    <div class="copy-foot"><button class="btn btn-primary" disabled>Run the copy</button></div>
+  </div>
+</div>
+
+<div class="state-panel">
+  <span class="state-label">(b4) Run a copy: mysterium through the Tailscale exit node, own volume, three ticks (two ticked)</span>
+  <form class="copy-form-grid" onsubmit="return false">
+    <div><label class="form-label">Box</label><select class="form-input"><option>watchtower</option></select></div>
+    <div><label class="form-label">Service deployed there</label><select class="form-input"><option>mysterium</option></select></div>
+    <div><label class="form-label">Proxy</label><select class="form-input"><option>geiserct exit node (Tailscale)</option></select></div>
+  </form>
+  <div class="copy-check warn">
+    <span class="head">mysterium can run through this proxy after you accept three risks.</span>
+    <dl>
+      <dt>New container</dt><dd class="mono">cashpilot-mysterium-p1</dd>
+      <dt>Leaves from</dt><dd><span class="mono">203.0.113.71 · ES</span> <span class="muted">(geiserct's own line)</span></dd>
+      <dt>Provider sees</dt><dd>a new device, <span class="mono">watchtower-p1</span></dd>
+      <dt>The original</dt><dd>keeps running on watchtower's own line</dd>
+    </dl>
+    <p class="ack-title" id="ack-mysterium">Read each risk. Tick it to accept it and run the copy:</p>
+    <ul aria-labelledby="ack-mysterium" class="ack-list">
+      <li><label class="check"><input type="checkbox" checked data-ack="net_admin"> <span>It holds NET_ADMIN, so it can change the network of its own namespace. CashPilot gives it a namespace of its own whose only way out is a gate that holds the proxy's firewall. It is still less contained than a service without it.</span></label></li>
+      <li><label class="check"><input type="checkbox" checked data-ack="tun_device"> <span>It gets this box's /dev/net/tun, to make tunnels of its own inside its namespace.</span></label></li>
+      <li><label class="check"><input type="checkbox" data-ack="no_inbound"> <span>It waits for connections from the internet. Behind a proxy nobody can reach it, so it can earn less or nothing.</span></label></li>
+    </ul>
+    <p class="side">This copy gets data volumes of its own (mysterium-data-p1). The provider sees a new device, not the original.</p>
+    <div class="copy-foot">
+      <button class="btn btn-primary run-gated" disabled aria-describedby="count-mysterium">Run the copy</button>
+      <p class="count" id="count-mysterium">Tick 1 more line to run the copy.</p>
+    </div>
+  </div>
+</div>
+
+<div class="state-panel">
+  <span class="state-label">(b5) Run a copy: the check is loading, then it could not load</span>
+  <div class="copy-check busy"><span class="spin" aria-hidden="true"></span><span class="muted">Checking what iproyal needs behind this proxy…</span>
+    <div class="copy-foot"><button class="btn btn-primary" disabled>Run the copy</button></div></div>
+  <div class="copy-check fail">
+    <span class="head">CashPilot could not read what this service needs behind this proxy (timeout). The copy cannot run until it can.</span>
+    <div class="copy-foot"><button class="btn btn-ghost btn-sm" type="button">Retry</button><button class="btn btn-primary" disabled>Run the copy</button></div>
+  </div>
+</div>
+
+<div class="state-panel">
+  <span class="state-label">(b6) Run a copy: earnfm already has a copy through this proxy on watchtower</span>
+  <form class="copy-form-grid" onsubmit="return false">
+    <div><label class="form-label">Box</label><select class="form-input"><option>watchtower</option></select></div>
+    <div><label class="form-label">Service deployed there</label><select class="form-input"><option>earnfm</option></select></div>
+    <div><label class="form-label">Proxy</label><select class="form-input"><option>geiserct exit node (Tailscale)</option></select></div>
+  </form>
+  <div class="copy-check ok">
+    <span class="mark-ok">✓</span><span class="head">earnfm already has a copy through this proxy on watchtower.</span>
+    <p class="say">Run deploys that copy again with the current settings of earnfm on watchtower. It keeps its device name, <span class="mono">watchtower-p1</span>. It does not add a second copy. To stop or remove it, use its row in the list above.</p>
+    <div class="copy-foot"><button class="btn btn-primary">Deploy the copy again</button></div>
+  </div>
+</div>
+
+<div class="state-panel">
+  <span class="state-label">(b7) Run a copy: the same service already leaves from this IP (example: earnfm also runs on geiserct)</span>
+  <form class="copy-form-grid" onsubmit="return false">
+    <div><label class="form-label">Box</label><select class="form-input"><option>geiserback</option></select></div>
+    <div><label class="form-label">Service deployed there</label><select class="form-input"><option>earnfm</option></select></div>
+    <div><label class="form-label">Proxy</label><select class="form-input"><option>geiserct exit node (Tailscale)</option></select></div>
+  </form>
+  <div class="copy-check warn">
+    <span class="mark-ok">✓</span><span class="head">earnfm can run through this proxy.</span> <span class="muted">It needs no tick.</span>
+    <p class="ipwarn">earnfm already leaves from 203.0.113.71: from geiserct's own line, and from the copy on watchtower. Its provider counts devices per IP, so this copy may earn nothing there.</p>
+    <dl>
+      <dt>New container</dt><dd class="mono">cashpilot-earnfm-p1</dd>
+      <dt>Leaves from</dt><dd><span class="mono">203.0.113.71 · ES</span> <span class="muted">(geiserct's own line)</span></dd>
+      <dt>Provider sees</dt><dd>a new device, <span class="mono">geiserback-p1</span></dd>
+      <dt>The original</dt><dd>keeps running on geiserback's own line</dd>
+    </dl>
+    <div class="copy-foot"><button class="btn btn-primary">Run the copy</button><span class="muted">You can still run it. The warning does not block.</span></div>
+  </div>
+</div>
+
+<!-- (c) empty -->
+<div class="state-panel">
+  <span class="state-label">(c) Proxies: no proxy yet</span>
+  <section class="fleet-proxies">
+    <div class="block-head">
+      <h2 class="block-title">Proxies</h2>
+      <span class="head-actions">
+        <span class="block-meta">Copies of a service that leave through a proxy instead of the box's own connection. <a href="#">How it works</a></span>
+        <button class="btn btn-ghost btn-sm" type="button">+ Add a proxy</button>
+      </span>
+    </div>
+    <div class="explain">
+      <div class="explain-head"><h3>What is a copy?</h3><button class="btn btn-link" type="button">Hide</button></div>
+      <div class="explain-body">
+        <div class="lanes" role="img" aria-label="The original leaves from the box's own IP as device 1. The copy leaves through a proxy from another IP as device 2.">
+          <span></span><span class="hd">Service</span><span></span><span class="hd">Leaves through</span><span></span><span class="hd">Exit IP</span><span></span><span class="hd">Provider sees</span>
+          <span class="lab">Original</span><span class="chip ui">a service</span><span class="arr">→</span><span class="chip ui">your box's own line</span><span class="arr">→</span><span class="chip ui">your box's own IP</span><span class="arr">→</span><span class="end">device 1</span>
+          <span class="lab">Copy</span><span class="chip ui copy">the same service</span><span class="arr">→</span><span class="chip ui copy">a proxy</span><span class="arr">→</span><span class="chip ui copy">another IP</span><span class="arr">→</span><span class="end">device 2</span>
+        </div>
+        <ul class="facts">
+          <li><strong>A copy is a second container</strong> of a service that already runs on a box.</li>
+          <li>Its traffic leaves through the proxy. The provider sees <strong>one more device on another IP</strong>, and pays it as one more device.</li>
+          <li><strong>The original does not change.</strong> If the proxy stops, the copy stops.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="empty-state">
+      <div class="empty-state-title">No proxies yet.</div>
+      <p class="empty-state-text">A proxy gives your boxes one more public IP. Add one, then run a copy of a service through it.</p>
+      <button class="btn btn-primary btn-sm">Add a proxy</button>
+    </div>
+    <details class="add-worker" open>
+      <summary>Run a copy through a proxy</summary>
+      <div class="add-worker-body wide"><p class="muted" style="margin:0;">Add a proxy first. Then you can run a copy through it.</p></div>
+    </details>
+  </section>
+  <p class="tidy-note">With proxies but no box that can run copies, the Box select reads "No box can run proxied copies yet", and the check under it says: "Update the worker on a box with Docker. A phone cannot run copies." Run is off.</p>
+  <p class="tidy-note">With a box that has no service deployed, the Service select reads "Nothing is deployed on this box yet". The check under it says: "Deploy a service on this box first. A copy uses the settings of that service." Run is off.</p>
+</div>
+
+<!-- (c2) loading, error, explainer hidden -->
+<div class="state-panel">
+  <span class="state-label">(c2) Proxies: loading, could not load, and the explainer after Hide</span>
+  <div class="loading-line"><span class="spin" aria-hidden="true"></span><span class="muted">Loading proxies</span></div>
+  <p class="muted" style="margin:10px 0 18px;">Could not load the proxies: the server did not answer.</p>
+  <section class="fleet-proxies">
+    <div class="block-head">
+      <h2 class="block-title">Proxies</h2>
+      <span class="head-actions">
+        <span class="block-meta">Copies of a service that leave through a proxy instead of the box's own connection. <a href="#">How it works</a></span>
+        <button class="btn btn-link explain-show" type="button" aria-controls="copy-explain" aria-expanded="false">What is a copy?</button>
+        <button class="btn btn-ghost btn-sm" type="button">+ Add a proxy</button>
+      </span>
+    </div>
+  </section>
+  <p class="tidy-note">After Hide, the explainer box goes away and <strong>What is a copy?</strong> shows in the block head. It opens the box again and clears the saved choice. The lead line of Run a copy gets the same link.</p>
+</div>
+
+<!-- (d) copies in every state -->
+<div class="state-panel">
+  <span class="state-label">(d) Copies: stopped, failing, missing, no report, reduced isolation, tripped, recovery skipped, removing. Exit table with a clash (example data)</span>
+  <article class="px-card">
+    <div class="px-head">
+      <div class="a-name"><span class="px-name">geiserct exit node (Tailscale)</span><span class="px-sub">Tailscale exit 100.64.0.22</span></div>
+      <div class="a-exit"><span class="px-k">Exit IP providers see</span><span class="px-v">203.0.113.71 · ES</span><span class="px-sub">Same IP as geiserct's own line</span></div>
+      <div class="a-traffic"><span class="px-k">Traffic</span><span class="traffic-line">No cap</span></div>
+      <div class="a-acts px-acts">
+        <label class="lbl">Test on</label><select class="form-input"><option>watchtower</option></select>
+        <button class="btn btn-ghost btn-sm" type="button">Test</button><span class="sep"></span>
+        <button class="btn btn-ghost btn-sm" type="button">Edit</button><button class="btn btn-danger btn-sm" type="button">Delete</button>
+      </div>
+    </div>
+    <table class="fleet-table tidy cp-table">
+      <colgroup><col class="k1"><col class="k2"><col class="k3"><col class="k4"></colgroup>
+      <thead><tr><th>Copy (10)</th><th>Box</th><th>State</th><th class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        <tr><td><span class="status-dot running"></span><span class="slug">earnfm</span></td><td>watchtower</td><td><span class="st-word">running</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop earnfm">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove earnfm">Remove</button></span></td></tr>
+        <tr><td><span class="status-dot idle"></span><span class="slug">proxylite</span></td><td>watchtower</td><td><span class="st-word idle">stopped</span><span class="why">Not running, so it does not earn. Start it to earn again.</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Start proxylite">Start</button><button class="btn btn-danger btn-sm" aria-label="Remove proxylite">Remove</button></span></td></tr>
+        <tr><td><span class="status-dot fail"></span><span class="slug">proxybase</span></td><td>watchtower</td><td><span class="st-word fail">restarting</span><span class="why">The tunnel of this proxy on watchtower has not been running since 09:12 UTC.</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Start proxybase">Start</button><button class="btn btn-danger btn-sm" aria-label="Remove proxybase">Remove</button></span></td></tr>
+        <tr><td><span class="status-dot running"></span><span class="slug">proxyrack</span></td><td>geiserback</td><td><span class="st-word">running</span><span class="why">Exit not seen yet. CashPilot groups it by IP once it sees the exit.</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop proxyrack on geiserback">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove proxyrack on geiserback">Remove</button></span></td></tr>
+        <tr><td><span class="status-dot fail"></span><span class="slug">repocket</span></td><td>watchtower</td><td><span class="st-word fail">missing</span><span class="why">watchtower no longer runs it. Start adds it again.</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Start repocket">Start</button><button class="btn btn-danger btn-sm" aria-label="Remove repocket">Remove</button></span></td></tr>
+        <tr><td><span class="status-dot unknown"></span><span class="slug">packetstream</span></td><td>watchtower</td><td><span class="st-word unk">no report</span><span class="why">watchtower sent no state for it.</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Start packetstream">Start</button><button class="btn btn-danger btn-sm" aria-label="Remove packetstream">Remove</button></span></td></tr>
+        <tr><td><span class="status-dot running"></span><span class="slug">honeygain</span> <span class="flag flag-warn" title="Your Honeygain account may be suspended… Withdraw removes this copy. Its data volumes stay, so the copy keeps its identity if you add it again.">reduced isolation</span></td><td>watchtower</td><td><span class="st-word">running</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop honeygain">Stop</button><button class="btn btn-danger btn-sm" aria-label="Withdraw honeygain" title="Withdraw removes this copy. Its data volumes stay, so the copy keeps its identity if you add it again.">Withdraw</button></span></td></tr>
+        <tr><td><span class="status-dot idle"></span><span class="slug">bitping</span> <span class="flag flag-warn">reduced isolation</span></td><td>watchtower</td><td><span class="st-word idle">stopped</span><span class="why warn">The watchdog of its tunnel stopped it: the tunnel's firewall changed, or traffic left from this box's own IP. It stays stopped until you start it.</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Start bitping">Start</button><button class="btn btn-danger btn-sm" aria-label="Withdraw bitping">Withdraw</button></span></td></tr>
+        <tr><td><span class="status-dot running"></span><span class="slug">earnfm</span></td><td>geiserback</td><td><span class="st-word">running</span><span class="why warn">CashPilot skipped recovery for earnfm through geiserct exit node (Tailscale) on geiserback. A container in the tunnel does not match the worker's saved ID.</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop earnfm on geiserback">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove earnfm on geiserback">Remove</button></span></td></tr>
+        <tr><td><span class="status-dot idle"></span><span class="slug">traffmonetizer</span></td><td>watchtower</td><td><span class="st-word idle">removing…</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm hold" tabindex="-1">Stop</button><button class="btn btn-danger btn-sm hold" tabindex="-1">Remove</button></span></td></tr>
+        <tr class="cp-foot"><td colspan="4"><button class="btn btn-ghost btn-sm" type="button">+ Add a copy through this proxy</button></td></tr>
+      </tbody>
+    </table>
+  </article>
+  <div class="exits">
+    <div class="sub-title"><span>Exit IPs that providers see</span><span class="muted">Running copies, and box lines that share an exit with a proxy</span></div>
+    <table class="fleet-table tidy exits-table">
+      <colgroup><col class="e1"><col class="e2"><col></colgroup>
+      <thead><tr><th>Exit IP</th><th>Who leaves from it</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td class="ip">203.0.113.71 · ES</td><td>earnfm on watchtower, honeygain on watchtower, earnfm on geiserback<span class="own">and geiserct's own line</span></td>
+          <td class="meaning warn">earnfm leaves from this IP three times: from geiserct's own line, and from the copies on watchtower and geiserback. Its provider counts devices per IP, so two of them may earn nothing.</td></tr>
+        <tr><td class="ip c-dim">Exit not seen yet</td><td>proxyrack on geiserback</td><td class="meaning c-dim">Not grouped until CashPilot sees its exit.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tidy-note">The state word is translated: exited, created and paused read "stopped"; dead reads "failed"; a box with no entry reads "no report". The line under it comes from the open alert for that copy. With no alert, it comes from the state word. Dot colours: green runs, grey is stopped or being removed, red is failing, amber has no report.</p>
+</div>
+
+<!-- (e) cap -->
+<div class="state-panel">
+  <span class="state-label">(e) Traffic cap: a proxy at 92% of 50 GB, one the cap stopped, one never tested (example proxies)</span>
+  <article class="px-card">
+    <div class="px-head">
+      <div class="a-name"><span class="px-name">residential gate</span><span class="px-sub">socks5 gate.example.net:7000</span></div>
+      <div class="a-exit"><span class="px-k">Exit IP providers see</span><span class="px-v">81.44.12.9 · ES (rotating)</span></div>
+      <div class="a-traffic"><span class="px-k">Traffic</span><span class="traffic-line">46.00 of 50 GB, stops at 95%, resets on day 1</span>
+        <span class="meter-line"><span class="meter warn" role="meter" aria-valuenow="92" aria-valuemin="0" aria-valuemax="100" aria-label="92% of the cap used"><i style="width:92%"></i><b style="left:95%"></b></span><button class="btn btn-ghost btn-sm" type="button">Reset</button></span></div>
+      <div class="a-acts px-acts">
+        <label class="lbl">Test on</label><select class="form-input"><option>geiserback</option></select>
+        <button class="btn btn-ghost btn-sm" type="button">Test</button><span class="sep"></span>
+        <button class="btn btn-ghost btn-sm" type="button">Edit</button><button class="btn btn-danger btn-sm" type="button">Delete</button>
+      </div>
+    </div>
+    <table class="fleet-table tidy cp-table">
+      <colgroup><col class="k1"><col class="k2"><col class="k3"><col class="k4"></colgroup>
+      <thead><tr><th>Copy (2)</th><th>Box</th><th>State</th><th class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        <tr><td><span class="status-dot running"></span><span class="slug">iproyal</span></td><td>geiserback</td><td><span class="st-word">running</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop iproyal">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove iproyal">Remove</button></span></td></tr>
+        <tr><td><span class="status-dot running"></span><span class="slug">repocket</span></td><td>geiserback</td><td><span class="st-word">running</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" aria-label="Stop repocket">Stop</button><button class="btn btn-danger btn-sm" aria-label="Remove repocket">Remove</button></span></td></tr>
+        <tr class="cp-foot"><td colspan="4"><button class="btn btn-ghost btn-sm" type="button">+ Add a copy through this proxy</button></td></tr>
+      </tbody>
+    </table>
+  </article>
+  <article class="px-card">
+    <div class="px-head">
+      <div class="a-name"><span class="px-name">mobile pool</span><span class="px-sub">http pool.example.net:8080</span></div>
+      <div class="a-exit"><span class="px-k">Exit IP providers see</span><span class="px-v">92.10.4.7 · GB</span><span class="px-sub warn">Last test failed on geiserct (2026-11-28 09:12): connection refused</span></div>
+      <div class="a-traffic"><span class="px-k">Traffic</span><span class="traffic-line"><span class="text-fail">Stopped:</span> mobile pool reached 90% of its 50 GB cap on 2026-11-27; reset it by hand to start the copies again</span>
+        <span class="meter-line"><span class="meter fail" role="meter" aria-valuenow="90" aria-valuemin="0" aria-valuemax="100" aria-label="90% of the cap used"><i style="width:90%"></i><b style="left:90%"></b></span><button class="btn btn-ghost btn-sm" type="button">Reset</button></span></div>
+      <div class="a-acts px-acts">
+        <label class="lbl">Test on</label><select class="form-input"><option>geiserct</option></select>
+        <button class="btn btn-ghost btn-sm" type="button">Test</button><span class="sep"></span>
+        <button class="btn btn-ghost btn-sm" type="button">Edit</button><button class="btn btn-danger btn-sm" type="button">Delete</button>
+      </div>
+    </div>
+    <table class="fleet-table tidy cp-table">
+      <colgroup><col class="k1"><col class="k2"><col class="k3"><col class="k4"></colgroup>
+      <thead><tr><th>Copy (1)</th><th>Box</th><th>State</th><th class="c-act"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        <tr><td><span class="status-dot idle"></span><span class="slug">traffmonetizer</span></td><td>geiserct</td><td><span class="st-word idle">stopped</span><span class="why">Stopped by the cap. Press Reset to start it again.</span></td>
+          <td class="c-act"><span class="cp-acts"><button class="btn btn-ghost btn-sm" disabled title="mobile pool reached 90% of its 50 GB cap on 2026-11-27; reset it by hand to start the copies again" aria-label="Start traffmonetizer">Start</button><button class="btn btn-danger btn-sm" aria-label="Remove traffmonetizer">Remove</button></span></td></tr>
+        <tr class="cp-foot"><td colspan="4"><button class="btn btn-ghost btn-sm" type="button" disabled title="The cap holds. Press Reset first.">+ Add a copy through this proxy</button></td></tr>
+      </tbody>
+    </table>
+  </article>
+  <article class="px-card">
+    <div class="px-head">
+      <div class="a-name"><span class="px-name">datacenter test</span><span class="px-sub">socks5 203.0.113.24:1080</span></div>
+      <div class="a-exit"><span class="px-k">Exit IP providers see</span><span class="px-v c-dim" style="color:var(--text-muted)">not tested</span><span class="px-sub">Press Test to see the exit IP.</span></div>
+      <div class="a-traffic"><span class="px-k">Traffic</span><span class="traffic-line">No cap</span></div>
+      <div class="a-acts px-acts">
+        <label class="lbl">Test on</label><select class="form-input"><option>watchtower</option></select>
+        <button class="btn btn-ghost btn-sm" type="button">Test</button><span class="sep"></span>
+        <button class="btn btn-ghost btn-sm" type="button">Edit</button><button class="btn btn-danger btn-sm" type="button">Delete</button>
+      </div>
+    </div>
+    <table class="fleet-table tidy cp-table">
+      <colgroup><col class="k1"><col class="k2"><col class="k3"><col class="k4"></colgroup>
+      <tbody>
+        <tr class="cp-foot"><td colspan="4"><span class="cp-none" style="margin-right:12px;">No copies yet.</span><button class="btn btn-ghost btn-sm" type="button">+ Add a copy through this proxy</button></td></tr>
+      </tbody>
+    </table>
+  </article>
+  <div class="exits">
+    <div class="sub-title"><span>Exit IPs that providers see</span></div>
+    <table class="fleet-table tidy exits-table">
+      <colgroup><col class="e1"><col class="e2"><col></colgroup>
+      <thead><tr><th>Exit IP</th><th>Who leaves from it</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td class="ip c-dim">Rotating</td><td>iproyal on geiserback, repocket on geiserback</td><td class="meaning c-dim">The exit IP changes with each connection, so CashPilot does not group these copies by IP.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="tidy-note">The bar turns amber within 5 points of the stop line. It turns red when the cap holds. The white mark is the stop line.</p>
+</div>
+
+<!-- (f) running costs with known costs, heat, device -->
+<div class="state-panel">
+  <span class="state-label">(f) Running costs: watts set (example values), Heat open on geiserback (heat pump) and geiserct (fuel), a tracked device, not billed per kWh, not reporting, earned nothing (example machines)</span>
+  <div class="table-scroll">
+  <table class="fleet-table tidy mach-table" style="max-width:1180px;">
+    <thead><tr><th>Machine</th><th class="c-num">Earned</th><th>Power draw</th><th class="c-num">Electricity</th><th class="c-num">Net</th><th class="c-act">Heat</th></tr></thead>
+    <tbody>
+      <tr><td class="c-name">geiserback<span class="verdict">Earns more than its electricity below <strong>0.216 EUR/kWh</strong> (you pay 0.170)</span></td><td class="c-num">$15.95</td>
+        <td class="mono" style="font-size:var(--fs-2)">95 W</td><td class="c-num">$12.56</td><td class="c-num">$4.51<span class="net-sub">incl. heat +$1.12</span></td>
+        <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="true">A heat pump</button></td></tr>
+      <tr class="heat-row"><td colspan="6">
+        <form class="heat-grid" onsubmit="return false">
+          <div><label class="form-label">Its heat replaces</label><select class="form-input"><option>Nothing (no heat credit)</option><option>Electric resistive heating</option><option selected>A heat pump</option><option>Gas, oil or another fuel</option></select></div>
+          <div><label class="form-label">Heat pump COP</label><input class="form-input" type="number" value="3.5"></div>
+          <div></div>
+          <fieldset class="heat-months-grid"><legend>Months you heat</legend>
+            <label><input type="checkbox" checked> Jan</label><label><input type="checkbox" checked> Feb</label><label><input type="checkbox" checked> Mar</label><label><input type="checkbox"> Apr</label><label><input type="checkbox"> May</label><label><input type="checkbox"> Jun</label><label><input type="checkbox"> Jul</label><label><input type="checkbox"> Aug</label><label><input type="checkbox"> Sep</label><label><input type="checkbox"> Oct</label><label><input type="checkbox" checked> Nov</label><label><input type="checkbox" checked> Dec</label>
+          </fieldset>
+          <div class="heat-actions"><button class="btn btn-primary btn-sm">Save</button><span class="muted" style="font-size:var(--fs-2)">Heat credit $1.12 a month: its heat replaces a heat pump in Jan, Feb, Mar, Nov, Dec.</span></div>
+        </form>
+      </td></tr>
+      <tr><td class="c-name">geiserct<span class="verdict">Earns more than its electricity below <strong>0.219 EUR/kWh</strong> (you pay 0.170); in your heating months below <strong>0.229 EUR/kWh</strong></span></td><td class="c-num">$15.38</td>
+        <td class="mono" style="font-size:var(--fs-2)">90 W</td><td class="c-num">$11.90</td><td class="c-num">$4.18<span class="net-sub">incl. heat +$0.70</span></td>
+        <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="true">Gas, oil or another fuel</button></td></tr>
+      <tr class="heat-row"><td colspan="6">
+        <form class="heat-grid" onsubmit="return false">
+          <div><label class="form-label">Its heat replaces</label><select class="form-input"><option>Nothing (no heat credit)</option><option>Electric resistive heating</option><option>A heat pump</option><option selected>Gas, oil or another fuel</option></select></div>
+          <div><label class="form-label">Fuel cost per kWh of heat (EUR)</label><input class="form-input" type="number" value="0.11"></div>
+          <div></div>
+          <fieldset class="heat-months-grid"><legend>Months you heat</legend>
+            <label><input type="checkbox" checked> Jan</label><label><input type="checkbox" checked> Feb</label><label><input type="checkbox"> Mar</label><label><input type="checkbox"> Apr</label><label><input type="checkbox"> May</label><label><input type="checkbox"> Jun</label><label><input type="checkbox"> Jul</label><label><input type="checkbox"> Aug</label><label><input type="checkbox"> Sep</label><label><input type="checkbox"> Oct</label><label><input type="checkbox"> Nov</label><label><input type="checkbox" checked> Dec</label>
+          </fieldset>
+          <div class="heat-actions"><button class="btn btn-primary btn-sm">Save</button><span class="muted" style="font-size:var(--fs-2)">Heat credit $0.70 a month: its heat replaces gas, oil or another fuel in Jan, Feb, Dec.</span></div>
+        </form>
+      </td></tr>
+      <tr><td class="c-name">watchtower<span class="verdict text-fail">Loses $3.22 a month. It is dedicated, so turning it off would save that.</span></td><td class="c-num">$15.95</td>
+        <td class="mono" style="font-size:var(--fs-2)">145 W</td><td class="c-num">$19.17</td><td class="c-num text-fail">−$3.22</td>
+        <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false">None</button></td></tr>
+      <tr><td class="c-name">Bitaxe Gamma <span class="muted" style="font-family:var(--font-ui);font-weight:400">Device</span><span class="verdict">Expected at the hashrate the pool last reported (1.2 TH/s): <strong>0.0000062 BTC</strong> in 30 days, before the pool's fee. This is an estimate, not money owed.</span></td><td class="c-num" title="Accrued at the pool during this period">$1.40</td>
+        <td><form class="dev-watts" onsubmit="return false"><label for="dw-bx">Wall draw (W)</label><input id="dw-bx" class="form-input" type="number" min="1" step="1" value="18"><button class="btn btn-link" style="font-size:var(--fs-2)">Save</button></form>
+          <span class="verdict" style="min-width:0;max-width:34ch;margin-top:4px;">Use the miner readings above as a starting point. Enter the total wall draw for the miners that use this pool account.</span></td>
+        <td class="c-num">$2.55</td><td class="c-num text-fail">−$1.15</td><td class="c-act"></td></tr>
+      <tr><td class="c-name">nas-office<span class="verdict">nas-office is not billed by the kilowatt-hour, so electricity is not what decides whether it is worth running.</span></td><td class="c-num">$3.10</td>
+        <td class="mono" style="font-size:var(--fs-2)">40 W</td><td class="c-num c-dim">not billed</td><td class="c-num c-dim">—</td><td class="c-act"></td></tr>
+      <tr><td class="c-name">old-laptop<span class="verdict">old-laptop is not reporting, so CashPilot cannot see what it earns. Nothing here says whether it is worth running. The last figures it sent are not evidence about now.</span></td><td class="c-num c-dim">—</td>
+        <td class="mono" style="font-size:var(--fs-2)">30 W</td><td class="c-num c-dim">—</td><td class="c-num c-dim">—</td>
+        <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false" aria-label="Heat of old-laptop: none">None</button></td></tr>
+      <tr><td class="c-name">pi-garage<span class="verdict text-fail">pi-garage earned nothing measurable in the last 30 days, so it loses money at any electricity price.</span></td><td class="c-num">$0.00</td>
+        <td class="mono" style="font-size:var(--fs-2)">6 W</td><td class="c-num">$0.79</td><td class="c-num text-fail">−$0.79</td>
+        <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false" aria-label="Heat of pi-garage: none">None</button></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tidy-note">The sentence under a machine shows only when it adds a fact the columns do not hold: a break-even price, a loss, or that the machine is not reporting. "Not billed per kWh" rows show that sentence and no Heat button.</p>
+  <p class="tidy-note">Notes under the service table stay as today, when they apply: <code>fleet.econ.no_heat_per_service</code>, <code>fleet.econ.withheld</code>, <code>fleet.econ.unmetered</code>, <code>fleet.econ.unknown</code>. Example: "Per-service figures leave out the heat credit, which belongs to the whole machine." · "Electricity cost is unknown for 1 service."</p>
+</div>
+
+<!-- (f2) price not set -->
+<div class="state-panel">
+  <span class="state-label">(f2) Running costs: no electricity price yet, watts set on geiserback (example)</span>
+  <div class="costs-settings" style="padding-top:0;">
+    <div><label class="form-label" for="pp2">Electricity price per kWh</label><input id="pp2" class="form-input form-input-price" type="number" step="0.001" min="0" placeholder="0.30"></div>
+    <div><label class="form-label" for="pc2">Currency</label><input id="pc2" class="form-input form-input-code" type="text" maxlength="4" placeholder="EUR"></div>
+    <button class="btn btn-primary">Save</button>
+    <p class="form-hint">Your tariff, as it appears on your bill. Figures below are converted to USD.</p>
+  </div>
+  <div class="table-scroll">
+  <table class="fleet-table tidy mach-table" style="max-width:980px;margin-top:10px;">
+    <thead><tr><th>Machine</th><th class="c-num">Earned</th><th>Power draw</th><th class="c-num">Electricity</th><th class="c-num">Net</th><th class="c-act">Heat</th></tr></thead>
+    <tbody>
+      <tr><td class="c-name">geiserback<span class="verdict">Earns more than its electricity below <strong>0.216 EUR/kWh</strong></span></td><td class="c-num">$15.95</td>
+        <td class="mono" style="font-size:var(--fs-2)">95 W</td><td class="c-num c-dim">needs a price</td><td class="c-num c-dim">—</td>
+        <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false" aria-label="Heat of geiserback: none">None</button></td></tr>
+      <tr><td class="c-name">watchtower</td><td class="c-num">$15.95</td>
+        <td><span class="power-missing"><span class="c-dim" aria-hidden="true">—</span><button class="btn btn-link" type="button" aria-label="Set the power draw of watchtower in the Boxes table">Set in Boxes</button></span></td><td class="c-num c-dim">needs a price</td><td class="c-num c-dim">—</td>
+        <td class="c-act"><button class="btn btn-link heat-toggle" type="button" aria-expanded="false" aria-label="Heat of watchtower: none">None</button></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="tidy-note">With no price, the Electricity cell says what is missing. The break-even line still shows where the watts are known, so the owner can compare it with the bill.</p>
+</div>
+
+<!-- (g) add a box -->
+<div class="state-panel">
+  <span class="state-label">(g) Add a box: key checking, key revealed, clipboard blocked on plain http, loopback address, key not set</span>
+  <div class="env-block" style="max-width:760px;">
+    <code class="env-code">CASHPILOT_UI_URL=https://cashpilot.example.lan
+CASHPILOT_API_KEY=••••••••
+CASHPILOT_WORKER_NAME=server-name</code>
+    <div class="env-actions"><span class="badge badge-category">Checking…</span><span class="push-right"></span><button class="btn btn-ghost btn-sm">Reveal API Key</button><button class="btn btn-ghost btn-sm">Copy</button></div>
+  </div>
+  <div class="env-block" style="max-width:760px;margin-top:14px;">
+    <code class="env-code">CASHPILOT_UI_URL=http://&lt;this-server-address&gt;:8080
+CASHPILOT_API_KEY=cp_7f3a…e91c
+CASHPILOT_WORKER_NAME=server-name</code>
+    <div class="env-actions">
+      <span class="badge badge-deployed">From CASHPILOT_API_KEY</span>
+      <span class="push-right"></span>
+      <button class="btn btn-ghost btn-sm">Hide API Key</button>
+      <button class="btn btn-ghost btn-sm">Copy</button>
+    </div>
+    <div class="env-fallback"><textarea readonly rows="3" class="form-input mono">CASHPILOT_UI_URL=http://&lt;this-server-address&gt;:8080
+CASHPILOT_API_KEY=cp_7f3a…e91c
+CASHPILOT_WORKER_NAME=server-name</textarea></div>
+  </div>
+  <p class="muted add-worker-text" style="max-width:760px;">This page is open on a loopback address, which another server cannot reach. Put this server's LAN or Tailscale address in <code>CASHPILOT_UI_URL</code>. The default install listens only on 127.0.0.1, so set <code>CASHPILOT_BIND_ADDR</code> first (<a href="#">how</a>).</p>
+  <div class="env-block" style="max-width:760px;margin-top:14px;">
+    <code class="env-code">CASHPILOT_UI_URL=https://cashpilot.example.lan
+CASHPILOT_API_KEY=(not configured)
+CASHPILOT_WORKER_NAME=server-name</code>
+    <div class="env-actions"><span class="badge badge-category">Not set</span></div>
+  </div>
+  <p class="tidy-note">The last block is the viewer's view: the key status only, with no Reveal and no Copy. When the key status cannot load, the badge reads "Unknown"; a failed reveal shows "(error)" in the block and a toast. The toast on plain http says: "This page is not on https, so CashPilot cannot reach the clipboard. The text is selected, press Ctrl/Cmd+C."</p>
+</div>
+
+</main>
+<script>
+// Mockup only: a risk tick gates Run, and the counter recounts.
+document.querySelectorAll('.copy-check').forEach(box => {
+  const ticks = box.querySelectorAll('input[data-ack]'); const run = box.querySelector('.run-gated'); const count = box.querySelector('.count');
+  if (!ticks.length || !run) return;
+  const sync = () => {
+    const left = [...ticks].filter(t => !t.checked).length;
+    run.disabled = left > 0; count.style.color = left ? '' : 'var(--text-muted)';
+    count.textContent = left === 0 ? 'All risks accepted.' : left === 1 ? 'Tick 1 more line to run the copy.' : 'Tick ' + left + ' more lines to run the copy.';
+  };
+  ticks.forEach(t => t.addEventListener('change', sync)); sync();
+});
+// Mockup only: flip the Heat toggles.
+document.querySelectorAll('.heat-toggle').forEach(b => b.addEventListener('click', () => {
+  b.setAttribute('aria-expanded', b.getAttribute('aria-expanded') === 'true' ? 'false' : 'true');
+}));
+</script>
+</body>
+</html>

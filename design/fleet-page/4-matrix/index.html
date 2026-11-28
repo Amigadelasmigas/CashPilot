@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet, lower half: 4. Exit matrix</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<style>
+/* ===== Only the new parts. Everything else is app/static/css/style.css. ===== */
+.mock-note { font-size: var(--fs-2); color: var(--text-muted); border: 1px dashed var(--border-light); padding: 6px 10px; margin-bottom: 18px; }
+.mock-out { font-size: var(--fs-2); color: var(--text-muted); border-top: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light); padding: 14px 0; margin-bottom: 28px; }
+
+.sub-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 4px; }
+.sub-title { font-size: var(--fs-3); font-weight: 600; }
+.sub-meta { font-size: var(--fs-2); color: var(--text-muted); }
+
+/* ----- Running costs ----- */
+.rc-settings { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
+.rc-settings .form-hint { margin: 0 0 6px; }
+.rc-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 0 40px; align-items: start; }
+.rc-notice { display: flex; gap: 10px; align-items: baseline; padding: 10px 0; color: var(--text-secondary); max-width: 72ch; }
+.rc-notice .cell { flex: none; width: 10px; height: 10px; }
+.num-r { text-align: right !important; font-family: var(--font-mono); font-size: var(--fs-2); white-space: nowrap; }
+.th-sort { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+.th-sort:hover { color: var(--text-primary); }
+.th-sort[aria-pressed="true"] { color: var(--text-primary); font-weight: 600; }
+.th-sort .arr { font-family: var(--font-mono); font-size: var(--fs-1); }
+.fleet-table.rc-table td { vertical-align: middle; padding-top: 6px; padding-bottom: 6px; }
+.rc-table .mono-name { font-family: var(--font-mono); font-size: var(--fs-2); }
+.rc-table .c-state { color: var(--text-muted); font-size: var(--fs-2); }
+.rc-table .c-heat { text-align: right; width: 1%; white-space: nowrap; padding-right: 0; }
+.btn-link { color: var(--text-secondary); font-size: var(--fs-2); text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; cursor: pointer; }
+.btn-link:hover { color: var(--text-primary); }
+.netbar { position: relative; height: 10px; width: 100%; min-width: 120px; }
+.netbar::before { content: ''; position: absolute; top: -3px; bottom: -3px; left: var(--zero); width: 1px; background: var(--border-strong); }
+.netbar > i { position: absolute; top: 0; height: 10px; display: block; }
+.netbar > i.pos { left: var(--zero); background: var(--success); }
+.netbar > i.neg { right: calc(100% - var(--zero)); background: var(--error); }
+.rc-table .c-bar { width: 32%; }
+.rc-foot { font-size: var(--fs-2); color: var(--text-muted); margin-top: 8px; max-width: 80ch; }
+.rc-foot p + p { margin-top: 4px; }
+.rc-heatrow td { background: var(--bg-secondary); padding: 12px 14px !important; }
+.heat-grid { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; }
+.heat-grid fieldset { border: 0; padding: 0; }
+.heat-grid legend { font-size: var(--fs-2); color: var(--text-secondary); font-weight: 500; margin-bottom: 4px; }
+.months { display: grid; grid-template-columns: repeat(6, auto); gap: 4px 14px; font-size: var(--fs-2); color: var(--text-secondary); }
+.months label { display: inline-flex; gap: 5px; align-items: center; }
+.w-field { display: inline-flex; align-items: center; gap: 6px; }
+.w-field .form-input { width: 5rem; height: 26px; }
+
+/* ----- Proxies ----- */
+.px-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; }
+.px-bar .inline-field .form-input { width: 12rem; height: 28px; }
+.px-bar label { font-size: var(--fs-2); color: var(--text-secondary); }
+.fleet-table.px-table td { vertical-align: middle; }
+.px-table .p-name strong { display: block; }
+.px-table .p-sub { font-size: var(--fs-2); color: var(--text-muted); }
+.px-table .p-exit { font-family: var(--font-mono); font-size: var(--fs-2); white-space: nowrap; }
+.px-table .p-act { width: 1%; white-space: nowrap; text-align: right; padding-right: 0; }
+.px-acts { display: inline-grid; grid-template-columns: repeat(3, 4.6rem); gap: 6px; }
+.px-acts .btn { width: 100%; }
+.px-table .p-traffic { min-width: 15rem; }
+.cap { display: grid; grid-template-columns: minmax(8rem, 1fr) auto; gap: 4px 10px; align-items: center; }
+.cap-track { position: relative; height: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-light); }
+.cap-track > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text-secondary); }
+.cap-track.warn > i { background: var(--warning); }
+.cap-track.fail > i { background: var(--error); }
+.cap-track > b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text-primary); }
+.cap-text { grid-column: 1 / -1; font-size: var(--fs-2); color: var(--text-secondary); }
+
+/* ----- Exit matrix ----- */
+.mx-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 24px; align-items: start; margin-top: 10px; }
+.mx-legend { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: var(--fs-2); color: var(--text-muted); padding: 8px 0; }
+.mx-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.mx-legend .cell { width: 10px; height: 10px; }
+.mx-legend .k-add { border: 1px dashed var(--border-strong); padding: 0 5px; font-size: var(--fs-1); color: var(--text-secondary); }
+.mx-legend .k-no { font-size: var(--fs-1); border-bottom: 1px dotted var(--text-muted); }
+.mx-alert { display: flex; gap: 10px; align-items: baseline; border-left: 2px solid var(--warning); background: var(--warning-soft); padding: 8px 12px; margin: 4px 0 10px; color: var(--text-primary); max-width: 100%; }
+.mx-alert .flag { margin-left: 0; flex: none; }
+.mx { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.mx th, .mx td { border-bottom: 1px solid var(--border-color); padding: 5px 8px; text-align: left; vertical-align: middle; }
+.mx thead th { font-weight: 500; color: var(--text-muted); font-size: var(--fs-2); vertical-align: bottom; }
+.mx thead tr:first-child th { border-bottom: 0; padding-bottom: 0; }
+.mx thead .ip { font-family: var(--font-mono); color: var(--text-primary); white-space: nowrap; }
+.mx thead .ip-sub { display: block; font-family: var(--font-ui); color: var(--text-muted); font-size: var(--fs-1); white-space: normal; }
+.mx thead .ip-sub.warn { color: var(--warning); }
+.mx thead .grp { border-top: 2px solid var(--border-strong); }
+.mx thead .grp-shared { border-top-color: var(--warning); }
+.mx thead tr:nth-child(2) th { border-bottom: 1px solid var(--border-light); padding-top: 4px; }
+.mx thead .exit-name { display: block; color: var(--text-primary); font-weight: 600; font-family: var(--font-mono); font-size: var(--fs-2); }
+.mx thead .exit-kind { display: block; font-size: var(--fs-1); color: var(--text-muted); }
+.mx .svc { font-family: var(--font-mono); font-size: var(--fs-2); color: var(--text-primary); width: 150px; padding-left: 0; overflow-wrap: anywhere; }
+.mx .col-proxy { background: var(--bg-secondary); }
+.mx td.col-proxy, .mx th.col-proxy { border-left: 1px solid var(--border-light); }
+.mx tbody tr:hover td { background: var(--bg-hover); }
+.mx td { height: 40px; }
+.mx-c { display: flex; align-items: center; gap: 6px; font-size: var(--fs-2); color: var(--text-secondary); min-width: 0; }
+.mx-c .cell, .mx-cellbtn .cell { width: 10px; height: 10px; flex: none; }
+.mx-cellbtn .from { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+.mx-cellbtn .flag { flex: none; }
+.mx-c .from { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mx-c .fail { color: var(--error); font-weight: 500; }
+.mx-none { color: var(--border-strong); font-family: var(--font-mono); }
+.mx-cellbtn { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; padding: 2px 6px; margin: 0 -6px; width: calc(100% + 12px); cursor: pointer; border: 1px solid transparent; font-size: var(--fs-2); color: var(--text-secondary); }
+.mx-cellbtn:hover { border-color: var(--border-strong); }
+.mx-cellbtn:focus-visible, .mx-cellbtn.sel { outline: 2px solid var(--accent-secondary); outline-offset: -2px; }
+.mx-add { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 28px; padding: 2px 8px; border: 1px dashed var(--border-strong); color: var(--text-secondary); font-size: var(--fs-2); cursor: pointer; }
+.mx-add:hover { border-style: solid; color: var(--text-primary); background: var(--bg-tertiary); }
+.mx-add:focus-visible, .mx-add.sel { outline: 2px solid var(--accent-secondary); outline-offset: -2px; border-style: solid; }
+.mx-add .plus { font-family: var(--font-mono); color: var(--text-primary); }
+.mx-add .need { font-size: var(--fs-1); color: var(--text-muted); white-space: nowrap; }
+.mx-add .need.warn { color: var(--warning); }
+.mx-no { position: relative; display: inline-block; font-size: var(--fs-1); color: var(--text-muted); border-bottom: 1px dotted var(--text-muted); cursor: help; outline: none; }
+.mx-no:focus-visible { outline: 2px solid var(--accent-secondary); outline-offset: 2px; }
+.mx-tip { display: none; position: absolute; z-index: 5; right: 0; top: calc(100% + 6px); width: 300px; padding: 8px 10px; background: var(--bg-tertiary); border: 1px solid var(--border-strong); color: var(--text-primary); font-size: var(--fs-2); line-height: 1.4; white-space: normal; cursor: default; }
+.mx-no:hover .mx-tip, .mx-no:focus .mx-tip, .mx-no.show .mx-tip { display: block; }
+.mx td.clash { box-shadow: inset 0 0 0 1px var(--warning); }
+.mx td.clash .flag { margin-left: auto; }
+.mx-foot { font-size: var(--fs-2); color: var(--text-muted); margin-top: 8px; }
+
+/* Inspector, the panel beside the matrix */
+.insp { border: 1px solid var(--border-light); background: var(--bg-secondary); padding: 14px 16px 16px; position: sticky; top: 12px; }
+.insp h3 { font-size: var(--fs-3); font-weight: 600; margin-bottom: 8px; }
+.insp h3 .mono { font-weight: 600; }
+.insp p { color: var(--text-secondary); margin-bottom: 8px; }
+.insp ol { padding-left: 20px; color: var(--text-secondary); margin-bottom: 10px; }
+.insp ol li + li { margin-top: 4px; }
+.insp .k { color: var(--text-primary); font-weight: 500; }
+.insp-dl { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 5px 12px; margin: 10px 0 12px; font-size: var(--fs-2); }
+.insp-dl dt { color: var(--text-muted); }
+.insp-dl dd { color: var(--text-primary); overflow-wrap: anywhere; }
+.insp-dl dd.mono { font-size: var(--fs-2); }
+.insp-warn { border-left: 2px solid var(--warning); background: var(--warning-soft); padding: 8px 10px; font-size: var(--fs-2); color: var(--text-primary); margin: 0 0 12px; }
+.insp-fail { border-left: 2px solid var(--error); background: var(--error-soft); padding: 8px 10px; font-size: var(--fs-2); color: var(--text-primary); margin: 0 0 12px; }
+.insp-ack { border: 1px solid var(--warning); padding: 10px 12px; margin: 0 0 12px; }
+.insp-ack .ack-title { font-size: var(--fs-2); font-weight: 600; margin-bottom: 8px; }
+.insp-ack label { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; font-size: var(--fs-2); color: var(--text-secondary); align-items: start; }
+.insp-ack label + label { margin-top: 8px; }
+.insp-ack input { margin-top: 3px; }
+.insp-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.insp-acts .form-hint { margin: 0; flex-basis: 100%; }
+.insp .form-group .form-input { width: 100%; }
+.insp-rule { font-size: var(--fs-2); color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 12px; }
+.insp-pane[hidden] { display: none; }
+.badge-warning { color: var(--warning); }
+
+/* ----- Proxy form ----- */
+.pf { border: 1px solid var(--border-light); background: var(--bg-secondary); padding: 14px 16px 16px; }
+.pf-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.pf-head h3 { font-size: var(--fs-3); font-weight: 600; }
+.pf-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 28px; }
+.pf fieldset { border: 0; padding: 0; min-width: 0; }
+.pf legend { font-size: var(--fs-2); font-weight: 600; color: var(--text-primary); text-transform: none; padding: 0 0 6px; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); width: 100%; }
+.pf .form-group { margin-bottom: 10px; }
+.pf .form-input { width: 100%; }
+.pf .row2 { display: grid; grid-template-columns: minmax(0, 1fr) 6.5rem; gap: 10px; }
+.pf .row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.kinds { display: grid; gap: 6px; }
+.kind { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; padding: 7px 10px; border: 1px solid var(--border-light); cursor: pointer; }
+.kind input { grid-row: span 2; margin-top: 3px; accent-color: var(--accent); }
+.kind b { font-weight: 500; font-size: var(--fs-2); }
+.kind span { font-size: var(--fs-1); color: var(--text-muted); }
+.kind.on { border-color: var(--text-secondary); background: var(--bg-tertiary); }
+.stored { font-size: var(--fs-1); color: var(--text-muted); font-weight: 400; margin-left: 6px; }
+.clear-tick { display: flex; gap: 6px; align-items: center; font-size: var(--fs-2); color: var(--text-secondary); margin-top: 5px; }
+.rot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; font-size: var(--fs-2); color: var(--text-secondary); margin-top: 4px; }
+.rot input { margin-top: 3px; }
+.pf-foot { display: flex; gap: 8px; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-color); }
+
+/* ----- Add a box ----- */
+.ab-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 0 40px; padding-top: 10px; }
+.ab-ways { list-style: none; padding: 0; }
+.ab-ways li { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); padding: 8px 0; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); }
+.ab-ways li:first-child { padding-top: 0; }
+.ab-ways .n { font-family: var(--font-mono); color: var(--text-muted); }
+.ab-ways b { color: var(--text-primary); font-weight: 600; display: block; }
+.ab-ways code { font-size: var(--fs-2); }
+.add-worker.ab > summary { font-size: var(--fs-3); }
+
+
+.rc-table .c-state { font-family: var(--font-ui); }
+.mx-cellbtn .fail { color: var(--error); font-weight: 500; }
+.mx thead .ip { white-space: normal; }
+.mx thead .ip .nw { white-space: nowrap; }
+.px-table .p-name { min-width: 12rem; overflow-wrap: normal; }
+.px-table .p-target { white-space: nowrap; overflow-wrap: normal; }
+.px-table .p-traffic { max-width: 26rem; }
+.px-table .p-copies { white-space: nowrap; overflow-wrap: normal; }
+.rot { align-items: start; }
+/* style.css hides .fleet-table heads under 1100 px for the stacked Boxes table; these tables keep theirs. */
+@media (max-width: 1100px) {
+  .fleet-table.rc-table, .fleet-table.px-table { display: table; }
+  .fleet-table.rc-table tbody, .fleet-table.px-table tbody { display: table-row-group; }
+  .fleet-table.rc-table thead, .fleet-table.px-table thead { display: table-header-group; }
+}
+@media (max-width: 960px) {
+  .px-acts { grid-template-columns: 4.6rem; }
+  .px-table .p-traffic { min-width: 11rem; }
+}
+
+/* ----- State panels ----- */
+.states-title { font-size: var(--fs-4); font-weight: 600; margin: 40px 0 4px; font-family: var(--font-mono); }
+.states-lede { color: var(--text-muted); margin-bottom: 16px; }
+.state { border: 1px solid var(--border-light); padding: 14px 16px 16px; margin-bottom: 20px; }
+.state-cap { font-size: var(--fs-2); color: var(--text-muted); margin-bottom: 12px; max-width: 110ch; }
+.state-cap b { color: var(--text-primary); font-weight: 600; font-family: var(--font-mono); margin-right: 4px; }
+.state-2 { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 24px; align-items: start; }
+.state-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.after { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: var(--fs-2); color: var(--text-secondary); margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+.after .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-light); padding: 3px 8px; background: var(--bg-secondary); }
+.after .chip .cell { width: 10px; height: 10px; }
+.after .arrow { color: var(--text-muted); font-family: var(--font-mono); }
+.ghost-col { border: 1px dashed var(--border-strong); padding: 10px 12px; color: var(--text-secondary); font-size: var(--fs-2); }
+
+@media (max-width: 1100px) {
+  .mx-wrap, .state-2 { grid-template-columns: minmax(0, 1fr); }
+  .insp { position: static; }
+  .pf-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 960px) {
+  .rc-grid, .ab-grid, .state-pair { grid-template-columns: minmax(0, 1fr); }
+  .rc-grid > div + div { margin-top: 18px; }
+  .ab-grid > div + div { margin-top: 14px; }
+  .px-table .p-target { display: none; }
+}
+@media (max-width: 760px) {
+  .pf-cols { grid-template-columns: minmax(0, 1fr); }
+  .mx .svc { width: 110px; }
+}
+</style>
+</head>
+<body>
+<main class="page-content">
+
+<div class="mock-note">Mockup 4 of 4, "Exit matrix". Proxies, copies, costs and machines are the owner's real figures. Which services run directly on each box is assumed. The own-line IPs of watchtower and geiserback are documentation stand-ins (203.0.113.x, 198.51.100.x).</div>
+<div class="mock-out">The four stats and the Boxes table stay as they are today. This mockup starts after them.</div>
+
+<!-- ============================================================
+     1. RUNNING COSTS
+     ============================================================ -->
+<section class="fleet-economics" id="fleet-economics-card" aria-labelledby="rc-title">
+  <div class="block-head">
+    <h2 class="block-title" id="rc-title">Running costs</h2>
+    <span class="block-meta">Costs are known for 0 of 5 machines.</span>
+  </div>
+
+  <div class="rc-settings" id="power-settings">
+    <div>
+      <label for="power-price" class="form-label">Electricity price per kWh</label>
+      <input id="power-price" class="form-input form-input-price" type="text" inputmode="decimal" value="0,17">
+    </div>
+    <div>
+      <label for="power-currency" class="form-label">Currency</label>
+      <input id="power-currency" class="form-input form-input-code" type="text" maxlength="4" value="EUR">
+    </div>
+    <button class="btn btn-primary" id="power-save" type="button">Save</button>
+    <p class="form-hint" id="power-help">Your tariff, as it appears on your bill. Figures below are converted to USD.</p>
+  </div>
+
+  <div class="rc-grid">
+    <!-- Machines -->
+    <div>
+      <div class="sub-head">
+        <h3 class="sub-title">Machines</h3>
+        <span class="sub-meta">Last month</span>
+      </div>
+      <div class="rc-notice">
+        <span class="cell cell-unknown" aria-hidden="true"></span>
+        <span>CashPilot does not know the power draw of these machines. Without it, CashPilot cannot say if they cover their electricity. Set each machine's watts in the <a href="#boxes">Boxes table</a>.</span>
+      </div>
+      <div class="table-scroll">
+        <table class="fleet-table rc-table">
+          <thead>
+            <tr>
+              <th>Machine</th>
+              <th class="num-r">Earned</th>
+              <th class="num-r">Power</th>
+              <th class="num-r">Net</th>
+              <th class="c-heat"><span class="sr-only">Heat</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr title="geiserback earned 15.95 last month. Without this machine's power draw CashPilot cannot say whether that covers the electricity, and guessing would be worse than not saying.">
+              <td class="mono-name">geiserback</td>
+              <td class="num-r">$15.95</td>
+              <td class="num-r c-state">needs watts</td>
+              <td class="num-r muted">—</td>
+              <td class="c-heat"><button class="btn-link" type="button">Heat</button></td>
+            </tr>
+            <tr>
+              <td class="mono-name">watchtower</td>
+              <td class="num-r">$15.95</td>
+              <td class="num-r c-state">needs watts</td>
+              <td class="num-r muted">—</td>
+              <td class="c-heat"><button class="btn-link" type="button">Heat</button></td>
+            </tr>
+            <tr>
+              <td class="mono-name">geiserct</td>
+              <td class="num-r">$15.38</td>
+              <td class="num-r c-state">needs watts</td>
+              <td class="num-r muted">—</td>
+              <td class="c-heat"><button class="btn-link" type="button">Heat</button></td>
+            </tr>
+            <tr>
+              <td class="mono-name">OPPO CPH1951 (5bdadbc5)</td>
+              <td class="num-r">$1.90</td>
+              <td class="num-r c-state">needs watts</td>
+              <td class="num-r muted">—</td>
+              <td class="c-heat"><button class="btn-link" type="button">Heat</button></td>
+            </tr>
+            <tr>
+              <td class="mono-name">motorola one fusion+ (1414f972)</td>
+              <td class="num-r">$1.90</td>
+              <td class="num-r c-state">needs watts</td>
+              <td class="num-r muted">—</td>
+              <td class="c-heat"><button class="btn-link" type="button">Heat</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="rc-foot"><p>Point at a row to read CashPilot's full sentence for it. Heat opens the heat credit form under the row.</p></div>
+    </div>
+
+    <!-- Per service -->
+    <div>
+      <div class="sub-head">
+        <h3 class="sub-title">Per service</h3>
+        <span class="sub-meta">Last 30 days · <span class="text-fail">5 of 11</span> cost more than they earn</span>
+      </div>
+      <div class="table-scroll">
+        <table class="fleet-table rc-table">
+          <thead>
+            <tr>
+              <th><button class="th-sort" type="button" aria-pressed="false">Service <span class="arr">↕</span></button></th>
+              <th class="num-r"><button class="th-sort" type="button" aria-pressed="false">Earned <span class="arr">↕</span></button></th>
+              <th class="num-r"><button class="th-sort" type="button" aria-pressed="false">Power <span class="arr">↕</span></button></th>
+              <th class="num-r" aria-sort="descending"><button class="th-sort" type="button" aria-pressed="true">Net <span class="arr">↓</span></button></th>
+              <th class="c-bar"><span class="sr-only">Net, as a bar</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- zero axis at 0.92 / (0.92 + 17.88) = 4.9 % -->
+            <tr><td class="mono-name">honeygain</td><td class="num-r">$18.76</td><td class="num-r">$0.88</td><td class="num-r text-ok">$17.88</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="pos" style="width:95.1%"></i></div></td></tr>
+            <tr><td class="mono-name">traffmonetizer</td><td class="num-r">$6.72</td><td class="num-r">$0.88</td><td class="num-r text-ok">$5.84</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="pos" style="width:31.1%"></i></div></td></tr>
+            <tr><td class="mono-name">mysterium</td><td class="num-r">$6.40</td><td class="num-r">$1.04</td><td class="num-r text-ok">$5.36</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="pos" style="width:28.5%"></i></div></td></tr>
+            <tr><td class="mono-name">earnfm</td><td class="num-r">$4.32</td><td class="num-r">$0.88</td><td class="num-r text-ok">$3.43</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="pos" style="width:18.2%"></i></div></td></tr>
+            <tr><td class="mono-name">packetstream</td><td class="num-r">$1.62</td><td class="num-r">$0.88</td><td class="num-r text-ok">$0.74</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="pos" style="width:3.9%"></i></div></td></tr>
+            <tr><td class="mono-name">storj</td><td class="num-r">$1.12</td><td class="num-r">$0.79</td><td class="num-r text-ok">$0.33</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="pos" style="width:1.8%"></i></div></td></tr>
+            <tr><td class="mono-name">proxyrack</td><td class="num-r">$0.60</td><td class="num-r">$0.91</td><td class="num-r text-fail">−$0.31</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="neg" style="width:1.6%"></i></div></td></tr>
+            <tr><td class="mono-name">repocket</td><td class="num-r">$0.15</td><td class="num-r">$0.88</td><td class="num-r text-fail">−$0.72</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="neg" style="width:3.8%"></i></div></td></tr>
+            <tr><td class="mono-name">bitping</td><td class="num-r">$0.08</td><td class="num-r">$0.88</td><td class="num-r text-fail">−$0.80</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="neg" style="width:4.3%"></i></div></td></tr>
+            <tr><td class="mono-name">iproyal</td><td class="num-r">$0.03</td><td class="num-r">$0.88</td><td class="num-r text-fail">−$0.86</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="neg" style="width:4.6%"></i></div></td></tr>
+            <tr><td class="mono-name">bytelixir</td><td class="num-r">$1.12</td><td class="num-r">$2.03</td><td class="num-r text-fail">−$0.92</td><td class="c-bar"><div class="netbar" style="--zero:4.9%"><i class="neg" style="width:4.9%"></i></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="rc-foot">
+        <p>Power is an estimate until you set the watts: CashPilot uses 65 W per box, or the box's rated CPU power. A service's share of a box is its part of that box's electricity.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     2. PROXIES
+     ============================================================ -->
+<section class="fleet-proxies" id="fleet-proxies" aria-labelledby="proxies-title">
+  <div class="block-head">
+    <h2 class="block-title" id="proxies-title">Proxies</h2>
+    <span class="block-meta">A proxy gives your boxes one more public IP. <a href="https://geiserx.github.io/CashPilot/proxies/">How it works</a></span>
+  </div>
+
+  <div class="px-bar">
+    <div class="inline-field">
+      <label for="copy-worker">Test from</label>
+      <select id="copy-worker" class="form-input"><option>watchtower</option><option>geiserback</option><option>geiserct</option></select>
+    </div>
+    <button class="btn btn-primary" type="button" data-show="pf-add">+ Add a proxy</button>
+  </div>
+
+  <div class="table-scroll">
+    <table class="fleet-table px-table">
+      <thead>
+        <tr><th>Proxy</th><th class="p-target">Goes through</th><th>Exit IP</th><th>Traffic</th><th>Copies</th><th class="p-act"><span class="sr-only">Actions</span></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="p-name"><strong>geiserct exit node (Tailscale)</strong><span class="p-sub">Tailscale exit node</span></td>
+          <td class="p-target mono" style="font-size:var(--fs-2)">100.64.0.22</td>
+          <td><span class="p-exit">203.0.113.71 · ES</span><br><span class="p-sub">Same IP as geiserct's own line</span></td>
+          <td class="p-traffic">No cap</td>
+          <td class="p-copies"><span class="cell cell-ok" style="width:10px;height:10px;margin-right:6px"></span>7 running<br><a href="#mx" class="p-sub">See them in the matrix</a></td>
+          <td class="p-act"><div class="px-acts"><button class="btn btn-ghost btn-sm">Test</button><button class="btn btn-ghost btn-sm">Edit</button><button class="btn btn-danger btn-sm">Delete</button></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================
+     3. RUN A COPY: THE EXIT MATRIX
+     ============================================================ -->
+<section class="fleet-copies" id="mx" aria-labelledby="mx-title">
+  <div class="block-head">
+    <h2 class="block-title" id="mx-title">Where each service leaves from</h2>
+    <span class="block-meta">Rows are services. Columns are the public IPs that providers see.</span>
+  </div>
+
+  <div class="mx-wrap">
+    <div>
+      <div class="mx-legend" aria-label="Legend">
+        <span><i class="cell cell-ok"></i> running</span>
+        <span><i class="cell cell-unknown"></i> stopped</span>
+        <span><i class="cell cell-fail"></i> failing</span>
+        <span><span class="mx-none">·</span> not deployed</span>
+        <span><span class="k-add">+ copy</span> can run a copy</span>
+        <span><span class="k-no">not possible</span> point at it to see why</span>
+      </div>
+
+      <div class="mx-alert" role="status">
+        <span class="flag flag-warn">same IP</span>
+        <span><b class="mono">earnfm</b> leaves twice from 203.0.113.71: from geiserct, and from the copy on watchtower. The provider may count one device per IP. Then one of the two earns nothing.</span>
+      </div>
+
+      <div class="table-scroll">
+      <table class="mx">
+        <colgroup><col style="width:140px"><col><col><col><col style="width:31%"></colgroup>
+        <thead>
+          <tr>
+            <th rowspan="2" class="svc" style="vertical-align:bottom;color:var(--text-muted);font-family:var(--font-ui)">Service</th>
+            <th class="grp"><span class="ip"><span class="nw">203.0.113.24</span> <span class="nw">· ES</span></span></th>
+            <th class="grp"><span class="ip"><span class="nw">198.51.100.7</span> <span class="nw">· ES</span></span></th>
+            <th class="grp grp-shared" colspan="2"><span class="ip"><span class="nw">203.0.113.71</span> <span class="nw">· ES</span></span><span class="ip-sub warn">2 exits share this IP</span></th>
+          </tr>
+          <tr>
+            <th><span class="exit-name">watchtower</span><span class="exit-kind">box, own line</span></th>
+            <th><span class="exit-name">geiserback</span><span class="exit-kind">box, own line</span></th>
+            <th><span class="exit-name">geiserct</span><span class="exit-kind">box, own line</span></th>
+            <th class="col-proxy"><span class="exit-name">geiserct exit node</span><span class="exit-kind">proxy, Tailscale</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="svc">bitping</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-add" type="button" data-pane="p-bitping"><span class="plus">+ copy</span><span class="need">1 tick</span></button></td></tr>
+          <tr><td class="svc">bytelixir</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-add" type="button" data-pane="p-honeygain"><span class="plus">+ copy</span></button></td></tr>
+          <tr><td class="svc">earnfm</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="clash"><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td class="col-proxy clash"><button class="mx-cellbtn" type="button" data-pane="p-earnfm"><i class="cell cell-ok"></i>running <span class="from">from watchtower</span><span class="flag flag-warn">same IP</span></button></td></tr>
+          <tr><td class="svc">honeygain</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td class="col-proxy"><button class="mx-add" type="button" data-pane="p-honeygain"><span class="plus">+ copy</span><span class="need warn">risk · IP in use</span></button></td></tr>
+          <tr><td class="svc">iproyal</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-add" type="button" data-pane="p-honeygain"><span class="plus">+ copy</span></button></td></tr>
+          <tr><td class="svc">mysterium</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td class="col-proxy"><button class="mx-add" type="button" data-pane="p-honeygain"><span class="plus">+ copy</span><span class="need warn">3 ticks · IP in use</span></button></td></tr>
+          <tr><td class="svc">packetstream</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-cellbtn" type="button" data-pane="p-earnfm"><i class="cell cell-ok"></i>running <span class="from">from watchtower</span></button></td></tr>
+          <tr><td class="svc">proxybase</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-cellbtn" type="button" data-pane="p-earnfm"><i class="cell cell-ok"></i>running <span class="from">from watchtower</span></button></td></tr>
+          <tr><td class="svc">proxylite</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-cellbtn" type="button" data-pane="p-earnfm"><i class="cell cell-ok"></i>running <span class="from">from watchtower</span></button></td></tr>
+          <tr><td class="svc">proxyrack</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-cellbtn" type="button" data-pane="p-earnfm"><i class="cell cell-ok"></i>running <span class="from">from watchtower</span></button></td></tr>
+          <tr><td class="svc">repocket</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-cellbtn" type="button" data-pane="p-earnfm"><i class="cell cell-ok"></i>running <span class="from">from watchtower</span></button></td></tr>
+          <tr><td class="svc">storj</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td class="col-proxy"><span class="mx-no" tabindex="0">not possible<span class="mx-tip" role="tooltip">storj needs inbound connections on a published port. Those reach this box, never the proxy's address, so it cannot work behind a proxy.</span></span></td></tr>
+          <tr><td class="svc">traffmonetizer</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-cellbtn" type="button" data-pane="p-earnfm"><i class="cell cell-ok"></i>running <span class="from">from watchtower</span></button></td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p class="mx-foot">Phones are not in the matrix: a phone cannot run copies. A copy runs on one box, so "from watchtower" names the box that runs it.</p>
+    </div>
+
+    <!-- Inspector: the explainer until a cell is picked -->
+    <aside class="insp" aria-live="polite">
+      <div class="insp-pane" id="p-intro">
+        <h3>What is a copy?</h3>
+        <ol>
+          <li>A copy is <span class="k">a second container of a service</span> that already runs on a box.</li>
+          <li>Its traffic leaves <span class="k">through a proxy</span>, not through the box's own line.</li>
+          <li>The provider sees <span class="k">a new device on a new IP</span>. It pays for it as one more device.</li>
+          <li>The original <span class="k">keeps running</span> as before.</li>
+          <li>If the proxy goes down, the copy stops. It never falls back to the box's own IP.</li>
+        </ol>
+        <p>To start one, pick a <span class="k">+ copy</span> cell in a proxy's column. To manage a copy, pick its cell.</p>
+        <p class="insp-rule">A copy has no value on an IP where the same service already runs. Some providers forbid proxies or VPNs. CashPilot asks you to accept that risk before it starts the copy.</p>
+      </div>
+      <div class="insp-pane" id="p-earnfm" hidden>
+        <h3><span class="mono">earnfm</span> through geiserct exit node</h3>
+        <dl class="insp-dl">
+          <dt>Status</dt><dd><span class="cell cell-ok" style="width:10px;height:10px;margin-right:6px"></span>running via 203.0.113.71 · ES</dd>
+          <dt>Runs on</dt><dd>watchtower</dd>
+          <dt>Container</dt><dd class="mono">cashpilot-earnfm-p1</dd>
+        </dl>
+        <div class="insp-warn">earnfm also leaves from 203.0.113.71 on geiserct. Copies on one IP share its bandwidth, and the provider may limit devices per IP.</div>
+        <div class="insp-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button><button class="btn-link push-right" data-pane="p-intro">Close</button></div>
+      </div>
+      <div class="insp-pane" id="p-bitping" hidden></div>
+      <div class="insp-pane" id="p-honeygain" hidden></div>
+    </aside>
+  </div>
+</section>
+
+<!-- ============================================================
+     4. ADD A BOX
+     ============================================================ -->
+<details class="add-worker ab" id="add-worker" open>
+  <summary>Add a box</summary>
+  <div class="ab-grid">
+    <div>
+      <ol class="ab-ways">
+        <li><span class="n">1</span><div><b>A server with Docker</b>Deploy <code>drumsergio/cashpilot-worker:3.1</code> and set the environment variables in the block.</div></li>
+        <li><span class="n">2</span><div><b>A phone</b>Install the Android app.</div></li>
+        <li><span class="n">3</span><div><b>A computer with CashPilot Desktop</b>Pick <b style="display:inline">Join my CashPilot</b>, then paste the block into <b style="display:inline">Paste from Add a box</b>.</div></li>
+      </ol>
+      <p class="muted add-worker-text" style="margin-top:10px">This is the enrolment key. Use the same key on all workers. Each worker uses it only to join, then gets its own key.</p>
+    </div>
+    <div>
+      <p class="add-worker-text">For Docker workers, set these environment variables:</p>
+      <div class="env-block">
+        <code id="worker-env">CASHPILOT_UI_URL=<span id="env-ui-url">https://cashpilot.example.net</span>
+CASHPILOT_API_KEY=<span id="env-api-key">••••••••</span>
+CASHPILOT_WORKER_NAME=server-name</code>
+        <div class="env-actions">
+          <span id="api-key-status" class="badge badge-deployed">Generated in /fleet/.fleet_key</span>
+          <span class="push-right"></span>
+          <button class="btn btn-ghost btn-sm" id="reveal-btn">Reveal API Key</button>
+          <button class="btn btn-ghost btn-sm">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</details>
+
+
+<!-- ============================================================
+     STATE PANELS
+     ============================================================ -->
+<h2 class="states-title">States</h2>
+<p class="states-lede">Each panel shows one part of the page in another state.</p>
+
+<!-- (a) proxy form -->
+<div class="state">
+  <div class="state-cap"><b>(a1)</b> Edit a SOCKS5 proxy. "+ Add a proxy" and "Edit" open this panel under the proxy table. Stored secrets show a "stored" mark and a Remove tick.</div>
+  <form class="pf" autocomplete="off">
+    <div class="pf-head"><h3>Edit Residential ES</h3><span class="sub-meta">A new host or port needs the user and password again.</span></div>
+    <div class="pf-cols">
+      <fieldset>
+        <legend>Proxy</legend>
+        <div class="form-group"><label class="form-label">Name</label><input class="form-input" value="Residential ES"></div>
+        <div class="form-label">Type</div>
+        <div class="kinds" role="radiogroup">
+          <label class="kind on"><input type="radio" name="k1" checked><b>SOCKS5</b><span>Carries TCP only. Not encrypted.</span></label>
+          <label class="kind"><input type="radio" name="k1"><b>HTTP CONNECT</b><span>Carries TCP only. Not encrypted.</span></label>
+          <label class="kind"><input type="radio" name="k1"><b>Tailscale exit node</b><span>Carries UDP too. Uses an exit node in your tailnet.</span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Where it connects</legend>
+        <div class="row2">
+          <div class="form-group"><label class="form-label">Host</label><input class="form-input" value="gate.example.net"></div>
+          <div class="form-group"><label class="form-label">Port</label><input class="form-input" value="7000"></div>
+        </div>
+        <div class="form-group"><label class="form-label">User <span class="stored">stored</span></label><input class="form-input" placeholder="kept if empty, unless the host or port changes"><label class="clear-tick"><input type="checkbox"> Remove the stored user</label></div>
+        <div class="form-group"><label class="form-label">Password <span class="stored">stored</span></label><input class="form-input" type="password" placeholder="kept if empty, unless the host or port changes"><label class="clear-tick"><input type="checkbox"> Remove the stored password</label></div>
+      </fieldset>
+      <fieldset>
+        <legend>Traffic limit</legend>
+        <div class="row3">
+          <div class="form-group"><label class="form-label">Cap (GB)</label><input class="form-input" value="50"></div>
+          <div class="form-group"><label class="form-label">Stop at (%)</label><input class="form-input" value="95"></div>
+          <div class="form-group"><label class="form-label">Resets on day</label><input class="form-input" value="1"></div>
+        </div>
+        <p class="form-hint" style="margin:-4px 0 12px">At the stop percentage, every copy through this proxy stops. Leave the cap empty for no cap. Leave the day empty to reset by hand.</p>
+        <label class="rot"><input type="checkbox"><span><b style="color:var(--text-primary);font-weight:500">Rotating exit IP</b><br>Tick this when the provider changes the exit IP on each connection. CashPilot then does not group its copies by IP.</span></label>
+      </fieldset>
+    </div>
+    <div class="pf-foot"><button class="btn btn-primary" type="button">Save</button><button class="btn btn-ghost" type="button">Cancel</button></div>
+  </form>
+
+  <div class="state-cap" style="margin-top:18px"><b>(a2)</b> Add a proxy, Tailscale exit node. Host, port, user and password give way to the Tailscale fields. In add mode nothing is stored, so no "kept if empty" text.</div>
+  <form class="pf" autocomplete="off">
+    <div class="pf-head"><h3>Add a proxy</h3><span class="sub-meta">Test it after you save.</span></div>
+    <div class="pf-cols">
+      <fieldset>
+        <legend>Proxy</legend>
+        <div class="form-group"><label class="form-label">Name</label><input class="form-input" value="geiserct exit node (Tailscale)"></div>
+        <div class="form-label">Type</div>
+        <div class="kinds" role="radiogroup">
+          <label class="kind"><input type="radio" name="k2"><b>SOCKS5</b><span>Carries TCP only. Not encrypted.</span></label>
+          <label class="kind"><input type="radio" name="k2"><b>HTTP CONNECT</b><span>Carries TCP only. Not encrypted.</span></label>
+          <label class="kind on"><input type="radio" name="k2" checked><b>Tailscale exit node</b><span>Carries UDP too. Uses an exit node in your tailnet.</span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Where it connects</legend>
+        <div class="form-group"><label class="form-label">Auth key</label><input class="form-input" type="password" placeholder="tskey-auth-…"><p class="form-hint">Use a reusable, ephemeral, tagged key. With device approval on, make it pre-approved.</p></div>
+        <div class="form-group"><label class="form-label">Exit node</label><input class="form-input" value="100.64.0.22"><p class="form-hint">The 100.x address, not the name.</p></div>
+        <div class="form-group"><label class="form-label">Login server</label><input class="form-input" placeholder="empty for Tailscale's own"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Traffic limit</legend>
+        <div class="row3">
+          <div class="form-group"><label class="form-label">Cap (GB)</label><input class="form-input" placeholder="none"></div>
+          <div class="form-group"><label class="form-label">Stop at (%)</label><input class="form-input" value="90"></div>
+          <div class="form-group"><label class="form-label">Resets on day</label><input class="form-input" placeholder="by hand"></div>
+        </div>
+        <p class="form-hint" style="margin:-4px 0 12px">At the stop percentage, every copy through this proxy stops. Leave the cap empty for no cap. Leave the day empty to reset by hand.</p>
+        <label class="rot"><input type="checkbox"><span><b style="color:var(--text-primary);font-weight:500">Rotating exit IP</b><br>Tick this when the provider changes the exit IP on each connection. CashPilot then does not group its copies by IP.</span></label>
+      </fieldset>
+    </div>
+    <div class="pf-foot"><button class="btn btn-primary" type="button">Save</button><button class="btn btn-ghost" type="button">Cancel</button></div>
+  </form>
+</div>
+
+<!-- (b) run a copy -->
+<div class="state">
+  <div class="state-cap"><b>(b)</b> Run a copy. The owner picks the honeygain "+ copy" cell. The panel beside the matrix explains the copy, warns about the shared IP and asks for the risk tick. Run stays off until the tick. Below: storj, which cannot run a copy, with its reason open.</div>
+  <div class="state-2">
+    <div>
+      <table class="mx">
+        <colgroup><col style="width:140px"><col><col><col><col style="width:31%"></colgroup>
+        <thead>
+          <tr><th rowspan="2" class="svc" style="vertical-align:bottom;color:var(--text-muted);font-family:var(--font-ui)">Service</th>
+            <th class="grp"><span class="ip"><span class="nw">203.0.113.24</span> <span class="nw">· ES</span></span></th><th class="grp"><span class="ip"><span class="nw">198.51.100.7</span> <span class="nw">· ES</span></span></th>
+            <th class="grp grp-shared" colspan="2"><span class="ip"><span class="nw">203.0.113.71</span> <span class="nw">· ES</span></span><span class="ip-sub warn">2 exits share this IP</span></th></tr>
+          <tr><th><span class="exit-name">watchtower</span><span class="exit-kind">box, own line</span></th><th><span class="exit-name">geiserback</span><span class="exit-kind">box, own line</span></th><th><span class="exit-name">geiserct</span><span class="exit-kind">box, own line</span></th><th class="col-proxy"><span class="exit-name">geiserct exit node</span><span class="exit-kind">proxy, Tailscale</span></th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="svc">honeygain</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td class="col-proxy"><button class="mx-add sel" type="button"><span class="plus">+ copy</span><span class="need warn">risk · IP in use</span></button></td></tr>
+          <tr><td class="svc">iproyal</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-none">·</span></td><td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-add" type="button"><span class="plus">+ copy</span></button></td></tr>
+          <tr><td class="svc">storj</td>
+            <td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-none">·</span></td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td>
+            <td class="col-proxy"><span class="mx-no show" tabindex="0">not possible<span class="mx-tip" role="tooltip">storj needs inbound connections on a published port. Those reach this box, never the proxy's address, so it cannot work behind a proxy. Run it directly on the box instead.</span></span></td></tr>
+          <tr><td class="svc" style="height:120px"></td><td></td><td></td><td></td><td class="col-proxy"></td></tr>
+        </tbody>
+      </table>
+      <div class="after">
+        <span>After Run:</span>
+        <span class="chip"><span class="spinner"></span> starting the tunnel</span>
+        <span class="arrow">→</span>
+        <span class="chip"><i class="cell cell-ok"></i> running <span class="muted">from watchtower</span></span>
+        <span class="muted">A toast says "Running through 203.0.113.71 · ES". If the provider needs the new device added to the account, a second toast says so.</span>
+      </div>
+    </div>
+    <div>
+      <aside class="insp" style="position:static">
+        <h3>Copy <span class="mono">honeygain</span> through geiserct exit node</h3>
+        <div class="form-group">
+          <label class="form-label" for="b-box">Run it on</label>
+          <select class="form-input" id="b-box"><option>watchtower</option><option>geiserback</option><option>geiserct</option></select>
+          <p class="form-hint">Boxes where honeygain runs and that can run copies.</p>
+        </div>
+        <dl class="insp-dl">
+          <dt>New container</dt><dd class="mono">cashpilot-honeygain-p1</dd>
+          <dt>Leaves from</dt><dd>203.0.113.71 · ES</dd>
+          <dt>Provider sees</dt><dd>a new device, <span class="mono">watchtower-p1</span></dd>
+          <dt>The original</dt><dd>keeps running on watchtower's own line</dd>
+        </dl>
+        <div class="insp-warn">honeygain already leaves from 203.0.113.71 on geiserct. Copies on one IP share its bandwidth, and the provider may limit devices per IP.</div>
+        <div class="insp-ack">
+          <div class="ack-title">Behind a proxy this service is less isolated. Tick each line to run it anyway:</div>
+          <label><input type="checkbox" data-ack="account_risk"><span>Your Honeygain account may be suspended. Honeygain's help centre strictly prohibits VPNs and wants your regular home or mobile connection. It does not support data-center IPs, and one shared IP can get several accounts suspended at once. <a href="https://support.honeygain.com/hc/en-us/articles/30688484350492-Does-Honeygain-work-with-VPNs">Read Honeygain's rule</a></span></label>
+        </div>
+        <div class="insp-acts">
+          <button class="btn btn-primary" type="button" disabled>Run the copy</button>
+          <button class="btn btn-ghost" type="button">Cancel</button>
+          <p class="form-hint">Starting the tunnel can take up to a minute.</p>
+        </div>
+      </aside>
+      <aside class="insp" style="position:static;margin-top:14px">
+        <h3><span class="mono">storj</span> cannot run through a proxy</h3>
+        <div class="insp-fail">storj needs inbound connections on a published port. Those reach this box, never the proxy's address, so it cannot work behind a proxy. Run it directly on the box instead.</div>
+        <p class="insp-rule" style="margin-top:0;border-top:0;padding-top:0">A service that uses the host's network, publishes ports, keeps data in a host folder or needs a GPU cannot run through a proxy. Each copy gets data volumes of its own.</p>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- (c) empty -->
+<div class="state">
+  <div class="state-cap"><b>(c)</b> No proxies yet. The matrix still shows each box's own IP, so the shared-IP check works for boxes too. A dashed column says what a proxy would add.</div>
+  <div class="block-head"><h2 class="block-title">Proxies</h2><span class="block-meta">A proxy gives your boxes one more public IP. <a href="#">How it works</a></span></div>
+  <div class="empty-state">
+    <div class="empty-state-title">No proxies yet</div>
+    <p class="empty-state-text">Add a SOCKS5 proxy, an HTTP CONNECT proxy or a Tailscale exit node. Then each service can run a copy that providers see as a new device.</p>
+    <button class="btn btn-primary" type="button">+ Add a proxy</button>
+  </div>
+  <table class="mx" style="margin-top:6px">
+    <colgroup><col style="width:140px"><col><col><col><col style="width:31%"></colgroup>
+    <thead>
+      <tr><th rowspan="2" class="svc" style="vertical-align:bottom;color:var(--text-muted);font-family:var(--font-ui)">Service</th>
+        <th class="grp"><span class="ip"><span class="nw">203.0.113.24</span> <span class="nw">· ES</span></span></th><th class="grp"><span class="ip"><span class="nw">198.51.100.7</span> <span class="nw">· ES</span></span></th><th class="grp"><span class="ip"><span class="nw">203.0.113.71</span> <span class="nw">· ES</span></span></th><th rowspan="5" style="vertical-align:top;padding-top:10px"><div class="ghost-col">A proxy adds a column here: one more IP for every service that can run a copy.</div></th></tr>
+      <tr><th><span class="exit-name">watchtower</span><span class="exit-kind">box, own line</span></th><th><span class="exit-name">geiserback</span><span class="exit-kind">box, own line</span></th><th><span class="exit-name">geiserct</span><span class="exit-kind">box, own line</span></th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="svc">earnfm</td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-none">·</span></td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td></tr>
+      <tr><td class="svc">honeygain</td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td></tr>
+      <tr><td class="svc">traffmonetizer</td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-none">·</span></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- (d) stopped + failing -->
+<div class="state">
+  <div class="state-cap"><b>(d)</b> One copy stopped by the owner (repocket), one failing (proxyrack). Also a copy with reduced isolation (bitping, PR #940: Withdraw replaces Remove) and one being removed (packetstream).</div>
+  <div class="state-2">
+    <div>
+      <table class="mx">
+        <colgroup><col style="width:140px"><col><col><col><col style="width:31%"></colgroup>
+        <thead>
+          <tr><th rowspan="2" class="svc" style="vertical-align:bottom;color:var(--text-muted);font-family:var(--font-ui)">Service</th>
+            <th class="grp"><span class="ip"><span class="nw">203.0.113.24</span> <span class="nw">· ES</span></span></th><th class="grp"><span class="ip"><span class="nw">198.51.100.7</span> <span class="nw">· ES</span></span></th>
+            <th class="grp grp-shared" colspan="2"><span class="ip"><span class="nw">203.0.113.71</span> <span class="nw">· ES</span></span><span class="ip-sub warn">2 exits share this IP</span></th></tr>
+          <tr><th><span class="exit-name">watchtower</span><span class="exit-kind">box, own line</span></th><th><span class="exit-name">geiserback</span><span class="exit-kind">box, own line</span></th><th><span class="exit-name">geiserct</span><span class="exit-kind">box, own line</span></th><th class="col-proxy"><span class="exit-name">geiserct exit node</span><span class="exit-kind">proxy, Tailscale</span></th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="svc">bitping</td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-none">·</span></td><td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-cellbtn" type="button"><i class="cell cell-ok"></i>running <span class="from">from watchtower</span><span class="flag flag-warn" style="margin-left:auto">reduced isolation</span></button></td></tr>
+          <tr><td class="svc">packetstream</td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><span class="mx-c"><span class="spinner"></span><span class="muted">removing…</span></span></td></tr>
+          <tr><td class="svc">proxyrack</td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-none">·</span></td><td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-cellbtn sel" type="button"><i class="cell cell-fail"></i><span class="fail">exited</span> <span class="from">from watchtower</span></button></td></tr>
+          <tr><td class="svc">repocket</td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-c"><i class="cell cell-ok"></i>running</span></td><td><span class="mx-none">·</span></td>
+            <td class="col-proxy"><button class="mx-cellbtn" type="button"><i class="cell cell-unknown"></i>stopped <span class="from">from watchtower</span></button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <aside class="insp" style="position:static">
+        <h3><span class="mono">proxyrack</span> through geiserct exit node</h3>
+        <dl class="insp-dl">
+          <dt>Status</dt><dd><span class="cell cell-fail" style="width:10px;height:10px;margin-right:6px"></span><span class="text-fail">exited</span> · exit not seen yet</dd>
+          <dt>Runs on</dt><dd>watchtower</dd>
+          <dt>Container</dt><dd class="mono">cashpilot-proxyrack-p1</dd>
+        </dl>
+        <div class="insp-fail">The tunnel of geiserct exit node is down on watchtower. The copy has no way out, so it stopped. It never sends from watchtower's own IP.</div>
+        <div class="insp-acts"><button class="btn btn-ghost btn-sm">Start</button><button class="btn btn-danger btn-sm">Remove</button><button class="btn btn-ghost btn-sm push-right">Test the proxy</button></div>
+      </aside>
+      <aside class="insp" style="position:static;margin-top:14px">
+        <h3><span class="mono">repocket</span> through geiserct exit node</h3>
+        <dl class="insp-dl">
+          <dt>Status</dt><dd><span class="cell cell-unknown" style="width:10px;height:10px;margin-right:6px"></span>stopped by you</dd>
+          <dt>Runs on</dt><dd>watchtower</dd>
+        </dl>
+        <div class="insp-acts"><button class="btn btn-ghost btn-sm">Start</button><button class="btn btn-danger btn-sm">Remove</button></div>
+      </aside>
+      <aside class="insp" style="position:static;margin-top:14px">
+        <h3><span class="mono">bitping</span> through geiserct exit node <span class="badge badge-warning" style="font-weight:400">reduced isolation</span></h3>
+        <p style="font-size:var(--fs-2)">You ticked: "It holds NET_RAW, so it can send raw packets. They reach only its gate, but it is less contained than a service without it."</p>
+        <div class="insp-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Withdraw</button><p class="form-hint">Withdraw removes this copy. Its data volumes stay, so the copy keeps its identity if you add it again.</p></div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- (e) cap -->
+<div class="state">
+  <div class="state-cap"><b>(e)</b> A proxy at 92% of a 50 GB cap that stops at 95% (warning), and one that the cap stopped (failing). The white mark is the stop point. Reset sits next to the figure it resets.</div>
+  <div class="table-scroll">
+    <table class="fleet-table px-table">
+      <thead><tr><th>Proxy</th><th class="p-target">Goes through</th><th>Exit IP</th><th>Traffic</th><th>Copies</th><th class="p-act"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="p-name"><strong>Residential ES</strong><span class="p-sub">SOCKS5</span></td>
+          <td class="p-target mono" style="font-size:var(--fs-2)">gate.example.net:7000</td>
+          <td><span class="p-exit">203.0.113.88 · ES</span></td>
+          <td class="p-traffic"><div class="cap"><div class="cap-track warn"><i style="width:92%"></i><b style="left:95%"></b></div><button class="btn btn-ghost btn-sm">Reset</button><span class="cap-text text-warn">46.0 of 50 GB, stops at 95%, resets on day 1</span></div></td>
+          <td class="p-copies"><span class="cell cell-ok" style="width:10px;height:10px;margin-right:6px"></span>3 running</td>
+          <td class="p-act"><div class="px-acts"><button class="btn btn-ghost btn-sm">Test</button><button class="btn btn-ghost btn-sm">Edit</button><button class="btn btn-danger btn-sm">Delete</button></div></td>
+        </tr>
+        <tr>
+          <td class="p-name"><strong>Mobile NL</strong><span class="p-sub">HTTP CONNECT</span></td>
+          <td class="p-target mono" style="font-size:var(--fs-2)">nl.example.org:8080</td>
+          <td><span class="p-exit">198.51.100.40 · NL</span><br><span class="p-sub">rotating</span></td>
+          <td class="p-traffic"><div class="cap"><div class="cap-track fail"><i style="width:90%"></i><b style="left:90%"></b></div><button class="btn btn-ghost btn-sm">Reset</button><span class="cap-text text-fail">Stopped: Mobile NL reached 90% of its 20 GB cap on 26 Nov; reset it by hand to start the copies again.</span></div></td>
+          <td class="p-copies"><span class="cell cell-unknown" style="width:10px;height:10px;margin-right:6px"></span>2 stopped<br><span class="p-sub">by the cap</span></td>
+          <td class="p-act"><div class="px-acts"><button class="btn btn-ghost btn-sm">Test</button><button class="btn btn-ghost btn-sm">Edit</button><button class="btn btn-danger btn-sm">Delete</button></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- (f) heat + device -->
+<div class="state">
+  <div class="state-cap"><b>(f)</b> Running costs, owner: the Heat form open under geiserback, and a tracked device row (example: a LAN miner) with its wall draw input in the Power column.</div>
+  <table class="fleet-table rc-table" style="max-width:820px">
+    <thead><tr><th>Machine</th><th class="num-r">Earned</th><th class="num-r">Power</th><th class="num-r">Net</th><th class="c-heat"><span class="sr-only">Heat</span></th></tr></thead>
+    <tbody>
+      <tr><td class="mono-name">geiserback</td><td class="num-r">$15.95</td><td class="num-r c-state">needs watts</td><td class="num-r muted">—</td><td class="c-heat"><button class="btn-link" type="button" aria-expanded="true" style="color:var(--text-primary)">Heat ▾</button></td></tr>
+      <tr class="rc-heatrow"><td colspan="5">
+        <form class="heat-grid">
+          <div><label class="form-label">Its heat replaces</label><select class="form-input" style="width:16rem"><option>A heat pump</option></select></div>
+          <div><label class="form-label">Heat pump COP</label><input class="form-input" style="width:6rem" value="3.2"></div>
+          <fieldset><legend>Months you heat</legend>
+            <div class="months">
+              <label><input type="checkbox" checked>Jan</label><label><input type="checkbox" checked>Feb</label><label><input type="checkbox" checked>Mar</label><label><input type="checkbox">Apr</label><label><input type="checkbox">May</label><label><input type="checkbox">Jun</label>
+              <label><input type="checkbox">Jul</label><label><input type="checkbox">Aug</label><label><input type="checkbox">Sep</label><label><input type="checkbox">Oct</label><label><input type="checkbox" checked>Nov</label><label><input type="checkbox" checked>Dec</label>
+            </div>
+          </fieldset>
+          <button class="btn btn-primary btn-sm" type="button">Save</button>
+        </form>
+      </td></tr>
+      <tr><td class="mono-name">Bitaxe 601 <span class="muted" style="font-family:var(--font-ui)">Device</span></td><td class="num-r">$0.62</td><td class="num-r"><span class="w-field"><label class="sr-only">Wall draw (W)</label><input class="form-input" value="" placeholder="W"><button class="btn-link" type="button">Save</button></span></td><td class="num-r muted">—</td><td class="c-heat"><button class="btn-link" type="button">Heat</button></td></tr>
+    </tbody>
+  </table>
+</div>
+
+</main>
+
+<script>
+/* Show/hide only: a picked cell swaps the inspector pane. */
+document.querySelectorAll('[data-pane]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var id = b.getAttribute('data-pane');
+    if (!document.getElementById(id) || !document.getElementById(id).innerHTML.trim()) id = 'p-intro';
+    document.querySelectorAll('.insp-pane').forEach(function (p) { p.hidden = p.id !== id; });
+    document.querySelectorAll('.mx-add.sel, .mx-cellbtn.sel').forEach(function (s) { s.classList.remove('sel'); });
+    if (id !== 'p-intro') b.classList.add('sel');
+  });
+});
+</script>
+</body>
+</html>

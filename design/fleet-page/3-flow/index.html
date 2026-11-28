@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en" data-theme="classic">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet, lower half: design 3, guided flow</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="../../../app/static/css/style.css">
+<style>
+/* ===== Mockup-only furniture (not part of the design) ===== */
+.mk-unchanged { border: 1px dashed var(--border-strong); color: var(--text-muted); padding: 14px 16px; margin-bottom: 28px; font-size: var(--fs-2); }
+.mk-state { margin: 56px 0 14px; padding: 6px 0; border-top: 2px dashed var(--accent-secondary); color: var(--accent-secondary); font-family: var(--font-mono); font-size: var(--fs-2); }
+.mk-state small { display: block; color: var(--text-muted); font-family: var(--font-ui); font-size: var(--fs-1); margin-top: 2px; }
+.mk-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 24px; align-items: start; }
+
+/* ===== New parts of the design ===== */
+.f3-sub { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 18px 0 6px; }
+.f3-sub h3 { font-size: var(--fs-2); font-weight: 600; color: var(--text-primary); }
+.f3-sub .block-meta { font-size: var(--fs-1); }
+
+/* Running costs: tariff strip */
+.f3-tariff { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; padding: 12px 0; border-bottom: 1px solid var(--border-color); }
+.f3-tariff .muted { font-size: var(--fs-2); flex-basis: 100%; }
+
+/* "Why no cost yet" call-out: said once, for the whole fleet */
+.f3-why { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; padding: 12px 14px; margin: 14px 0 4px; border: 1px solid var(--border-light); border-left: 3px solid var(--warning); background: var(--bg-secondary); }
+.f3-why-cells { display: flex; gap: 3px; align-items: center; padding-top: 6px; align-self: start; }
+.f3-why-cells .cell { width: 12px; height: 12px; }
+.f3-why strong { color: var(--text-primary); }
+.f3-why p { margin: 0; color: var(--text-secondary); max-width: 80ch; }
+.f3-why .muted { font-size: var(--fs-2); }
+
+.f3-costs-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 0 40px; align-items: start; }
+
+/* Ledger tables */
+.f3-ledger { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.f3-ledger th { font-size: var(--fs-2); font-weight: 500; color: var(--text-muted); text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border-light); white-space: nowrap; }
+.f3-ledger td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+.f3-ledger th:first-child, .f3-ledger td:first-child { padding-left: 0; }
+.f3-ledger th:last-child, .f3-ledger td:last-child { padding-right: 0; }
+.f3-ledger .n { text-align: right; font-family: var(--font-mono); font-size: var(--fs-2); white-space: nowrap; }
+.f3-ledger th.n { font-family: var(--font-ui); }
+.f3-ledger .m-name { font-family: var(--font-mono); font-weight: 600; font-size: var(--fs-2); }
+.f3-ledger .m-sub { display: block; font-family: var(--font-ui); font-weight: 400; font-size: var(--fs-1); color: var(--text-muted); }
+.f3-ledger .unknown { color: var(--text-muted); font-family: var(--font-ui); }
+.f3-ledger .acts { text-align: right; white-space: nowrap; width: 1%; }
+.f3-ledger .acts .btn { margin-left: 6px; }
+.f3-ledger tbody tr:hover { background: var(--bg-hover); }
+.f3-ledger tr.f3-heat-row:hover { background: none; }
+.f3-heat-row td { padding: 4px 0 14px 0; background: var(--bg-secondary); }
+.f3-heat-row .heat-form { margin: 0; padding: 10px 14px 0; }
+.f3-heat-row .heat-form label.form-label { margin: 0; }
+.f3-heat-toggle[aria-expanded="true"]::after { content: " ▴"; }
+.f3-heat-toggle[aria-expanded="false"]::after { content: " ▾"; }
+.text-fail { color: var(--error); }
+.f3-net { font-weight: 600; }
+
+/* Per-service net bar: zero line in the middle */
+.f3-bar { position: relative; width: 110px; height: 10px; display: inline-block; vertical-align: middle; }
+.f3-bar::before { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--border-strong); }
+.f3-bar i { position: absolute; top: 2px; height: 6px; min-width: 2px; }
+.f3-bar i.pos { left: 50%; background: var(--success); }
+.f3-bar i.neg { right: 50%; background: var(--error); }
+.f3-svc-sum { color: var(--text-secondary); font-size: var(--fs-2); margin: 10px 0 0; }
+.f3-svc-sum + .economics-note { margin-top: 6px; }
+
+/* Proxies: toolbar under the head */
+.f3-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 0 4px; }
+.f3-toolbar .push-right { margin-left: auto; }
+
+/* What is a copy: the route diagram */
+.f3-explain { border: 1px solid var(--border-light); background: var(--bg-secondary); margin: 10px 0 18px; }
+.f3-explain > summary { cursor: pointer; padding: 9px 14px; font-weight: 600; list-style-position: inside; }
+.f3-explain-body { padding: 4px 14px 14px; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px 32px; align-items: start; }
+.f3-lanes { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 12px; align-items: center; }
+.f3-lane-label { font-size: var(--fs-2); color: var(--text-muted); text-align: right; white-space: nowrap; }
+.f3-route { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 0; }
+.f3-node { border: 1px solid var(--border-light); background: var(--bg-primary); padding: 4px 9px; line-height: 1.25; }
+.f3-node b { display: block; font-family: var(--font-mono); font-weight: 500; font-size: var(--fs-2); color: var(--text-primary); white-space: nowrap; }
+.f3-node span { display: block; font-size: var(--fs-1); color: var(--text-muted); white-space: nowrap; }
+.f3-node.proxy { border-style: dashed; border-color: var(--accent-secondary); }
+.f3-node.svc { border-color: var(--border-strong); }
+.f3-arrow { width: 28px; height: 1px; background: var(--border-strong); position: relative; margin: 0 4px 0 2px; flex: none; }
+.f3-arrow::after { content: ''; position: absolute; right: -5px; top: -4px; border: 4.5px solid transparent; border-left: 6px solid var(--border-strong); border-right: 0; }
+.f3-facts { margin: 0; padding: 0; list-style: none; font-size: var(--fs-2); color: var(--text-secondary); }
+.f3-facts li { padding-left: 14px; position: relative; margin-bottom: 5px; }
+.f3-facts li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 6px; height: 1px; background: var(--text-muted); }
+.f3-facts strong { color: var(--text-primary); font-weight: 600; }
+
+/* One proxy */
+.f3-proxy { border: 1px solid var(--border-light); margin-bottom: 14px; }
+.f3-proxy-head { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) auto; gap: 8px 24px; padding: 12px 14px; align-items: start; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); }
+.f3-k { display: block; font-size: var(--fs-1); color: var(--text-muted); margin-bottom: 2px; }
+.f3-v { font-size: var(--fs-3); }
+.f3-v.mono { font-size: var(--fs-2); }
+.f3-pname { font-weight: 600; font-size: var(--fs-3); }
+.f3-proxy-acts { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.f3-proxy-acts select.form-input { height: 24px; font-size: var(--fs-2); padding: 0 4px; width: auto; }
+.f3-proxy-acts .sep { width: 1px; height: 18px; background: var(--border-light); margin: 0 4px; }
+.f3-copies-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 14px 4px; font-size: var(--fs-2); color: var(--text-muted); }
+.f3-copies-head strong { color: var(--text-primary); font-weight: 600; }
+.f3-copies { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.f3-copies col.k-svc { width: 250px; } .f3-copies col.k-route { width: 300px; } .f3-copies col.k-acts { width: 228px; }
+.f3-copies th { text-align: left; font-size: var(--fs-1); font-weight: 500; color: var(--text-muted); padding: 2px 14px 4px; }
+.f3-copies td { padding: 5px 14px; border-top: 1px solid var(--border-color); vertical-align: middle; font-size: var(--fs-2); }
+.f3-copies tbody tr:first-child td { border-top: 1px solid var(--border-light); }
+.f3-copies tr:hover td { background: var(--bg-hover); }
+.f3-copies .c-svc { font-family: var(--font-mono); font-weight: 500; color: var(--text-primary); }
+.f3-copies .c-svc .flag { display: inline-block; margin: 2px 0 0 18px; font-family: var(--font-ui); }
+.f3-copies .c-svc .cell { width: 10px; height: 10px; margin-right: 8px; vertical-align: 0; }
+.f3-copies .c-route { font-family: var(--font-mono); color: var(--text-secondary); }
+.f3-copies .c-route .ar { color: var(--text-muted); margin: 0 6px; }
+.f3-copies .c-state { color: var(--text-secondary); }
+.f3-copies .c-state .why { display: block; font-size: var(--fs-1); color: var(--text-muted); }
+.f3-copies .c-acts { text-align: right; white-space: nowrap; }
+.f3-copies .c-acts .btn { min-width: 86px; margin-left: 6px; }
+.f3-copies .c-acts .btn-hidden { visibility: hidden; }
+.f3-copies tr.removing td { color: var(--text-muted); }
+.f3-warnline { display: block; color: var(--warning); font-family: var(--font-ui); font-size: var(--fs-1); margin-top: 2px; }
+.text-warn { color: var(--warning); }
+
+/* Traffic meter */
+.f3-meter { position: relative; height: 6px; background: var(--bg-input); border: 1px solid var(--border-light); margin: 5px 0 3px; max-width: 260px; }
+.f3-meter i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--warning); }
+.f3-meter b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text-primary); }
+.f3-meter.over i { background: var(--error); }
+
+/* Exit IP strip */
+.f3-exits { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.f3-exits th { text-align: left; font-size: var(--fs-2); font-weight: 500; color: var(--text-muted); padding: 6px 10px; border-bottom: 1px solid var(--border-light); }
+.f3-exits td { padding: 7px 10px; border-bottom: 1px solid var(--border-color); font-size: var(--fs-2); vertical-align: top; }
+.f3-exits th:first-child, .f3-exits td:first-child { padding-left: 0; white-space: nowrap; }
+.f3-exits .mono { color: var(--text-primary); }
+
+/* Panels (forms and the flow) */
+.f3-panel { border: 1px solid var(--border-light); margin: 0 0 16px; }
+.f3-panel > header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary); }
+.f3-panel > header h3 { font-size: var(--fs-3); font-weight: 600; }
+.f3-panel-body { padding: 14px; }
+.f3-formbody { max-width: 1000px; }
+.f3-panel-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-top: 1px solid var(--border-color); }
+.f3-panel-foot .muted { font-size: var(--fs-2); }
+
+/* Proxy form */
+.f3-fieldset { border: 0; padding: 0; margin: 0 0 18px; }
+.f3-fieldset > legend { font-size: var(--fs-2); font-weight: 600; color: var(--text-primary); padding: 0; margin-bottom: 8px; }
+.f3-fieldset > legend span { font-weight: 400; color: var(--text-muted); }
+.f3-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 16px; }
+.f3-grid .span2 { grid-column: span 2; }
+.f3-grid .span4 { grid-column: 1 / -1; }
+.f3-grid .form-input { width: 100%; }
+.f3-check { display: flex; gap: 7px; align-items: flex-start; font-size: var(--fs-2); color: var(--text-secondary); margin-top: 6px; }
+.f3-check input { margin-top: 3px; }
+.f3-stored { font-size: var(--fs-1); color: var(--text-muted); margin-top: 3px; }
+.f3-seg { display: inline-flex; border: 1px solid var(--border-light); }
+.f3-seg label { padding: 4px 12px; font-size: var(--fs-2); cursor: pointer; color: var(--text-secondary); white-space: nowrap; }
+.f3-seg label + label { border-left: 1px solid var(--border-light); }
+.f3-seg input { position: absolute; opacity: 0; pointer-events: none; }
+.f3-seg label:has(input:checked) { background: var(--accent-soft); color: var(--text-primary); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 600; }
+.f3-kindhelp { font-size: var(--fs-2); color: var(--text-muted); margin: 6px 0 0; max-width: 80ch; }
+
+/* Guided flow */
+.f3-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.f3-step { padding: 14px; border-right: 1px solid var(--border-color); min-width: 0; }
+.f3-step:last-child { border-right: 0; }
+.f3-step h4 { display: flex; align-items: center; gap: 8px; font-size: var(--fs-3); font-weight: 600; margin-bottom: 4px; }
+.f3-step .hint { font-size: var(--fs-2); color: var(--text-muted); margin: 0 0 10px; }
+.f3-n { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border: 1px solid var(--border-strong); font-family: var(--font-mono); font-size: var(--fs-1); flex: none; }
+.f3-step.done .f3-n { background: var(--accent); border-color: var(--accent); color: var(--bg-primary); }
+.f3-opts { display: flex; flex-direction: column; gap: 6px; }
+.f3-opt { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 0 8px; padding: 7px 10px; border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-primary); }
+.f3-opt input, .f3-seg input, .f3-check input, .heat-form input, .f3-risk input { color-scheme: dark; }
+.f3-opt input { margin: 3px 0 0; accent-color: var(--accent); }
+.f3-opt b { font-family: var(--font-mono); font-weight: 500; font-size: var(--fs-2); color: var(--text-primary); }
+.f3-opt span { grid-column: 2; font-size: var(--fs-1); color: var(--text-muted); line-height: 1.35; }
+.f3-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.f3-opt.no { cursor: not-allowed; background: none; border-style: dashed; }
+.f3-opt.no b { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--border-strong); }
+.f3-opt.no span { color: var(--text-secondary); }
+.f3-opt .tag, em.flag { font-style: normal; }
+.f3-opt .tag { font-family: var(--font-ui); font-size: var(--fs-1); color: var(--text-muted); border: 1px solid var(--border-light); padding: 0 4px; margin-left: 6px; font-weight: 400; vertical-align: 1px; }
+.f3-opt .tag-warn { color: var(--warning); border-color: var(--warning); }
+.f3-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.f3-chips label { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: var(--fs-1); color: var(--text-secondary); cursor: pointer; }
+.f3-chips input { margin: 0; accent-color: var(--accent); color-scheme: dark; }
+.f3-chips label:has(input:checked) { border-color: var(--accent); color: var(--text-primary); }
+.f3-group-label { font-size: var(--fs-1); color: var(--text-muted); margin: 10px 0 4px; }
+.f3-preview { border-top: 1px solid var(--border-light); padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 32px; background: var(--bg-secondary); }
+.f3-preview h4 { font-size: var(--fs-3); font-weight: 600; margin-bottom: 8px; }
+.f3-preview > .full { grid-column: 1 / -1; }
+.f3-say { font-size: var(--fs-3); color: var(--text-primary); margin: 10px 0 8px; max-width: 70ch; }
+.f3-say .mono { font-size: var(--fs-2); }
+.f3-risk { border: 1px solid var(--warning); padding: 10px 12px; background: var(--warning-soft); }
+.f3-risk h5 { font-size: var(--fs-2); font-weight: 600; color: var(--warning); margin-bottom: 6px; }
+.f3-risk label { display: flex; gap: 8px; align-items: flex-start; font-size: var(--fs-2); color: var(--text-primary); }
+.f3-risk label + label { margin-top: 8px; }
+.f3-risk input { margin-top: 3px; flex: none; accent-color: var(--warning); }
+.f3-risk a { color: var(--text-secondary); }
+.f3-ok { border: 1px solid var(--border-light); padding: 10px 12px; font-size: var(--fs-2); color: var(--text-secondary); }
+.f3-steps-after { margin: 8px 0 0; padding-left: 20px; font-size: var(--fs-2); color: var(--text-secondary); }
+.f3-steps-after li { margin-bottom: 3px; }
+.f3-progress li.ok::marker { color: var(--success); }
+.f3-progress li.now { color: var(--text-primary); }
+
+/* Add a box */
+.f3-paths { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 4px 0 14px; }
+.f3-path { border: 1px solid var(--border-color); padding: 10px 12px; font-size: var(--fs-2); color: var(--text-secondary); }
+.f3-path h4 { font-size: var(--fs-2); font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.f3-path p { margin: 0; }
+.f3-env-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.f3-env-head h4 { font-size: var(--fs-2); font-weight: 600; }
+.add-worker-body.f3-wide { max-width: none; }
+.f3-addbox-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0 32px; align-items: start; }
+
+/* Empty state */
+.f3-empty { padding: 16px 0 4px; }
+.f3-empty .empty-state-title { margin-bottom: 4px; }
+
+@media (max-width: 1180px) {
+  .f3-costs-grid { grid-template-columns: minmax(0, 1fr); }
+  .f3-explain-body, .f3-preview, .f3-addbox-grid { grid-template-columns: minmax(0, 1fr); }
+  .f3-proxy-head { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .f3-proxy-acts { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (max-width: 1000px) {
+  .f3-steps { grid-template-columns: minmax(0, 1fr); }
+  .f3-step { border-right: 0; border-bottom: 1px solid var(--border-color); }
+  .f3-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .f3-paths { grid-template-columns: minmax(0, 1fr); }
+  /* Copy lines stack: name, route and state on the left, buttons on the right. */
+  .f3-copies, .f3-copies tbody { display: block; }
+  .f3-copies colgroup, .f3-copies thead { display: none; }
+  .f3-copies tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; border-top: 1px solid var(--border-color); padding: 6px 0; }
+  .f3-copies tbody tr:first-child { border-top: 1px solid var(--border-light); }
+  .f3-copies td, .f3-copies tbody tr:first-child td { border-top: 0; padding: 1px 14px; }
+  .f3-copies .c-svc { grid-column: 1; grid-row: 1; white-space: normal; }
+  .f3-copies .c-route { grid-column: 1; grid-row: 2; }
+  .f3-copies .c-state { grid-column: 1; grid-row: 3; }
+  .f3-copies .c-acts { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+}
+@media (max-width: 760px) {
+  .f3-lanes { grid-template-columns: minmax(0, 1fr); }
+  .f3-lane-label { text-align: left; }
+}
+</style>
+</head>
+<body>
+<main class="page-content">
+
+<div class="mk-unchanged">Mockup. The page title, the four stats and the Boxes table stay as they are today. Everything below them is the new design.</div>
+
+<!-- ============================================================
+     1. RUNNING COSTS: a ledger
+     ============================================================ -->
+<section class="fleet-economics" id="fleet-economics-card">
+  <div class="block-head">
+    <h2 class="block-title">Running costs</h2>
+    <span class="block-meta">Costs are known for 0 of 5 machines.</span>
+  </div>
+
+  <div class="f3-tariff" id="power-settings">
+    <div>
+      <label for="power-price" class="form-label">Electricity price per kWh</label>
+      <input id="power-price" class="form-input form-input-price" type="number" step="0.001" min="0" value="0.17">
+    </div>
+    <div>
+      <label for="power-currency" class="form-label">Currency</label>
+      <input id="power-currency" class="form-input form-input-code" maxlength="4" value="EUR">
+    </div>
+    <button class="btn btn-primary" id="power-save" style="height:30px">Save</button>
+    <span class="muted">Your tariff, as it appears on your bill. Figures below are converted to USD.</span>
+  </div>
+
+  <div class="f3-why" role="note">
+    <div class="f3-why-cells" aria-label="0 of 5 machines have their watts">
+      <span class="cell cell-unknown"></span><span class="cell cell-unknown"></span><span class="cell cell-unknown"></span><span class="cell cell-unknown"></span><span class="cell cell-unknown"></span>
+    </div>
+    <div>
+      <p><strong>Why no cost yet:</strong> CashPilot knows what each machine earned. It does not know how much power each machine draws.</p>
+      <p class="muted">Press <strong>Add watts</strong> on a machine and type its wall draw. CashPilot then shows its electricity cost and what is left.</p>
+    </div>
+  </div>
+
+  <div class="f3-costs-grid">
+    <div>
+      <div class="f3-sub"><h3>Per machine, last month</h3><span class="block-meta">USD</span></div>
+      <table class="f3-ledger">
+        <thead><tr><th>Machine</th><th class="n">Earned</th><th class="n">Electricity</th><th class="n">Heat credit</th><th class="n">Net</th><th class="acts"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="m-name">geiserback</span><span class="m-sub">No watts yet</span></td>
+            <td class="n" title="Gross earnings per month">$15.95</td>
+            <td class="n unknown">not known</td>
+            <td class="n unknown">—</td>
+            <td class="n unknown">—</td>
+            <td class="acts"><button class="btn btn-ghost btn-sm" title="Opens the watts field of geiserback in the Boxes table">Add watts</button><button class="btn btn-link btn-sm f3-heat-toggle" aria-expanded="true" data-heat="h1">Heat</button></td>
+          </tr>
+          <tr class="f3-heat-row" id="h1">
+            <td colspan="6">
+              <form class="heat-form">
+                <div><label class="form-label" for="hs1">Its heat replaces</label>
+                  <select class="form-input heat-source" id="hs1"><option>Nothing (no heat credit)</option><option selected>Electric resistive heating</option><option>A heat pump</option><option>Gas, oil or another fuel</option></select></div>
+                <fieldset class="heat-months"><legend class="form-label">Months you heat</legend>
+                  <label><input type="checkbox" checked> Jan</label><label><input type="checkbox" checked> Feb</label><label><input type="checkbox"> Mar</label><label><input type="checkbox"> Apr</label><label><input type="checkbox"> May</label><label><input type="checkbox"> Jun</label><label><input type="checkbox"> Jul</label><label><input type="checkbox"> Aug</label><label><input type="checkbox"> Sep</label><label><input type="checkbox"> Oct</label><label><input type="checkbox"> Nov</label><label><input type="checkbox" checked> Dec</label>
+                </fieldset>
+                <button class="btn btn-ghost btn-sm" type="button">Save</button>
+              </form>
+            </td>
+          </tr>
+          <tr>
+            <td><span class="m-name">watchtower</span><span class="m-sub">No watts yet</span></td>
+            <td class="n">$15.95</td><td class="n unknown">not known</td><td class="n unknown">—</td><td class="n unknown">—</td>
+            <td class="acts"><button class="btn btn-ghost btn-sm">Add watts</button><button class="btn btn-link btn-sm f3-heat-toggle" aria-expanded="false">Heat</button></td>
+          </tr>
+          <tr>
+            <td><span class="m-name">geiserct</span><span class="m-sub">No watts yet</span></td>
+            <td class="n">$15.38</td><td class="n unknown">not known</td><td class="n unknown">—</td><td class="n unknown">—</td>
+            <td class="acts"><button class="btn btn-ghost btn-sm">Add watts</button><button class="btn btn-link btn-sm f3-heat-toggle" aria-expanded="false">Heat</button></td>
+          </tr>
+          <tr>
+            <td><span class="m-name">OPPO CPH1951 (5bdadbc5)</span><span class="m-sub">No watts yet</span></td>
+            <td class="n">$1.90</td><td class="n unknown">not known</td><td class="n unknown">—</td><td class="n unknown">—</td>
+            <td class="acts"><button class="btn btn-ghost btn-sm">Add watts</button><button class="btn btn-link btn-sm f3-heat-toggle" aria-expanded="false">Heat</button></td>
+          </tr>
+          <tr>
+            <td><span class="m-name">motorola one fusion+ (1414f972)</span><span class="m-sub">No watts yet</span></td>
+            <td class="n">$1.90</td><td class="n unknown">not known</td><td class="n unknown">—</td><td class="n unknown">—</td>
+            <td class="acts"><button class="btn btn-ghost btn-sm">Add watts</button><button class="btn btn-link btn-sm f3-heat-toggle" aria-expanded="false">Heat</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="economics-note">A machine with known watts shows its cost, its heat credit and its net here. It also shows the electricity price below which it earns more than it costs.</p>
+    </div>
+
+    <div>
+      <div class="f3-sub"><h3>Per service, where the cost can be attributed</h3><span class="block-meta">Sorted by net</span></div>
+      <table class="f3-ledger">
+        <thead><tr><th>Service</th><th class="n">Earned</th><th class="n">Electricity</th><th class="n">Net</th><th><span class="sr-only">Net, drawn</span></th></tr></thead>
+        <tbody>
+          <tr><td class="m-name">honeygain</td><td class="n">$18.76</td><td class="n">−$0.88</td><td class="n f3-net text-ok">$17.88</td><td><span class="f3-bar"><i class="pos" style="width:50%"></i></span></td></tr>
+          <tr><td class="m-name">traffmonetizer</td><td class="n">$6.72</td><td class="n">−$0.88</td><td class="n f3-net text-ok">$5.84</td><td><span class="f3-bar"><i class="pos" style="width:16.3%"></i></span></td></tr>
+          <tr><td class="m-name">mysterium</td><td class="n">$6.40</td><td class="n">−$1.04</td><td class="n f3-net text-ok">$5.36</td><td><span class="f3-bar"><i class="pos" style="width:15%"></i></span></td></tr>
+          <tr><td class="m-name">earnfm</td><td class="n">$4.32</td><td class="n">−$0.88</td><td class="n f3-net text-ok">$3.43</td><td><span class="f3-bar"><i class="pos" style="width:9.6%"></i></span></td></tr>
+          <tr><td class="m-name">packetstream</td><td class="n">$1.62</td><td class="n">−$0.88</td><td class="n f3-net text-ok">$0.74</td><td><span class="f3-bar"><i class="pos" style="width:2.1%"></i></span></td></tr>
+          <tr><td class="m-name">storj</td><td class="n">$1.12</td><td class="n">−$0.79</td><td class="n f3-net text-ok">$0.33</td><td><span class="f3-bar"><i class="pos" style="width:1%"></i></span></td></tr>
+          <tr><td class="m-name">proxyrack</td><td class="n">$0.60</td><td class="n">−$0.91</td><td class="n f3-net text-fail">−$0.31</td><td><span class="f3-bar"><i class="neg" style="width:1%"></i></span></td></tr>
+          <tr><td class="m-name">repocket</td><td class="n">$0.15</td><td class="n">−$0.88</td><td class="n f3-net text-fail">−$0.72</td><td><span class="f3-bar"><i class="neg" style="width:2%"></i></span></td></tr>
+          <tr><td class="m-name">bitping</td><td class="n">$0.08</td><td class="n">−$0.88</td><td class="n f3-net text-fail">−$0.80</td><td><span class="f3-bar"><i class="neg" style="width:2.2%"></i></span></td></tr>
+          <tr><td class="m-name">iproyal</td><td class="n">$0.03</td><td class="n">−$0.88</td><td class="n f3-net text-fail">−$0.86</td><td><span class="f3-bar"><i class="neg" style="width:2.4%"></i></span></td></tr>
+          <tr><td class="m-name">bytelixir</td><td class="n">$1.12</td><td class="n">−$2.03</td><td class="n f3-net text-fail">−$0.92</td><td><span class="f3-bar"><i class="neg" style="width:2.6%"></i></span></td></tr>
+        </tbody>
+      </table>
+      <p class="f3-svc-sum">6 services earn more than their electricity. 5 earn less.</p>
+      <p class="economics-note">These costs are estimates. No machine has its watts yet, so CashPilot assumes 65 W per machine, or the processor's rated power, and shares it among the services on that machine.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     2. PROXIES
+     ============================================================ -->
+<section class="fleet-proxies" id="fleet-proxies">
+  <div class="block-head">
+    <h2 class="block-title">Proxies <span class="count">1</span></h2>
+    <span class="block-meta">Copies of a service that leave through a proxy instead of the box's own connection. <a href="#">How it works</a></span>
+  </div>
+
+  <div class="f3-toolbar">
+    <button class="btn btn-primary btn-sm">Run a copy through a proxy</button>
+    <button class="btn btn-ghost btn-sm">Add a proxy</button>
+  </div>
+
+  <details class="f3-explain" open>
+    <summary>What is a copy?</summary>
+    <div class="f3-explain-body">
+      <div class="f3-lanes">
+        <span class="f3-lane-label">The service</span>
+        <div class="f3-route">
+          <div class="f3-node"><b>watchtower</b><span>your box</span></div><i class="f3-arrow"></i>
+          <div class="f3-node"><b>your own IP</b><span>your connection</span></div><i class="f3-arrow"></i>
+          <div class="f3-node svc"><b>honeygain</b><span>device 1</span></div>
+        </div>
+        <span class="f3-lane-label">Its copy</span>
+        <div class="f3-route">
+          <div class="f3-node"><b>watchtower</b><span>same box</span></div><i class="f3-arrow"></i>
+          <div class="f3-node proxy"><b>geiserct exit node</b><span>the proxy</span></div><i class="f3-arrow"></i>
+          <div class="f3-node"><b>203.0.113.71 · ES</b><span>another IP</span></div><i class="f3-arrow"></i>
+          <div class="f3-node svc"><b>honeygain</b><span>device 2</span></div>
+        </div>
+      </div>
+      <ul class="f3-facts">
+        <li>A copy is <strong>a second container</strong> of a service that already runs on the box. It uses the same account.</li>
+        <li>Its traffic leaves <strong>through the proxy</strong>. The provider sees a second device on another IP, and pays it too.</li>
+        <li>The original <strong>does not change</strong>. It keeps your own IP.</li>
+        <li>If the proxy goes down, the copy <strong>stops</strong>. It never uses your own IP.</li>
+        <li>Some providers forbid proxies. CashPilot asks you to accept that risk first.</li>
+      </ul>
+    </div>
+  </details>
+
+  <article class="f3-proxy">
+    <div class="f3-proxy-head">
+      <div><span class="f3-pname">geiserct exit node (Tailscale)</span><span class="f3-k" style="margin-top:2px">Tailscale exit 100.64.0.22</span></div>
+      <div><span class="f3-k">Exit IP the providers see</span><span class="f3-v mono">203.0.113.71 · ES</span></div>
+      <div><span class="f3-k">Traffic</span><span class="f3-v">No cap</span></div>
+      <div class="f3-proxy-acts">
+        <label class="f3-k" for="t1" style="margin:0">Test on</label>
+        <select class="form-input" id="t1"><option>watchtower</option><option>geiserback</option><option>geiserct</option></select>
+        <button class="btn btn-ghost btn-sm">Test</button>
+        <span class="sep"></span>
+        <button class="btn btn-ghost btn-sm">Edit</button>
+        <button class="btn btn-danger btn-sm">Delete</button>
+      </div>
+    </div>
+    <div class="f3-copies-head"><span><strong>7 copies</strong> · all running</span></div>
+    <table class="f3-copies"><colgroup><col class="k-svc"><col class="k-route"><col><col class="k-acts"></colgroup><thead><tr><th>Copy</th><th>Route out</th><th>State</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>earnfm</td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>packetstream</td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>proxybase</td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>proxylite</td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>proxyrack</td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>repocket</td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>traffmonetizer</td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+    </tbody></table>
+  </article>
+
+  <div class="f3-sub"><h3>Exit IPs the providers see</h3><span class="block-meta">Running copies only</span></div>
+  <table class="f3-exits">
+    <thead><tr><th>Exit IP</th><th>Copies that leave from it</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="mono">203.0.113.71 · ES</td>
+        <td>7 on watchtower: earnfm, packetstream, proxybase, proxylite, proxyrack, repocket, traffmonetizer</td>
+        <td>Shared by 7 different services. No service leaves from it twice, so no copy takes the place of another. They share its bandwidth.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Run a copy: the guided flow, open, with honeygain picked -->
+<section class="fleet-proxies">
+  <div class="f3-panel" id="proxy-copy-box">
+    <header><h3>Run a copy through a proxy</h3><button class="btn btn-link btn-sm">Close</button></header>
+    <div class="f3-steps">
+      <div class="f3-step done">
+        <h4><span class="f3-n">1</span>Pick the box</h4>
+        <p class="hint">The copy runs on this box, beside the service.</p>
+        <div class="f3-opts">
+          <label class="f3-opt"><input type="radio" name="b" checked><b>watchtower</b><span>12 services · 7 copies</span></label>
+          <label class="f3-opt"><input type="radio" name="b"><b>geiserback</b><span>9 services · no copies</span></label>
+          <label class="f3-opt"><input type="radio" name="b"><b>geiserct</b><span>8 services · no copies</span></label>
+          <label class="f3-opt no"><input type="radio" name="b" disabled><b>OPPO CPH1951</b><span>A phone runs no containers, so it cannot run a copy.</span></label>
+          <label class="f3-opt no"><input type="radio" name="b" disabled><b>motorola one fusion+</b><span>A phone runs no containers, so it cannot run a copy.</span></label>
+        </div>
+      </div>
+      <div class="f3-step done">
+        <h4><span class="f3-n">2</span>Pick a service on watchtower</h4>
+        <p class="hint">Only a service already on this box can get a copy.</p>
+        <div class="f3-opts">
+          <label class="f3-opt"><input type="radio" name="s" checked><b>honeygain <em class="tag tag-warn">account risk</em></b><span>Can run through a proxy. You accept a risk at the last step.</span></label>
+          <label class="f3-opt"><input type="radio" name="s"><b>iproyal</b><span>Can run through a proxy.</span></label>
+          <label class="f3-opt"><input type="radio" name="s"><b>bitping <em class="tag">1 tick</em></b><span>Can run through a proxy. It sends raw packets, so it asks for one tick.</span></label>
+          <label class="f3-opt"><input type="radio" name="s"><b>mysterium <em class="tag">3 ticks</em></b><span>Needs a Tailscale exit node, because it uses UDP.</span></label>
+        </div>
+        <div class="f3-group-label">Already has a copy through every proxy. Pick one to deploy it again.</div>
+        <div class="f3-chips">
+          <label><input type="radio" name="s">earnfm</label><label><input type="radio" name="s">packetstream</label><label><input type="radio" name="s">proxybase</label><label><input type="radio" name="s">proxylite</label><label><input type="radio" name="s">proxyrack</label><label><input type="radio" name="s">repocket</label><label><input type="radio" name="s">traffmonetizer</label>
+        </div>
+        <div class="f3-group-label">Cannot run through a proxy</div>
+        <div class="f3-opts">
+          <label class="f3-opt no"><input type="radio" name="s" disabled><b>storj</b><span>It needs inbound connections on a published port. Those reach this box, never the proxy's address.</span></label>
+          <label class="f3-opt no"><input type="radio" name="s" disabled><b>earnapp</b><span>Its terms forbid running it in Docker or a virtual machine.</span></label>
+        </div>
+      </div>
+      <div class="f3-step done">
+        <h4><span class="f3-n">3</span>Pick the proxy</h4>
+        <p class="hint">The copy leaves through it, from the proxy's exit IP.</p>
+        <div class="f3-opts">
+          <label class="f3-opt"><input type="radio" name="p" checked><b>geiserct exit node (Tailscale)</b><span>Exit 203.0.113.71 · ES · no cap · honeygain does not leave from this IP yet</span></label>
+        </div>
+        <p class="hint" style="margin-top:10px">Need another IP? <a href="#">Add a proxy</a>.</p>
+      </div>
+    </div>
+    <div class="f3-preview">
+      <div class="full">
+        <h4>What happens</h4>
+        <div class="f3-route">
+          <div class="f3-node"><b>watchtower</b><span>box</span></div><i class="f3-arrow"></i>
+          <div class="f3-node proxy"><b>geiserct exit node</b><span>proxy</span></div><i class="f3-arrow"></i>
+          <div class="f3-node"><b>203.0.113.71 · ES</b><span>exit IP</span></div><i class="f3-arrow"></i>
+          <div class="f3-node svc"><b>honeygain</b><span>new device: watchtower-p1</span></div>
+        </div>
+      </div>
+      <div>
+        <p class="f3-say" style="margin-top:0"><span class="mono">honeygain</span> on <span class="mono">watchtower</span> gets a second device. It leaves through <span class="mono">203.0.113.71 · ES</span>. The original honeygain keeps your own IP.</p>
+        <ul class="f3-steps-after">
+          <li>CashPilot starts the proxy's tunnel on watchtower. This can take up to a minute.</li>
+          <li>It checks that the exit IP is not watchtower's own IP.</li>
+          <li>It starts the copy with the same account, as device <span class="mono">watchtower-p1</span>.</li>
+          <li>The copy shows under the proxy above, with Stop and Remove.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="f3-risk">
+          <h5>Accept the account risk to continue</h5>
+          <label><input type="checkbox"> <span>Your Honeygain account may be suspended. Honeygain's help centre strictly prohibits VPNs and wants your regular home or mobile connection. It does not support data-center IPs, and one shared IP can get several accounts suspended at once. <a href="#">Honeygain help centre</a></span></label>
+        </div>
+      </div>
+    </div>
+    <div class="f3-panel-foot">
+      <button class="btn btn-primary btn-sm" disabled>Run the copy</button>
+      <span class="muted">Tick the line above to run the copy.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     3. ADD A BOX
+     ============================================================ -->
+<details class="add-worker" id="add-worker" open>
+  <summary>Add a box</summary>
+  <div class="add-worker-body f3-wide">
+    <div class="f3-paths">
+      <div class="f3-path"><h4>A server with Docker</h4><p>Deploy <code>drumsergio/cashpilot-worker:3.1</code> on the server. Set the variables below.</p></div>
+      <div class="f3-path"><h4>A computer with CashPilot Desktop</h4><p>Pick <strong>Join my CashPilot</strong>. Press <strong>Copy</strong> and paste the block into <strong>Paste from Add a box</strong>.</p></div>
+      <div class="f3-path"><h4>An Android phone</h4><p>Install the <a href="#">Android app</a> on your phone.</p></div>
+    </div>
+    <div class="f3-addbox-grid">
+      <div>
+        <div class="f3-env-head"><h4>For Docker workers, set these environment variables:</h4></div>
+        <div class="env-block">
+          <code id="worker-env">CASHPILOT_UI_URL=http://192.168.1.10:8080
+CASHPILOT_API_KEY=••••••••
+CASHPILOT_WORKER_NAME=server-name</code>
+          <div class="env-actions">
+            <span class="badge badge-deployed">Generated in /fleet/.fleet_key</span>
+            <button class="btn btn-ghost btn-sm">Reveal API Key</button>
+            <button class="btn btn-ghost btn-sm">Copy</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="muted add-worker-text" style="margin-top:26px">This is the enrolment key. It is <code>CASHPILOT_API_KEY</code> on the UI container when that is set. Otherwise CashPilot generates it in <code>/fleet/.fleet_key</code>. Use the same key on all workers. Each worker uses it only to join, then gets its own key.</p>
+      </div>
+    </div>
+  </div>
+</details>
+
+
+<!-- ============================================================
+     STATE PANELS
+     ============================================================ -->
+
+<div class="mk-state">(a1) Edit a proxy, SOCKS5<small>Edit mode: stored secrets show as "stored", and each gets its Remove box. In add mode the same form has no "stored" lines and no Remove boxes.</small></div>
+<div class="f3-panel">
+  <header><h3>Edit Residential pool</h3><button class="btn btn-link btn-sm">Cancel</button></header>
+  <div class="f3-panel-body f3-formbody">
+    <fieldset class="f3-fieldset"><legend>The proxy</legend>
+      <div class="f3-grid">
+        <div class="span2"><label class="form-label">Name</label><input class="form-input" value="Residential pool"></div>
+        <div class="span2"><label class="form-label">Type</label>
+          <div class="f3-seg" role="radiogroup"><label><input type="radio" name="k1" checked>SOCKS5</label><label><input type="radio" name="k1">HTTP CONNECT</label><label><input type="radio" name="k1">Tailscale exit node</label></div>
+          <p class="f3-kindhelp">SOCKS5 carries TCP only, not UDP. It is not encrypted.</p>
+        </div>
+        <div class="span2"><label class="form-label">Host</label><input class="form-input" value="gate.example.net"></div>
+        <div><label class="form-label">Port</label><input class="form-input" type="number" value="7000"></div>
+        <div></div>
+        <div class="span2"><label class="form-label">User</label><input class="form-input" placeholder="kept if empty, unless the host or port changes"><div class="f3-stored">A user is stored.</div><label class="f3-check"><input type="checkbox"> Remove the stored user</label></div>
+        <div class="span2"><label class="form-label">Password</label><input class="form-input" type="password" placeholder="kept if empty, unless the host or port changes"><div class="f3-stored">A password is stored.</div><label class="f3-check"><input type="checkbox"> Remove the stored password</label></div>
+      </div>
+    </fieldset>
+    <fieldset class="f3-fieldset" style="margin-bottom:0"><legend>Traffic limit <span>(optional)</span></legend>
+      <div class="f3-grid">
+        <div><label class="form-label">Traffic cap (GB)</label><input class="form-input" type="number" value="50"></div>
+        <div><label class="form-label">Stop at (%)</label><input class="form-input" type="number" value="90"></div>
+        <div><label class="form-label">Resets on day</label><input class="form-input" type="number" value="1"></div>
+        <div></div>
+        <div class="span4"><label class="f3-check" style="margin-top:0"><input type="checkbox"> <span><strong>Rotating exit IP.</strong> Tick it when the provider gives a new exit IP for each connection. CashPilot then does not group these copies by exit IP.</span></label></div>
+      </div>
+    </fieldset>
+  </div>
+  <div class="f3-panel-foot"><button class="btn btn-primary btn-sm">Save</button><span class="muted">When the cap is reached, every copy through this proxy stops until the reset day.</span></div>
+</div>
+
+<div class="mk-state">(a2) Add a proxy, Tailscale exit node<small>The Host, Port, User and Password fields go away. The auth key, exit node and login server come in. The traffic limit stays.</small></div>
+<div class="f3-panel">
+  <header><h3>Add a proxy</h3><button class="btn btn-link btn-sm">Cancel</button></header>
+  <div class="f3-panel-body f3-formbody">
+    <fieldset class="f3-fieldset"><legend>The proxy</legend>
+      <div class="f3-grid">
+        <div class="span2"><label class="form-label">Name</label><input class="form-input" placeholder=""></div>
+        <div class="span2"><label class="form-label">Type</label>
+          <div class="f3-seg" role="radiogroup"><label><input type="radio" name="k2">SOCKS5</label><label><input type="radio" name="k2">HTTP CONNECT</label><label><input type="radio" name="k2" checked>Tailscale exit node</label></div>
+          <p class="f3-kindhelp">A Tailscale exit node carries TCP and UDP. Use it for services that need UDP.</p>
+        </div>
+        <div class="span2"><label class="form-label">Auth key (reusable, ephemeral, tagged)</label><input class="form-input" type="password"><div class="f3-stored">Needed for a new Tailscale proxy. CashPilot never shows it again.</div></div>
+        <div><label class="form-label">Exit node</label><input class="form-input" placeholder="100.x address, not the name"></div>
+        <div><label class="form-label">Login server</label><input class="form-input" placeholder="empty for Tailscale's own"></div>
+      </div>
+    </fieldset>
+    <fieldset class="f3-fieldset" style="margin-bottom:0"><legend>Traffic limit <span>(optional)</span></legend>
+      <div class="f3-grid">
+        <div><label class="form-label">Traffic cap (GB)</label><input class="form-input" type="number" placeholder="none"></div>
+        <div><label class="form-label">Stop at (%)</label><input class="form-input" type="number" value="90"></div>
+        <div><label class="form-label">Resets on day</label><input class="form-input" type="number" placeholder="by hand"></div>
+        <div></div>
+        <div class="span4"><label class="f3-check" style="margin-top:0"><input type="checkbox"> <span><strong>Rotating exit IP.</strong> Tick it when the provider gives a new exit IP for each connection. CashPilot then does not group these copies by exit IP.</span></label></div>
+      </div>
+    </fieldset>
+  </div>
+  <div class="f3-panel-foot"><button class="btn btn-primary btn-sm">Save</button></div>
+</div>
+
+<div class="mk-state">(b) Run a copy: mysterium, two proxies<small>Step 3 greys out the SOCKS5 proxy with its reason. The preview asks for the three isolation ticks. With honeygain the main view above shows the account-risk tick.</small></div>
+<div class="f3-panel">
+  <header><h3>Run a copy through a proxy</h3><button class="btn btn-link btn-sm">Close</button></header>
+  <div class="f3-steps">
+    <div class="f3-step done"><h4><span class="f3-n">1</span>Pick the box</h4>
+      <div class="f3-opts"><label class="f3-opt"><input type="radio" name="b2" checked><b>watchtower</b><span>12 services · 7 copies</span></label></div>
+      <p class="hint" style="margin-top:8px">4 more boxes. <a href="#">Change</a></p>
+    </div>
+    <div class="f3-step done"><h4><span class="f3-n">2</span>Pick a service on watchtower</h4>
+      <div class="f3-opts"><label class="f3-opt"><input type="radio" name="s2" checked><b>mysterium <em class="tag">3 ticks</em></b><span>Needs a Tailscale exit node, because it uses UDP.</span></label></div>
+      <p class="hint" style="margin-top:8px">14 more services. <a href="#">Change</a></p>
+    </div>
+    <div class="f3-step done"><h4><span class="f3-n">3</span>Pick the proxy</h4>
+      <div class="f3-opts">
+        <label class="f3-opt"><input type="radio" name="p2" checked><b>geiserct exit node (Tailscale)</b><span>Exit 203.0.113.71 · ES · no cap</span></label>
+        <label class="f3-opt no"><input type="radio" name="p2" disabled><b>Residential pool (SOCKS5)</b><span>mysterium carries its traffic over UDP, which a SOCKS5 or HTTP proxy does not pass.</span></label>
+      </div>
+    </div>
+  </div>
+  <div class="f3-preview">
+    <div>
+      <h4>What happens</h4>
+      <p class="f3-say"><span class="mono">mysterium</span> on <span class="mono">watchtower</span> gets a second node. It leaves through <span class="mono">203.0.113.71 · ES</span>. The original mysterium keeps your own IP.</p>
+      <p class="muted" style="font-size:var(--fs-2);margin:0">This copy gets data volumes of its own (<span class="mono">mysterium-data-p1</span>). The provider sees a new device, not the original.</p>
+    </div>
+    <div class="f3-risk">
+      <h5>Behind a proxy this service is less isolated. Tick each line to run it anyway:</h5>
+      <label><input type="checkbox" checked> <span>It holds NET_ADMIN, so it can change the network of its own namespace. CashPilot gives it a namespace of its own whose only way out is a gate that holds the proxy's firewall. It is still less contained than a service without it.</span></label>
+      <label><input type="checkbox" checked> <span>It gets this box's /dev/net/tun, to make tunnels of its own inside its namespace.</span></label>
+      <label><input type="checkbox"> <span>It waits for connections from the internet. Behind a proxy nobody can reach it, so it can earn less or nothing.</span></label>
+    </div>
+  </div>
+  <div class="f3-panel-foot"><button class="btn btn-primary btn-sm" disabled>Run the copy</button><span class="muted">Tick 1 more line to run the copy.</span></div>
+</div>
+
+<div class="mk-pair">
+  <div>
+    <div class="mk-state" style="margin-top:24px">(b2) After Run: progress in place<small>The flow stays open and shows each step. The same text goes to the toasts.</small></div>
+    <div class="f3-panel">
+      <header><h3>Running honeygain on watchtower</h3></header>
+      <div class="f3-panel-body">
+        <ol class="f3-steps-after f3-progress" style="margin:0">
+          <li class="ok">Tunnel started on watchtower.</li>
+          <li class="ok">Exit 203.0.113.71 · ES is not watchtower's own IP.</li>
+          <li class="now"><span class="spinner spinner-inline"></span>Starting the copy. This can take up to a minute.</li>
+          <li class="muted">Add device watchtower-p1 to your Honeygain account.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="mk-state" style="margin-top:24px">(b3) No box can run a copy<small>Step 1 says why and stops there.</small></div>
+    <div class="f3-panel">
+      <header><h3>Run a copy through a proxy</h3></header>
+      <div class="f3-panel-body">
+        <p style="margin:0 0 6px"><strong>No box can run proxied copies yet.</strong></p>
+        <p class="muted" style="margin:0;font-size:var(--fs-2)">A copy needs a box with Docker and a worker new enough to run one. Update the worker on a box, or add a box.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mk-state">(c) Proxies, empty<small>The explainer stays open, so a first-time user learns what a proxy is for before adding one. "Run a copy" waits for a proxy.</small></div>
+<section class="fleet-proxies">
+  <div class="block-head">
+    <h2 class="block-title">Proxies <span class="count">0</span></h2>
+    <span class="block-meta">Copies of a service that leave through a proxy instead of the box's own connection. <a href="#">How it works</a></span>
+  </div>
+  <div class="f3-empty">
+    <p class="empty-state-title">No proxies yet.</p>
+    <p class="empty-state-text">A proxy gives your boxes another public IP. Add one, then run copies of your services through it. Each copy earns as one more device.</p>
+    <div class="f3-toolbar" style="padding-top:10px">
+      <button class="btn btn-primary btn-sm">Add a proxy</button>
+      <button class="btn btn-ghost btn-sm" disabled title="Add a proxy first">Run a copy through a proxy</button>
+      <span class="muted" style="font-size:var(--fs-2)">Add a proxy first.</span>
+    </div>
+  </div>
+  <details class="f3-explain" open>
+    <summary>What is a copy?</summary>
+    <div class="f3-explain-body">
+      <div class="f3-lanes">
+        <span class="f3-lane-label">The service</span>
+        <div class="f3-route"><div class="f3-node"><b>your box</b></div><i class="f3-arrow"></i><div class="f3-node"><b>your own IP</b></div><i class="f3-arrow"></i><div class="f3-node svc"><b>service</b><span>device 1</span></div></div>
+        <span class="f3-lane-label">Its copy</span>
+        <div class="f3-route"><div class="f3-node"><b>same box</b></div><i class="f3-arrow"></i><div class="f3-node proxy"><b>proxy</b></div><i class="f3-arrow"></i><div class="f3-node"><b>another IP</b></div><i class="f3-arrow"></i><div class="f3-node svc"><b>service</b><span>device 2</span></div></div>
+      </div>
+      <ul class="f3-facts">
+        <li>A copy is <strong>a second container</strong> of a service that already runs on the box.</li>
+        <li>The provider sees <strong>a second device on another IP</strong>.</li>
+        <li>The original <strong>does not change</strong>.</li>
+        <li>If the proxy goes down, the copy <strong>stops</strong>. It never uses your own IP.</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<div class="mk-state">(d) Copies stopped, failing, removing, and a same-service clash<small>The state word stays the raw Docker word. The reason under it comes from the open alert for that copy.</small></div>
+<section class="fleet-proxies">
+  <article class="f3-proxy">
+    <div class="f3-proxy-head">
+      <div><span class="f3-pname">geiserct exit node (Tailscale)</span><span class="f3-k" style="margin-top:2px">Tailscale exit 100.64.0.22</span></div>
+      <div><span class="f3-k">Exit IP the providers see</span><span class="f3-v mono">203.0.113.71 · ES</span></div>
+      <div><span class="f3-k">Traffic</span><span class="f3-v">No cap</span></div>
+      <div class="f3-proxy-acts"><label class="f3-k" style="margin:0">Test on</label><select class="form-input"><option>watchtower</option></select><button class="btn btn-ghost btn-sm">Test</button><span class="sep"></span><button class="btn btn-ghost btn-sm">Edit</button><button class="btn btn-danger btn-sm">Delete</button></div>
+    </div>
+    <div class="f3-copies-head"><span><strong>6 copies</strong> · 3 running, 1 stopped, 1 failing, 1 being removed</span></div>
+    <table class="f3-copies"><colgroup><col class="k-svc"><col class="k-route"><col><col class="k-acts"></colgroup><thead><tr><th>Copy</th><th>Route out</th><th>State</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>earnfm</td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-unknown"></span>packetstream</td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">exited<span class="why">You stopped it.</span></td><td class="c-acts"><button class="btn btn-ghost btn-sm">Start</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-fail"></span>proxyrack</td><td class="c-route">watchtower<span class="ar">→</span>exit not seen yet</td><td class="c-state text-fail">restarting<span class="why">The tunnel of this proxy on watchtower has not been running since 09:12 UTC.</span></td><td class="c-acts"><button class="btn btn-ghost btn-sm">Start</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-warn"></span>honeygain <em class="flag flag-warn">reduced isolation</em></td><td class="c-route">geiserback<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running<span class="f3-warnline">CashPilot skipped recovery for it. A container in the tunnel does not match the worker's saved ID.</span></td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm" title="Withdraw removes this copy. Its data volumes stay, so the copy keeps its identity if you add it again.">Withdraw</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>honeygain <em class="flag flag-warn">reduced isolation</em></td><td class="c-route">watchtower<span class="ar">→</span>203.0.113.71 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Withdraw</button></td></tr>
+      <tr class="removing"><td class="c-svc"><span class="cell cell-none"></span>repocket</td><td class="c-route">watchtower</td><td class="c-state">removing…</td><td class="c-acts"><button class="btn btn-ghost btn-sm btn-hidden">Stop</button><button class="btn btn-danger btn-sm btn-hidden">Remove</button></td></tr>
+    </tbody></table>
+  </article>
+  <table class="f3-exits">
+    <thead><tr><th>Exit IP</th><th>Copies that leave from it</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">203.0.113.71 · ES</td><td>earnfm on watchtower, honeygain on geiserback, honeygain on watchtower</td><td class="text-warn">honeygain leaves from this IP twice. Its provider allows one device per IP, so one of them earns nothing.</td></tr>
+      <tr><td class="mono muted">Exit not seen yet</td><td>proxyrack on watchtower</td><td class="muted">Not grouped until CashPilot sees its exit.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="mk-state">(e) A proxy near its cap, and one stopped by it<small>The meter shows use, the stop line, and the reset. Reset sits next to the figure it resets.</small></div>
+<section class="fleet-proxies">
+  <article class="f3-proxy">
+    <div class="f3-proxy-head">
+      <div><span class="f3-pname">Residential pool</span><span class="f3-k" style="margin-top:2px">socks5 gate.example.net:7000</span></div>
+      <div><span class="f3-k">Exit IP the providers see</span><span class="f3-v mono">81.44.12.9 · ES</span></div>
+      <div>
+        <span class="f3-k">Traffic</span>
+        <span class="f3-v">46.00 of 50 GB <span class="text-warn">(92%)</span></span>
+        <div class="f3-meter" title="Stops at 95%"><i style="width:92%"></i><b style="left:95%"></b></div>
+        <span class="f3-k">Stops at 95%, resets on day 1 <button class="btn btn-link btn-sm" style="margin-left:6px">Reset</button></span>
+      </div>
+      <div class="f3-proxy-acts"><label class="f3-k" style="margin:0">Test on</label><select class="form-input"><option>watchtower</option></select><button class="btn btn-ghost btn-sm">Test</button><span class="sep"></span><button class="btn btn-ghost btn-sm">Edit</button><button class="btn btn-danger btn-sm">Delete</button></div>
+    </div>
+    <div class="f3-copies-head"><span><strong>2 copies</strong> · all running</span></div>
+    <table class="f3-copies"><colgroup><col class="k-svc"><col class="k-route"><col><col class="k-acts"></colgroup><thead><tr><th>Copy</th><th>Route out</th><th>State</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>iproyal</td><td class="c-route">geiserback<span class="ar">→</span>81.44.12.9 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+      <tr><td class="c-svc"><span class="cell cell-ok"></span>repocket</td><td class="c-route">geiserback<span class="ar">→</span>81.44.12.9 · ES</td><td class="c-state">running</td><td class="c-acts"><button class="btn btn-ghost btn-sm">Stop</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+    </tbody></table>
+  </article>
+  <article class="f3-proxy">
+    <div class="f3-proxy-head">
+      <div><span class="f3-pname">Mobile pool</span><span class="f3-k" style="margin-top:2px">http mobile.example.net:8080</span></div>
+      <div><span class="f3-k">Exit IP the providers see</span><span class="f3-v mono">rotating</span><span class="f3-k">last seen 92.58.1.20 · ES</span></div>
+      <div>
+        <span class="f3-k">Traffic</span>
+        <span class="f3-v text-fail">Stopped at 50.10 of 50 GB</span>
+        <div class="f3-meter over"><i style="width:100%"></i><b style="left:90%"></b></div>
+        <span class="f3-k">Reached 100% on 2026-11-26. Reset it by hand to start the copies again. <button class="btn btn-link btn-sm" style="margin-left:6px">Reset</button></span>
+      </div>
+      <div class="f3-proxy-acts"><label class="f3-k" style="margin:0">Test on</label><select class="form-input"><option>watchtower</option></select><button class="btn btn-ghost btn-sm">Test</button><span class="sep"></span><button class="btn btn-ghost btn-sm">Edit</button><button class="btn btn-danger btn-sm">Delete</button></div>
+    </div>
+    <div class="f3-copies-head"><span><strong>1 copy</strong> · stopped by the cap</span></div>
+    <table class="f3-copies"><colgroup><col class="k-svc"><col class="k-route"><col><col class="k-acts"></colgroup><thead><tr><th>Copy</th><th>Route out</th><th>State</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>
+      <tr><td class="c-svc"><span class="cell cell-warn"></span>traffmonetizer</td><td class="c-route">geiserct<span class="ar">→</span>rotating</td><td class="c-state">exited<span class="why">Stopped by the cap. It starts again after Reset.</span></td><td class="c-acts"><button class="btn btn-ghost btn-sm" disabled title="The cap holds. Reset it first.">Start</button><button class="btn btn-danger btn-sm">Remove</button></td></tr>
+    </tbody></table>
+  </article>
+</section>
+
+</main>
+<script>
+document.querySelectorAll('.f3-heat-toggle').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var row = b.dataset.heat && document.getElementById(b.dataset.heat);
+    var open = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', String(open));
+    if (row) row.hidden = !open;
+  });
+});
+</script>
+</body>
+</html>
