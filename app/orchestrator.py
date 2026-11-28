@@ -1790,6 +1790,7 @@ def deploy_raw(
             and isinstance(exc, APIError)
             and exc.status_code == 409
         )
+        undo: dict[str, bool] = {"restored": True}
         restored = _roll_back(
             client,
             name,
@@ -1803,7 +1804,10 @@ def deploy_raw(
             create_only=not start or conflict or on_created is not None,
             gated=gated,
             joined=joined,
+            outcome=undo,
         )
+        if isinstance(exc, ImageUpdateFailed) and not undo["restored"]:
+            exc.restored = False
         if secrets_plan is not None:
             # The refused container is gone (_roll_back), so its credentials go too.
             secret_env.remove_volume(client, secrets_plan.volume)
@@ -1920,7 +1924,16 @@ def _remove_replaced(replaced: Any | None, name: str, slug: str) -> None:
         logger.warning("Could not remove %s%s after its replacement was created: %s", name, REPLACED_SUFFIX, exc)
 
 
-def _start_again(client: Any, old: Any, was_running: bool, gated: bool, name: str, *, joined: bool = False) -> str:
+def _start_again(
+    client: Any,
+    old: Any,
+    was_running: bool,
+    gated: bool,
+    name: str,
+    *,
+    joined: bool = False,
+    outcome: dict[str, bool] | None = None,
+) -> str:
     """Start the previous container again if it ran, a gated one only behind a complete fence. Says how it is.
 
     One inside a proxy tunnel's namespace (``joined``) is never started here:
@@ -1945,6 +1958,8 @@ def _start_again(client: Any, old: Any, was_running: bool, gated: bool, name: st
         old.start()
     except Exception as exc:  # noqa: BLE001 - reported to the caller
         logger.warning("Could not start %s again: %s", name, exc)
+        if outcome is not None:
+            outcome["restored"] = False
         return f"could not be started again ({exc})."
     return "is running again."
 
@@ -1963,8 +1978,12 @@ def _roll_back(
     create_only: bool = False,
     gated: bool,
     joined: bool = False,
+    outcome: dict[str, bool] | None = None,
 ) -> str:
     """Undo a deploy whose new container could not be created or started. Says what was put back.
+
+    ``outcome``, when given, gets ``restored`` False when the previous
+    container is not back as it was: kept aside, or not started again.
 
     The half-made container goes, the old one gets its name back and runs
     again if it ran, and the identity and stop records are as they were. A
@@ -2003,6 +2022,8 @@ def _roll_back(
         _mark_failed(name, True)
     if replaced is None:
         return "No container ran under that name before, so nothing was put back."
+    if outcome is not None and (taken or not leftover_gone):
+        outcome["restored"] = False
     if taken:
         return (
             f"Another deploy took the name meanwhile, so the previous container is kept, stopped, as "
@@ -2017,10 +2038,12 @@ def _roll_back(
         replaced.rename(name)
     except Exception as exc:  # noqa: BLE001 - reported to the caller
         logger.warning("Could not put %s back: %s", name, exc)
+        if outcome is not None:
+            outcome["restored"] = False
         return f"The previous container could not be put back ({exc}); it is kept as {name}{REPLACED_SUFFIX}."
     logger.info("Put the previous %s back after a failed deploy", name)
     return "The previous container was put back and " + _start_again(
-        client, replaced, was_running, gated, name, joined=joined
+        client, replaced, was_running, gated, name, joined=joined, outcome=outcome
     )
 
 
@@ -2029,7 +2052,16 @@ class ImageUpdateFailed(ContainerRuntimeError):
 
     deploy_raw undoes it as it undoes a failed start: the new container goes
     and the previous one, with its own image, gets its name back and runs again.
+    ``verified`` is False when Docker never described the replacement, so
+    nobody knows the build is bad: it is not held, and the next run tries it.
+    ``restored`` is False when the previous container is not back as it was:
+    the owner has to act (worker_api answers image_update_restore_failed).
     """
+
+    def __init__(self, message: str, status_code: int = 409, *, verified: bool = True, restored: bool = True) -> None:
+        super().__init__(message, status_code)
+        self.verified = verified
+        self.restored = restored
 
 
 #: Seconds between two looks at a replacement during its check period.
@@ -2055,6 +2087,8 @@ def _signal_hit(logs: str, signal: dict[str, Any]) -> bool:
 
 #: Seconds a check period runs on when Docker cannot describe the replacement at its end.
 _SETTLE_GRACE_SECONDS = 30.0
+#: How late the last look may start after the grace: the sleep's own overshoot.
+_SETTLE_LOOK_SLACK = 0.5
 
 
 class _SettleUnreadable(Exception):
@@ -2131,16 +2165,19 @@ def _settle(container: Any, slug: str, seconds: float, since: float, name: str) 
     """Watch a replacement for ``seconds``; raise ImageUpdateFailed as soon as it is not healthy."""
     logger.info("Watching %s for %d s before the previous container is removed", name, int(seconds))
     end = time.monotonic() + seconds
+    cutoff = end + _SETTLE_GRACE_SECONDS
     unreadable: _SettleUnreadable | None = None
     while True:
         # Passing needs a look that started once the period was over: one that
         # began earlier can miss a stop that came while Docker answered it.
         started = time.monotonic()
+        # A look that began after the grace cannot pass: the grace is the limit.
+        late = started > cutoff + _SETTLE_LOOK_SLACK
         # A stop, a restart or an unhealthy check fails at once. The log is judged
         # on a look after the period, so an unless line written later still counts.
         final = started >= end
         try:
-            problem, seen = _settle_problem(container, slug, since, logs=final), True
+            problem, seen, unreadable = _settle_problem(container, slug, since, logs=final), True, None
         except _SettleUnreadable as exc:
             # Passing needs a look that worked: the last one must have read the
             # container and, when it has signals to look for, its log.
@@ -2148,19 +2185,25 @@ def _settle(container: Any, slug: str, seconds: float, since: float, name: str) 
         if problem:
             logger.warning("%s failed its check after the update: it %s", name, problem)
             raise ImageUpdateFailed(f"The new {name} {problem} within its {int(seconds)} s check, so it was undone.")
-        if final and seen:
+        if final and seen and not late:
             return
         now = time.monotonic()
-        if now >= end + _SETTLE_GRACE_SECONDS:
+        if late or now >= cutoff:
             if isinstance(unreadable, _SettleStarting):
+                # Docker answered the last look: the build's own check had not passed in time.
                 raise ImageUpdateFailed(
                     f"The new {name} had not passed its own health check by the end of its "
                     f"{int(seconds)} s check, so it was undone."
                 )
+            # Docker did not answer the last look, or answered it too late: nobody
+            # knows whether the build is bad. Undone, and tried again later.
             raise ImageUpdateFailed(
-                f"Docker did not describe the new {name} at the end of its {int(seconds)} s check, so it was undone."
+                f"Docker did not describe the new {name} in time at the end of its {int(seconds)} s check, "
+                "so it was undone.",
+                verified=False,
             )
-        time.sleep(_SETTLE_POLL_SECONDS)
+        # Never past the grace: the last look starts at its end at the latest.
+        time.sleep(min(_SETTLE_POLL_SECONDS, cutoff - now))
 
 
 def _remove_old_image(client: Any, image_id: str) -> str | None:
@@ -2221,7 +2264,9 @@ def check_image(slug: str, timeout: float = 900) -> dict[str, Any]:
         client = _get_client()
     except RuntimeError as exc:
         raise ContainerRuntimeError(str(exc), 503) from exc
-    found = service_instances(slug, client)
+    # A previous container that a cleanup could not remove is not a copy: it is
+    # stopped and keeps the old build, and would hold every later update back.
+    found = [c for c in service_instances(slug, client) if not str(getattr(c, "name", "")).endswith(REPLACED_SUFFIX)]
     if not found:
         raise ContainerNotFoundError(f"Container for {slug} not found")
     refs = {str(((c.attrs or {}).get("Config") or {}).get("Image") or "") for c in found}
@@ -2267,7 +2312,7 @@ def check_image(slug: str, timeout: float = 900) -> dict[str, Any]:
 def _deploy_failure(exc: BaseException, restored: str, slug: str = "") -> ContainerRuntimeError:
     """The error a failed create or start answers with, after the roll-back."""
     if isinstance(exc, ImageUpdateFailed):
-        return ImageUpdateFailed(f"{exc} {restored}", exc.status_code)
+        return ImageUpdateFailed(f"{exc} {restored}", exc.status_code, verified=exc.verified, restored=exc.restored)
     if isinstance(exc, ContainerRuntimeError):
         return ContainerRuntimeError(f"{exc} {restored}", exc.status_code)
     refusal = proxy_refusal(exc) if isinstance(exc, APIError) else None
@@ -2670,6 +2715,19 @@ def service_name(slug: str) -> str:
     return str(((get_service(slug) if get_service else None) or {}).get("name") or slug)
 
 
+#: The check period of an image update (app/image_updates.py SETTLE_SECONDS).
+_IMAGE_UPDATE_SETTLE_SECONDS = 120
+
+
+def _stop_wait_seconds(slug: str) -> float:
+    """How long a Stop waits for a deploy of ``slug``: one that stops, starts and checks its container.
+
+    The dashboard gives a Stop this much and more (app/main.py
+    _proxy_worker_command), so a Stop it gave up on is never carried out later.
+    """
+    return 60 + _get_stop_timeout(slug) + START_SETTLE_SECONDS + _IMAGE_UPDATE_SETTLE_SECONDS
+
+
 def stop_service(slug: str, instance: int = 1) -> None:
     """Stop the container for a service."""
     # For a fence-gated service the container is looked up under the lock too: a
@@ -2679,13 +2737,21 @@ def stop_service(slug: str, instance: int = 1) -> None:
     # Every Stop also waits for a deploy of the service that holds the route
     # lock, so it cannot land inside an image update's check period, which
     # would read the stop as a failure and start the old container again.
-    with route_gate.deploying(slug), GATED_DEPLOY_LOCK if fence_gated(slug) else contextlib.nullcontext():
-        container = _find_container(slug, instance)
-        if _gated_container(slug, container):
-            # Recorded before the stop, under the guard's lock: a guard pass that
-            # read the records before this Stop would otherwise start it after.
-            _mark_stopped(container.name, True, strict=True)
-        container.stop(timeout=_get_stop_timeout(slug))
+    # A deploy that holds it longer, such as one still pulling a big image, gets
+    # the Stop refused: nothing is stopped after the dashboard stopped waiting.
+    route = route_gate.deploying(slug)
+    if not route.acquire(timeout=_stop_wait_seconds(slug)):
+        raise ContainerRuntimeError(t("err.orchestrator.stop_waits_for_deploy", slug=slug), 409)
+    try:
+        with GATED_DEPLOY_LOCK if fence_gated(slug) else contextlib.nullcontext():
+            container = _find_container(slug, instance)
+            if _gated_container(slug, container):
+                # Recorded before the stop, under the guard's lock: a guard pass that
+                # read the records before this Stop would otherwise start it after.
+                _mark_stopped(container.name, True, strict=True)
+            container.stop(timeout=_get_stop_timeout(slug))
+    finally:
+        route.release()
     logger.info("Stopped container %s", container.name)
 
 

@@ -271,6 +271,15 @@ class TestDesktopWalletDeploys:
         response = client.post("/api/workers/2/command", json={"command": "deploy", "slug": "honeygain", "spec": spec})
         self._assert_wallet_refusal(response, post, fake_wallet_seed)
 
+    @pytest.mark.parametrize(("field", "value"), [("settle_seconds", 120), ("expect_image", "sha256:" + "a" * 64)])
+    def test_raw_deploy_refuses_the_image_updaters_own_fields(self, client, worker_target, field, value):
+        # A raw spec with them would run a held or undone build by hand.
+        _, post = worker_target
+        spec = {"image": "honeygain/honeygain:latest", "env": self._HONEYGAIN_ENV, field: value}
+        response = client.post("/api/workers/2/command", json={"command": "deploy", "slug": "honeygain", "spec": spec})
+        assert response.status_code == 400 and "image updater" in response.json()["detail"]
+        assert not post.await_count
+
     def test_raw_deploy_refuses_a_seed_in_fields_docker_strips(self, client, worker_target, fake_wallet_seed):
         _, post = worker_target
         spec = {"image": "honeygain/honeygain:latest", "env": {}, "approval": [{"walletSeed": fake_wallet_seed}]}

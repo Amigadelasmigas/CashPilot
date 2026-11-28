@@ -3014,11 +3014,16 @@ async def _deploy_container(request: Request, slug: str, spec: CheckedDeploySpec
         logger.warning("Deploy of %s refused: %s", slug, exc.code)
         raise HTTPException(status_code=exc.status_code, detail={"error": exc.code, "message": str(exc)}) from None
     except orchestrator.ImageUpdateFailed as exc:
-        # The new image did not stay healthy and the previous container runs
-        # again: the UI holds that build back (app/image_updates.py).
-        raise HTTPException(
-            status_code=409, detail={"error": "image_update_rolled_back", "message": str(exc)}
-        ) from None
+        # The new image did not stay healthy and was undone. The UI holds that
+        # build back (app/image_updates.py), unless Docker never described it.
+        # A previous container that is not back as it was needs the owner.
+        if not exc.restored:
+            error = "image_update_restore_failed"
+        elif not exc.verified:
+            error = "image_update_unverified"
+        else:
+            error = "image_update_rolled_back"
+        raise HTTPException(status_code=409, detail={"error": error, "message": str(exc)}) from None
     except orchestrator.ContainerRuntimeError as exc:
         # Same shape as the network setting; 503 when the daemon could not be
         # asked at all. Mostly raised before the old container was touched; a
@@ -3139,6 +3144,9 @@ async def api_stop_container(request: Request, slug: str, instance: int = 1) -> 
         return {"status": "stopped"}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    except orchestrator.ContainerRuntimeError as exc:
+        # A deploy of it held the route lock too long (orchestrator.stop_service).
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 

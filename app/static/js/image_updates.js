@@ -14,7 +14,7 @@
   const offer = document.getElementById('updates-offer');
   const MODES = ['off', 'notify', 'auto'];
   // The page's status colours: a fault in red, news muted.
-  const BADGE = { updated: 'badge-running', rolled_back: 'badge-error', failed: 'badge-error', available: 'badge-available', skipped: 'badge-unknown' };
+  const BADGE = { updated: 'badge-running', rolled_back: 'badge-error', failed: 'badge-error', restore_failed: 'badge-error', available: 'badge-available', skipped: 'badge-unknown' };
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   let state = null;
   // A choice not saved yet is never thrown away by a refresh: each change
@@ -31,7 +31,7 @@
   }
 
   function resultLabel(result) {
-    return t(`fleet.updates.result.${result}`); // i18n-keys: fleet.updates.result.updated, fleet.updates.result.rolled_back, fleet.updates.result.failed, fleet.updates.result.available, fleet.updates.result.skipped
+    return t(`fleet.updates.result.${result}`); // i18n-keys: fleet.updates.result.updated, fleet.updates.result.rolled_back, fleet.updates.result.failed, fleet.updates.result.restore_failed, fleet.updates.result.available, fleet.updates.result.skipped
   }
 
   function shortDigest(d) {
@@ -68,7 +68,11 @@
         <td><select class="form-input form-input-sm" data-updates-worker="${esc(w.id)}" aria-label="${esc(t('fleet.updates.box.aria', { name: w.name }))}"${w.desktop ? ' disabled' : ''}>${options(s.workers[String(w.id)], true)}</select></td>
         <td class="muted">${esc(boxNote(w))}</td>
       </tr>`).join('');
-    const apps = state.services.map((a) => `
+    // An app with a saved choice stays listed after it leaves every box, so
+    // its choice can still be changed: it would apply again if the app returns.
+    const listed = new Set(state.services.map((a) => a.slug));
+    const services = state.services.concat(Object.keys(s.services || {}).filter((slug) => !listed.has(slug)).sort().map((slug) => ({ slug, name: slug })));
+    const apps = services.map((a) => `
       <tr>
         <td>${esc(a.name)}</td>
         <td><select class="form-input form-input-sm" data-updates-service="${esc(a.slug)}" aria-label="${esc(t('fleet.updates.app.aria', { name: a.name }))}">${options(s.services[a.slug], true)}</select></td>

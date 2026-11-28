@@ -147,6 +147,13 @@ const put = p.calls.at(-1);
 check('a save keeps an app choice with no control', put.body?.services?.gone === 'off', JSON.stringify(put.body));
 check('a save keeps a box choice with no control', put.body?.workers?.[9] === 'notify', JSON.stringify(put.body));
 
+// 6b2. An app that left every box but keeps a saved choice still gets a
+// control, so the owner can change that choice; a listed app is not doubled.
+p = makePage();
+await p.answer({...p.data, services: [{slug: 'honeygain', name: 'Honeygain'}], settings: {...p.data.settings, services: {gone: 'auto', honeygain: 'off'}}});
+check('a saved choice for an app on no box has a control', p.root.innerHTML.includes('data-updates-service="gone"'), p.root.innerHTML);
+check('an app on a box has one control', p.root.innerHTML.split('data-updates-service="honeygain"').length === 2, p.root.innerHTML);
+
 // 6c. Two saves run one after the other, in the order they were asked for.
 p = makePage();
 await p.answer();

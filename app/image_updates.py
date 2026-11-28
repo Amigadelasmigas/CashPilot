@@ -22,7 +22,9 @@ How it works, once a day at the owner's hour, one box at a time per worker:
    restarts, turns unhealthy or logs a catalog failure signal is undone: the
    old container, with its old image, runs again. That build is then held:
    it is never tried again on that box, only a newer one is, so a build that
-   fails after every recreate cannot loop.
+   fails after every recreate cannot loop. When the old container does not
+   start again either, the result is ``restore_failed``: the build is held
+   the same way and the owner is told the service needs them.
 
 Images pinned by digest in the catalog are not checked: a CashPilot release
 moves them.
@@ -54,7 +56,11 @@ FEATURE = "image_updates"
 
 #: Results kept in the image_updates table.
 UPDATED, ROLLED_BACK, FAILED, AVAILABLE, SKIPPED = "updated", "rolled_back", "failed", "available", "skipped"
-RESULTS = (UPDATED, ROLLED_BACK, FAILED, AVAILABLE, SKIPPED)
+#: The new build failed its check and the old container did not start again.
+RESTORE_FAILED = "restore_failed"
+RESULTS = (UPDATED, ROLLED_BACK, FAILED, AVAILABLE, SKIPPED, RESTORE_FAILED)
+#: The results that hold a build back on that box for good.
+HOLDS = (ROLLED_BACK, RESTORE_FAILED)
 
 
 def default_settings(fresh_install: bool) -> dict[str, Any]:
@@ -132,11 +138,17 @@ class Hooks:
 
 
 class DeployRefused(Exception):
-    """The deploy did not go through; ``rolled_back`` when the worker undid an unhealthy update."""
+    """The deploy did not go through.
 
-    def __init__(self, message: str, *, rolled_back: bool) -> None:
+    ``rolled_back`` when the worker undid an update that failed its check;
+    ``restore_failed`` when it undid it but the old container did not start
+    again. Both hold the build. Any other refusal is tried again the next day.
+    """
+
+    def __init__(self, message: str, *, rolled_back: bool, restore_failed: bool = False) -> None:
         super().__init__(message)
         self.rolled_back = rolled_back
+        self.restore_failed = restore_failed
 
 
 class ModeChanged(Exception):
@@ -145,6 +157,19 @@ class ModeChanged(Exception):
     def __init__(self, mode: str) -> None:
         super().__init__(mode)
         self.mode = mode
+
+
+#: Holds whose row could not be written yet, by (worker_id, slug, new image ID):
+#: the result and the row's facts. The build stays held in this process while
+#: the write is tried again on each check.
+_unsaved_holds: dict[tuple[int, str, str], tuple[str, dict[str, str]]] = {}
+
+
+async def _record_hold(hooks: Hooks, worker_id: int, slug: str, result: str, facts: dict[str, str]) -> None:
+    key = (worker_id, slug, facts["new_image"])
+    _unsaved_holds[key] = (result, facts)
+    await hooks.record(worker_id, slug, result, **facts)
+    _unsaved_holds.pop(key, None)
 
 
 def _short(digest: str) -> str:
@@ -169,7 +194,13 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
     old_id, old_digest = str(stale[0].get("image_id") or ""), str(stale[0].get("digest") or "")
     facts = {"old_image": old_id, "new_image": new_id, "old_digest": old_digest, "new_digest": new_digest}
     # A build that already failed here is never tried again; a newer one is.
-    if await hooks.seen(worker_id, slug, new_id, (ROLLED_BACK,)):
+    if unsaved := _unsaved_holds.get((worker_id, slug, new_id)):
+        try:
+            await _record_hold(hooks, worker_id, slug, *unsaved)
+        except Exception as exc:  # noqa: BLE001 - still held; written on a later check
+            logger.warning("Could not save the hold of %s on worker %s yet: %s", slug, worker_id, exc)
+        return "held"
+    if await hooks.seen(worker_id, slug, new_id, HOLDS):
         return "held"
     if mode == NOTIFY:
         if not await hooks.seen(worker_id, slug, new_id, (AVAILABLE,)):
@@ -199,8 +230,12 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
             await hooks.record(worker_id, slug, AVAILABLE, **facts)
         return "available"
     except DeployRefused as exc:
-        await hooks.record(worker_id, slug, ROLLED_BACK if exc.rolled_back else FAILED, detail=str(exc), **facts)
-        return "rolled_back" if exc.rolled_back else "failed"
+        if exc.restore_failed or exc.rolled_back:
+            result = RESTORE_FAILED if exc.restore_failed else ROLLED_BACK
+            await _record_hold(hooks, worker_id, slug, result, {**facts, "detail": str(exc)})
+            return result
+        await hooks.record(worker_id, slug, FAILED, detail=str(exc), **facts)
+        return "failed"
     done = result.get("image_update") if isinstance(result.get("image_update"), dict) else {}
     kept = str(done.get("old_kept") or "")
     detail = f"The old image stays on disk: {kept}." if kept else ""
@@ -221,6 +256,6 @@ async def run_worker(hooks: Hooks, settings: dict[str, Any], worker_id: int, slu
         except Exception as exc:  # noqa: BLE001 - one service's failure never stops the others
             logger.warning("Image check of %s on worker %s failed: %s", slug, worker_id, exc)
             outcomes[slug] = "error"
-        if outcomes[slug] in ("updated", "rolled_back"):
+        if outcomes[slug] in ("updated", ROLLED_BACK, RESTORE_FAILED):
             await hooks.sleep(GAP_SECONDS)
     return outcomes

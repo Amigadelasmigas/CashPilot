@@ -55,11 +55,17 @@ to turn the updates on. CashPilot never turns them on for you.
    the bell show **Undone**. An undo puts back the container, not the data:
    the old and the new container use the same volume, so anything the new
    build wrote there stays.
+   If the old container does not start again either, the table and the bell
+   show **Needs you**. The app is down on that box until you start or
+   redeploy it from the dashboard.
+   Sometimes Docker cannot show how the new container did. Then the worker
+   undoes it the same way, but the table shows **Failed**. The next daily
+   check tries that build again.
 5. If the new container passes, the worker removes the old container and its
    image.
 
-CashPilot never tries a build that was undone again on that box. It tries the
-next new build. So an app that fails after each update cannot go round in a
+CashPilot never tries a build that was undone (or that needed you) again on
+that box. It tries the next new build. So an app that fails after each update cannot go round in a
 loop.
 
 Each box updates one app at a time, with a minute between two updates. All
@@ -89,6 +95,29 @@ table shows **Not installed** and the reason:
 
 An update that did not go through for another reason, such as a registry that
 did not answer, shows **Failed**. CashPilot tries again at the next daily check.
+
+## Limits
+
+These are known limits of this release:
+
+- **The tag decides the build.** Automatic mode installs whatever the app's
+  publisher puts under the tag that the app follows, such as `:latest`.
+  CashPilot checks that the new container runs, not who made the build. If
+  you do not trust a publisher to do this, choose **Notify only** for that app.
+- **Data is not undone.** An undo puts back the old container and its image.
+  It does not put back the files in the app's volume. A new build that changes
+  its data, for example with a migration, leaves the changed data to the old
+  build.
+- **Apps run without you watching.** Apps that keep state in a volume are
+  updated by themselves too, against their live volume. CashPilot keeps the
+  volume. Choose **Notify only** for an app where you want to be there.
+- **A lost answer counts as Failed.** If the dashboard loses the worker's
+  answer during an update, the table shows **Failed**, even when the update
+  went through. The next daily check sees the build that runs and says so.
+- **A worker that stops during the check period.** The worker can restart
+  during the 2 minutes. Then the new container keeps running without the rest
+  of its check. The old one stays stopped as `<name>-replaced`. Remove that
+  container when the new build works, or start it again by hand.
 
 ## What CashPilot does not update
 
