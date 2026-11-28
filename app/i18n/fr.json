@@ -1440,7 +1440,7 @@
     "source": "d98dc7800c4c"
   },
   "api.role_must_viewer_writer_owner": {
-    "text": "Le rôle doit être lecteur, éditeur ou propriétaire",
+    "text": "Le rôle doit être viewer, writer ou owner",
     "source": "ad8bea04738b"
   },
   "api.route_proxy_id_0_worker": {

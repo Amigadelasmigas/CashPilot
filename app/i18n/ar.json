@@ -1440,7 +1440,7 @@
     "source": "d98dc7800c4c"
   },
   "api.role_must_viewer_writer_owner": {
-    "text": "يجب أن يكون الدور مشاهدًا أو محررًا أو مالكًا",
+    "text": "يجب أن يكون الدور viewer أو writer أو owner",
     "source": "ad8bea04738b"
   },
   "api.route_proxy_id_0_worker": {

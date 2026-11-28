@@ -1440,7 +1440,7 @@
     "source": "d98dc7800c4c"
   },
   "api.role_must_viewer_writer_owner": {
-    "text": "角色必须是查看者、编辑者或所有者",
+    "text": "角色必须是 viewer、writer 或 owner",
     "source": "ad8bea04738b"
   },
   "api.route_proxy_id_0_worker": {

@@ -1440,7 +1440,7 @@
     "source": "d98dc7800c4c"
   },
   "api.role_must_viewer_writer_owner": {
-    "text": "Vai trò phải là người xem, người chỉnh sửa hoặc chủ sở hữu",
+    "text": "Vai trò phải là viewer, writer hoặc owner",
     "source": "ad8bea04738b"
   },
   "api.route_proxy_id_0_worker": {
