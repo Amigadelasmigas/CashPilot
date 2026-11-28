@@ -91,7 +91,6 @@ def is_secure_vm(info: dict[str, Any]) -> bool:
 async def api_secure_vm_commands(request: Request, worker_id: int, ui_url: str = "") -> dict[str, Any]:
     # ui_url is optional so that FastAPI does not answer 422 before the owner check.
     deps._require_owner(request)
-    url = _ui_url(ui_url)
     workers = await database.list_workers()
     host = next((w for w in workers if w["id"] == worker_id), None)
     if host is None:
@@ -106,8 +105,10 @@ async def api_secure_vm_commands(request: Request, worker_id: int, ui_url: str =
         for vi in (placement.system_info(w) for w in workers)
     )
     # Only the install command uses the address. status, verify and remove
-    # never do, so they stay available on any address.
+    # never do, so they stay available on any address, a malformed one too.
+    url = ""
     if not has_vm:
+        url = _ui_url(ui_url)
         # The installer reaches the UI over IPv4 and refuses an IPv6 literal.
         if ":" in (urlsplit(url).hostname or ""):
             raise HTTPException(status_code=400, detail=i18n.t("secure_vm.cmd.ipv6_ui"))

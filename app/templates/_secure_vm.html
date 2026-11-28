@@ -11,9 +11,10 @@
   // the VM every 5 minutes; older than 10 is stale (app/layers_ui.py says the same).
   const STALE_S = 600;
   const SELFTEST_GAP_S = 300;
-  // "host id:VM worker id or none" -> {install} | {status, verify, remove} | {error}.
+  // "host id:VM worker id or none:host name" -> {install} | {status, verify, remove} | {error}.
   // Keyed by the VM too, so the install command goes once the VM registers,
-  // and a reply for the old state cannot land in the new one.
+  // and a reply for the old state cannot land in the new one. Keyed by the
+  // host's name too: the install command names it, so a rename loads it again.
   const commands = {};
   const asked = {};      // VM worker id -> message after asking for a self-test
   const open = new Set();
@@ -46,7 +47,10 @@
     // An unreadable time is no proof the guard ran: unknown, never OK.
     const at = Number(f.checked_at);
     if (!Number.isFinite(at) || at <= 0) return 'unknown';
-    return Date.now() / 1000 - at > STALE_S ? 'stale' : 'ok';
+    // A time in the future is a wrong clock, not a fresh check (app/layers_ui.py).
+    const age = Date.now() / 1000 - at;
+    if (age < 0) return 'unknown';
+    return age > STALE_S ? 'stale' : 'ok';
   }
 
   // The one non-VM worker named as the VM's host. Two with that name means
@@ -104,7 +108,7 @@
       const h = hostOf(x.system_info, workers);
       return h !== null && h.id === w.id;
     });
-    const key = `${w.id}:${vmWorker ? vmWorker.id : 'none'}`;
+    const key = `${w.id}:${vmWorker ? vmWorker.id : 'none'}:${w.name}`;
     const kvm = (sysInfo.layers || {}).kvm;
     if (!vmWorker && (!isOwner || kvm !== true)) {
       // Nothing to manage. Say why only when it is a fact, never a guess.

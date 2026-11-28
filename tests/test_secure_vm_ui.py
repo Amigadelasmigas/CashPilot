@@ -202,6 +202,12 @@ class TestWhatTheInstallerWouldRefuse:
         assert resp.status_code == 200, resp.text
         assert set(resp.json()) == {"status", "verify", "remove"}
 
+    @pytest.mark.parametrize("url", ["http://ui.lan:70000", "http://[::1", "ftp://ui.example", ""])
+    def test_a_malformed_ui_address_still_gets_the_commands_for_an_existing_vm(self, url):
+        resp = _get([_worker(7, "box"), _vm_of("box")], ui_url=url)
+        assert resp.status_code == 200, resp.text
+        assert set(resp.json()) == {"status", "verify", "remove"}
+
     @pytest.mark.parametrize("name", ["box$(id)", "b" * 65, "café"])
     def test_a_host_name_the_installer_refuses_gets_no_command(self, name):
         resp = _get([_worker(7, name)])
@@ -226,11 +232,11 @@ console.log(globalThis.CPSecureVM.flag(w, info));
 class TestAnOfflineSecureVm:
     # An offline VM's last report is old news: its fence shows unknown, never OK.
 
-    def _flag(self, status):
+    def _flag(self, status, ahead=0):
         node = shutil.which("node")
         if not node:
             pytest.skip("node is not installed")
-        now = int(time.time())
+        now = int(time.time()) + ahead
         info = {"features": ["secure_vm"], "secure_vm": {"host": "box", "fence": {"state": "ok", "checked_at": now}}}
         out = subprocess.run(
             [
@@ -253,6 +259,37 @@ class TestAnOfflineSecureVm:
     def test_an_offline_vm_shows_its_fence_as_unknown(self):
         out = self._flag("offline")
         assert "flag-ok" not in out and "layers.vm.fence_unknown" in out
+
+    def test_a_fence_time_in_the_future_is_unknown(self):
+        # A wrong clock, not a fresh check: app/layers_ui.py says the same.
+        out = self._flag("online", ahead=3600)
+        assert "flag-ok" not in out and "layers.vm.fence_unknown" in out
+
+
+_ROW_HARNESS = _PANEL_HARNESS.replace(
+    "console.log(globalThis.CPSecureVM.flag(w, info));",
+    "const workers = [w]; console.log(globalThis.CPSecureVM.row(w, info, workers));",
+)
+
+
+class TestARenamedHost:
+    # The install command names the host, so a rename must load it again.
+
+    def _key(self, name):
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("node is not installed")
+        w = {"id": 7, "name": name, "status": "online", "system_info": {"layers": {"kvm": True}}}
+        out = subprocess.run(
+            [node, "-e", _ROW_HARNESS, str(ROOT / "app/templates/_secure_vm.html"), json.dumps([w, w["system_info"]])],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        return re.search(r'data-cmd-key="([^"]*)"', out).group(1)
+
+    def test_the_install_command_is_cached_per_host_name(self):
+        assert self._key("box") != self._key("nas")
 
 
 class TestAHostHelperFixShips:
