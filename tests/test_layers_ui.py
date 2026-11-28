@@ -63,6 +63,12 @@ NONE = {"default": None, "earners": {}}
 
 
 class TestTheView:
+    @pytest.mark.parametrize("report", [["runsc"], "x", {"runtimes": "runsc"}, {"runtimes": [1, None]}, None])
+    def test_a_runtime_report_of_any_shape_reads_by_name_and_never_raises(self, report):
+        assert layers_ui.kind("runsc-hostnet", report) == "gvisor"
+        assert layers_ui.kind("runc", report) == "runc"
+        assert layers_ui.gvisor_ready(report) is False
+
     def test_each_earner_shows_its_fence_and_runtime(self):
         w = _worker(
             _layers(),
@@ -242,6 +248,20 @@ class TestStorage:
             _run(layers_ui.set_default(w, "runc"))
             assert _run(layers_ui.for_new_deploy(w, "honeygain")) == "runc"
 
+    def test_remember_records_dockers_default_so_a_later_worker_default_leaves_it(self):
+        store, g, s = self._store()
+        with g, s:
+            _run(layers_ui.remember(_worker(_layers()), "honeygain", None))
+            _run(layers_ui.set_default(_worker(_layers()), "gvisor"))
+            assert _run(layers_ui.for_new_deploy(_worker(_layers()), "honeygain")) is None
+        assert json.loads(store["worker_c7_runtime_choice"])["earners"] == {"honeygain": None}
+
+    def test_remember_ignores_a_value_that_is_no_choice(self):
+        store, g, s = self._store()
+        with g, s:
+            _run(layers_ui.remember(_worker(_layers()), "honeygain", "kata"))
+        assert "worker_c7_runtime_choice" not in store
+
     def test_remember_never_replaces_a_choice_already_there(self):
         store, g, s = self._store()
         store["worker_c7_runtime_choice"] = json.dumps({"default": "gvisor", "earners": {"honeygain": "runc"}})
@@ -358,6 +378,40 @@ class TestTheRoutes:
             )
         assert resp.status_code == 409, resp.text
         assert "WireGuard" in resp.json()["detail"]
+        put.assert_not_called()
+
+    def test_a_registered_custom_service_takes_a_choice(self):
+        w = _worker(_layers(), [{"slug": "custom-foo", "runtime": "runc", "network": "cashpilot-isolated"}])
+        patches = self._client(w)
+        with (
+            patches[0],
+            patches[1],
+            patches[2] as put,
+            patches[3],
+            patches[4],
+            patch.object(database, "get_custom_service", AsyncMock(return_value={"image": "x"})),
+        ):
+            resp = TestClient(main.app).post(
+                "/api/workers/7/runtime-choice", json={"slug": "custom-foo", "choice": "gvisor"}
+            )
+        assert resp.status_code == 200, resp.text
+        assert json.loads(put.call_args.args[1])["earners"] == {"custom-foo": "gvisor"}
+        assert "image" not in resp.text
+
+    def test_an_unregistered_custom_slug_is_still_a_404(self):
+        patches = self._client(_worker(_layers()))
+        with (
+            patches[0],
+            patches[1],
+            patches[2] as put,
+            patches[3],
+            patches[4],
+            patch.object(database, "get_custom_service", AsyncMock(return_value=None)),
+        ):
+            resp = TestClient(main.app).post(
+                "/api/workers/7/runtime-choice", json={"slug": "custom-nope", "choice": "gvisor"}
+            )
+        assert resp.status_code == 404
         put.assert_not_called()
 
     def test_a_choice_is_saved(self):
@@ -624,6 +678,108 @@ class TestTheDeploySendsTheChoice:
             sign as signed,
         ):
             _run(scenario(signed))
+
+    def test_a_pin_is_judged_on_the_network_mode_the_deploy_sends(self):
+        """A recorded network_mode none is not bridge: a bridge-only pin does not drop the gVisor choice."""
+        pins = {"default": "runc", "overrides": {}}
+        w = _worker(_layers(pins=pins))
+        stored = json.dumps({"default": None, "earners": {"honeygain": "gvisor"}})
+        with (
+            patch.object(database, "get_worker", AsyncMock(return_value=w)),
+            patch.object(database, "get_config", AsyncMock(return_value=stored)),
+        ):
+            assert _run(main._runtime_choice_for(7, "honeygain", network_mode="none")) == "gvisor"
+            # On bridge networking the pin decides, so nothing is sent.
+            assert _run(main._runtime_choice_for(7, "honeygain", network_mode=None)) is None
+
+    def test_a_deploy_sends_the_network_mode_it_carries_to_the_lookup(self):
+        lookup = AsyncMock(return_value=None)
+        with (
+            patch.object(main, "_runtime_choice_for", lookup),
+            patch.object(main, "_remember_runtime_choice", AsyncMock()),
+            patch.object(main, "_proxy_to_worker", AsyncMock(return_value={"container_id": "abc123"})),
+        ):
+            _run(main._send_worker_deploy(7, "honeygain", {"image": "h", "network_mode": "none"}))
+        assert lookup.await_args.kwargs["network_mode"] == "none"
+
+    def test_a_deploy_that_names_its_runtime_gets_no_inherited_choice_and_records_none(self):
+        sent = {}
+
+        async def hop(worker_id, method, path, *, json=None, **kwargs):
+            sent.update(json or {})
+            return {"container_id": "abc123"}
+
+        lookup = AsyncMock(return_value="gvisor")
+        remember = AsyncMock()
+        with (
+            patch.object(main, "_runtime_choice_for", lookup),
+            patch.object(main, "_remember_runtime_choice", remember),
+            patch.object(main, "_proxy_to_worker", side_effect=hop),
+        ):
+            _run(main._send_worker_deploy(7, "honeygain", {"image": "h", "runtime": "runc"}))
+        assert "runtime_choice" not in sent and sent["runtime"] == "runc"
+        lookup.assert_not_called()
+        remember.assert_not_called()
+
+    def test_a_direct_deploy_with_dockers_default_is_recorded_too(self):
+        remember = AsyncMock()
+        with (
+            patch.object(main, "_runtime_choice_for", AsyncMock(return_value=None)),
+            patch.object(main, "_remember_runtime_choice", remember),
+            patch.object(main, "_proxy_to_worker", AsyncMock(return_value={"container_id": "abc123"})),
+        ):
+            _run(main._send_worker_deploy(7, "honeygain", {"image": "h"}))
+        remember.assert_awaited_once_with(7, "honeygain", None)
+
+    def test_a_desktop_deploy_records_nothing(self):
+        # A Desktop picks its runtime from its own catalog: there is no choice to keep.
+        remember = AsyncMock()
+        with (
+            patch.object(database, "get_worker", AsyncMock(return_value=_worker(_layers(), device_type="desktop"))),
+            patch.object(layers_ui, "remember", remember),
+        ):
+            _run(main._remember_runtime_choice(7, "honeygain", None))
+        remember.assert_not_called()
+        with (
+            patch.object(database, "get_worker", AsyncMock(return_value=_worker(_layers()))),
+            patch.object(layers_ui, "remember", remember),
+        ):
+            _run(main._remember_runtime_choice(7, "honeygain", None))
+        remember.assert_awaited_once()
+
+    def test_a_routed_deploy_records_nothing(self):
+        remember = AsyncMock()
+        with (
+            patch.object(main, "_runtime_choice_for", AsyncMock(return_value=None)),
+            patch.object(main, "_remember_runtime_choice", remember),
+            patch.object(main, "_proxy_worker_call", AsyncMock(return_value={"container_id": "abc123"})),
+        ):
+            _run(main._send_worker_deploy(7, "honeygain", {"image": "honeygain/honeygain"}, proxy_id=3))
+        remember.assert_not_called()
+
+    def test_a_restore_looks_the_choice_up_before_it_signs(self):
+        order: list[str] = []
+
+        async def lookup(*a, **k):
+            order.append("lookup")
+            return "gvisor"
+
+        def sign(*a, **k):
+            order.append("sign")
+            return "approval"
+
+        restore = {"sha256": "ab" * 32, "bundle_b64": "eA==", "passphrase": "p"}
+        with (
+            patch.object(main, "_runtime_choice_for", side_effect=lookup),
+            patch.object(main, "_remember_runtime_choice", AsyncMock()),
+            patch.object(main, "_image_for_worker", AsyncMock(side_effect=lambda w, s, spec: spec)),
+            patch.object(database, "get_worker", AsyncMock(return_value={"client_id": "c7"})),
+            patch.object(main, "_confirmed_worker_key", AsyncMock(return_value="k" * 32)),
+            patch.object(main, "_proxy_to_worker", AsyncMock(return_value={"state_id": 1})),
+            patch.object(main.step_up, "sign", side_effect=sign),
+        ):
+            _run(main._proxy_worker_restore(7, "honeygain", {"image": "h"}, restore))
+        assert order == ["lookup", "sign"]
 
     def test_desktop_gets_none(self):
         w = _worker(_layers(), device_type="desktop")

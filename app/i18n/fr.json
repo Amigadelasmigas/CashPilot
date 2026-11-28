@@ -8511,6 +8511,10 @@
     "text": "impossible ici",
     "source": "845f15559082"
   },
+  "layers.load_failed": {
+    "text": "The security layers could not be loaded.",
+    "source": "000000000000"
+  },
   "layers.off": {
     "text": "désactivé",
     "source": "b4dc66dde806"

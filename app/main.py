@@ -5233,8 +5233,12 @@ async def _deploy(
                 await _refuse_direct_on_proxied_only(svc, slug, worker_id)
                 await _confirm_leave_route(request, svc, slug, worker_id, password)
                 # A runtime choice the worker cannot take refuses the deploy: ask
-                # before the routed copy goes, so a refusal stops nothing.
-                await _runtime_choice_for(worker_id, slug)
+                # before the routed copy goes, so a refusal stops nothing. The
+                # choice checked here is the one sent: no second lookup after the
+                # removal can refuse with the routed copy already gone.
+                options["runtime_choice"] = await _runtime_choice_for(
+                    worker_id, slug, network_mode=_spec_network_mode(spec)
+                )
                 await _remove_routed_copies(worker_id, slug, [recorded_route])
                 options["leave_route"] = True
         held = await _reserve_pending_identities(slug, worker_id, 1, spec.get("env"))
@@ -5264,8 +5268,12 @@ async def _deploy(
             if result is None:
                 await _refuse_direct_on_proxied_only(svc, slug, worker_id)
                 await _confirm_leave_route(request, svc, slug, worker_id, password)
-                # A routed copy the box still reports goes first, as above.
+                # A routed copy the box still reports goes first, as above, after
+                # the runtime choice is checked and kept for the deploy.
                 if leaving := await _routes_on(worker_id, slug):
+                    options["runtime_choice"] = await _runtime_choice_for(
+                        worker_id, slug, network_mode=_spec_network_mode(spec)
+                    )
                     await _remove_routed_copies(worker_id, slug, leaving)
                 options["leave_route"] = True
                 try:
@@ -8242,7 +8250,9 @@ async def _confirm_deploy_targets(worker_id: int, slug: str, keys: list[str]) ->
         await _ask_deploy_confirmation(worker_id, slug, targets, old=old)
 
 
-async def _runtime_choice_for(worker_id: int, slug: str, *, routed: bool = False) -> str | None:
+async def _runtime_choice_for(
+    worker_id: int, slug: str, *, routed: bool = False, network_mode: Any = layers_ui.CATALOG
+) -> str | None:
     """The runtime choice a deploy of ``slug`` sends to this worker, or None for Docker's default.
 
     Refused when a choice is stored but the worker cannot take it: deploying
@@ -8262,18 +8272,27 @@ async def _runtime_choice_for(worker_id: int, slug: str, *, routed: bool = False
                 status_code=409, detail=t("api.runtime_choice_routed", worker=worker.get("name") or f"#{worker_id}")
             )
         return None
-    choice = await layers_ui.for_new_deploy(worker, slug)
+    choice = await layers_ui.for_new_deploy(worker, slug, network_mode)
     if choice and layers_ui.FEATURE not in (info.get("features") or []):
         raise HTTPException(
             status_code=409,
             detail=t("api.runtime_choice_worker_too_old", runtime=choice, worker=worker.get("name") or f"#{worker_id}"),
         )
-    if choice == layers_ui.GVISOR and (why := layers_ui.locked(slug, info, choice)):
+    if choice == layers_ui.GVISOR and (why := layers_ui.locked(slug, info, choice, network_mode)):
         raise HTTPException(
             status_code=409,
             detail=t("api.runtime_choice_cannot", worker=worker.get("name") or f"#{worker_id}", why=why),
         )
     return choice
+
+
+#: ``runtime_choice`` not given to a deploy: it looks the owner's choice up itself.
+_LOOKUP = object()
+
+
+def _spec_network_mode(spec: dict[str, Any]) -> Any:
+    """The network mode a deploy sends, which can be a recorded one; the catalog's when it sends none."""
+    return spec.get("network_mode", layers_ui.CATALOG)
 
 
 async def _send_worker_deploy(
@@ -8286,8 +8305,13 @@ async def _send_worker_deploy(
     definition: dict[str, Any] | None = None,
     timeout: float = 30,
     desktop_json: dict[str, Any] | None = None,
+    runtime_choice: Any = _LOOKUP,
 ) -> dict[str, Any]:
-    """Send the exact expectation on every deploy. Serialize the legacy fallback on this dashboard."""
+    """Send the exact expectation on every deploy. Serialize the legacy fallback on this dashboard.
+
+    ``runtime_choice``: a choice already checked before something was removed
+    (a route left); it is sent as it is, never looked up a second time.
+    """
     if not isinstance(expected, str) or not _DEPLOY_TARGET_ID.fullmatch(expected):
         raise HTTPException(status_code=422, detail=t("api.expected_container_id_none"))
     instance = _copy_number(spec) or 1
@@ -8314,11 +8338,21 @@ async def _send_worker_deploy(
         # The owner's runtime choice for this earner on this worker (app/layers_ui.py),
         # picked and recorded under this lock: a second deploy of the earner reads
         # what the first one recorded, never a default changed in between.
+        record = proxy_id is None
         if proxy_id is not None:
             await _runtime_choice_for(worker_id, slug, routed=True)
-        elif "runtime_choice" not in body and (choice := await _runtime_choice_for(worker_id, slug)):
-            body["runtime_choice"] = choice
-        sent = body.get("runtime_choice") if proxy_id is None else None
+        elif body.get("runtime"):
+            # The request names its runtime outright: no inherited default rides
+            # next to it (the worker would refuse the two), and nothing is recorded.
+            record = False
+        elif runtime_choice is not _LOOKUP:
+            if runtime_choice:
+                body["runtime_choice"] = runtime_choice
+        elif "runtime_choice" not in body:
+            choice = await _runtime_choice_for(worker_id, slug, network_mode=_spec_network_mode(body))
+            if choice:
+                body["runtime_choice"] = choice
+        sent = body.get("runtime_choice")
         # A Desktop's lookup answers checked or refuses: it never falls back to the old route.
         current, checked = await _worker_deploy_target(worker_id, slug, instance, proxy_id)
         if not checked and current != expected:
@@ -8338,8 +8372,9 @@ async def _send_worker_deploy(
             # The intermediate worker protocol also requires this flag.
             body["replace_existing"] = True
         result = await send(checked=checked)
-        # The worker took it: a default this earner inherited is now its own (app/layers_ui.py).
-        await _remember_runtime_choice(worker_id, slug, sent)
+        # The worker took it: what it runs under is now the earner's own (app/layers_ui.py).
+        if record:
+            await _remember_runtime_choice(worker_id, slug, sent)
     return result
 
 
@@ -8350,11 +8385,10 @@ async def _remember_runtime_choice(worker_id: int, slug: str, choice: Any) -> No
     worker default can move it, so it is logged and the deploy's own
     bookkeeping goes on.
     """
-    if not isinstance(choice, str):
-        return
     try:
         worker = await database.get_worker(worker_id)
-        if worker:
+        info = placement.system_info(worker or {})
+        if worker and not placement.is_desktop(info) and not placement.is_android(info):
             await layers_ui.remember(worker, slug, choice)
     except Exception as exc:
         logger.warning(
@@ -8370,6 +8404,7 @@ async def _proxy_worker_deploy(
     approve: bool = False,
     leave_route: bool = False,
     expected_container: str = "none",
+    runtime_choice: Any = _LOOKUP,
 ) -> dict[str, Any]:
     """Forward a deploy command with full spec to a worker.
 
@@ -8393,6 +8428,7 @@ async def _proxy_worker_deploy(
         timeout=_deploy_timeout(slug),
         # Desktop gets its runtime settings from its own catalog.
         desktop_json={key: spec[key] for key in _DesktopDeploySpec.model_fields if key in spec},
+        runtime_choice=runtime_choice,
     )
 
 
@@ -8441,7 +8477,12 @@ async def _proxy_worker_restore(
     locks = _worker_deploy_locks.setdefault(asyncio.get_running_loop(), {})
     # Picked and recorded under the deploy lock, as a deploy does (_send_worker_deploy).
     async with locks.setdefault((worker_id, slug), asyncio.Lock()):
-        # Signed once the lock is held: a deploy ahead of it can run for minutes,
+        # A restore recreates the earner: it keeps the runtime the owner chose, as a
+        # deploy does. Looked up first, so the approval below loses none of its life.
+        choice = spec.get("runtime_choice")
+        if "runtime_choice" not in spec and not spec.get("runtime"):
+            choice = await _runtime_choice_for(worker_id, slug, network_mode=_spec_network_mode(spec))
+        # Signed last, once the lock is held: a deploy ahead of it can run for minutes,
         # and the approval's lifetime must start when the request goes out.
         body = {
             **spec,
@@ -8449,8 +8490,7 @@ async def _proxy_worker_restore(
             "passphrase": restore["passphrase"],
             "approval": step_up.sign(key, step_up.ACTION_RESTORE, target),
         }
-        # A restore recreates the earner: it keeps the runtime the owner chose, as a deploy does.
-        if "runtime_choice" not in body and (choice := await _runtime_choice_for(worker_id, slug)):
+        if choice:
             body["runtime_choice"] = choice
         # The worker pulls the image, creates the container and writes and reads
         # the backup back before it answers; a deploy's time plus the copy.
@@ -8467,7 +8507,8 @@ async def _proxy_worker_restore(
         # The worker restored it: whatever fails after this, the restore happened.
         restore["answered"] = True
         restore["state_id"] = result.get("state_id") if isinstance(result, dict) else None
-        await _remember_runtime_choice(worker_id, slug, body.get("runtime_choice"))
+        if not spec.get("runtime"):
+            await _remember_runtime_choice(worker_id, slug, body.get("runtime_choice"))
     return result
 
 
