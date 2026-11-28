@@ -30,10 +30,14 @@ listings still do.
 
 ## The LAN fence
 
-Earners sit on CashPilot's own network, `cashpilot-isolated`, behind firewall
-rules that let them reach the internet and nothing else
-([network isolation](isolation.md)). Each earner shows **fenced** or **not
-fenced**.
+An earner on CashPilot's own network, `cashpilot-isolated`, sits behind
+firewall rules that let it reach the internet and nothing else
+([network isolation](isolation.md)). The fence covers only the earners on that
+network. On an upgraded install, an earner that was stopped when you turned
+isolation on stays on Docker's default bridge, and starting it does not move
+it: it is fenced only once you redeploy it
+([upgraded installs](isolation.md#turning-it-on-for-an-upgraded-install)).
+Each earner shows **fenced** or **not fenced**, so check each one.
 
 ## gVisor
 
@@ -61,9 +65,14 @@ gives you one command to run on the host.
    It restores `daemon.json`, deletes gVisor and its backup, reloads Docker and
    checks that nothing is left. It refuses while any container, running or
    stopped, still uses a gVisor runtime. Switching a stopped earner saves the
-   choice only, so redeploy or remove each stopped one first. After the remove, an earner still set to gVisor is not redeployed,
-   and while the worker's default still says gVisor no new earner is deployed.
-   The page says why, and nothing is stopped or removed.
+   choice only, so redeploy or remove each stopped one first. If a worker
+   variable (`CASHPILOT_CONTAINER_RUNTIME` or
+   `CASHPILOT_CONTAINER_RUNTIME_OVERRIDES`) pins gVisor, the page locks the
+   choice: remove the variable from the worker's compose file, recreate the
+   worker with `docker compose up -d`, then redeploy its earners. After the
+   remove, an earner still set to gVisor is not redeployed, and while the
+   worker's default still says gVisor no new earner is deployed. The page says
+   why, and nothing is stopped or removed.
 
 A copy routed through one of your proxies runs under Standard: it shares the
 proxy's network, and gVisor is not offered there yet. An earner you set to
