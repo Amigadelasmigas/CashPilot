@@ -525,7 +525,7 @@ def test_a_selftest_request_waits_out_the_gap_instead_of_vanishing(age, ran):
     out = _run(
         """
 AGE=$1; CALLS=$(mktemp)
-load_conf() { :; }; tap_up() { :; }
+load_conf() { :; }; tap_up() { :; }; GUARD_LOCKED=1
 RUN_DIR=$(mktemp -d); echo provisioned >"$STATE/provisioned"
 echo $(( $(date +%s) - AGE )) >"$RUN_DIR/selftest.last"
 guest_ssh() { echo "ssh $*" >>"$CALLS"; }
@@ -862,3 +862,121 @@ guard_pass; echo done
 """
     )
     assert out.split() == ["done"]
+
+
+@pytest.mark.parametrize("fails", ["golden", "rules", "none"])
+def test_a_fence_that_cannot_be_saved_keeps_the_guest_cut_off(fails):
+    # The periodic guard runs with errexit off: a failed move must stop the
+    # pass, or the guest connects over rules its golden copy does not match.
+    out = _run(
+        """
+FAILS=$1; CALLS=$(mktemp)
+load_conf() { :; }; CONF=$(mktemp); RUN_DIR=$(mktemp -d); GUARD_LOCKED=1
+ns_ready() { :; }; log() { :; }; host_rules_ensure() { :; }
+link_cut() { echo cut >>"$CALLS"; }; link_connect() { echo connect >>"$CALLS"; }
+apply_ns_rules() { :; }; ns_filter_matches() { :; }; ns_base_ok() { :; }; ns_fingerprint() { echo new; }
+guard_fail() { echo "fail:$1" >>"$CALLS"; }
+mv() { case "$*" in *"fence.$FAILS.new"*) return 1 ;; esac; command mv "$@"; }
+rc=0; guard_pass || rc=$?
+echo "RC=$rc" >>"$CALLS"
+[ -f "$STATE/fence.rules" ] && echo RULES-SAVED >>"$CALLS" || echo RULES-NOT-SAVED >>"$CALLS"
+ls "$STATE" | grep -c '\\.new$' >>"$CALLS" || true
+cat "$CALLS"
+""",
+        fails,
+    )
+    lines = out.splitlines()
+    if fails == "none":
+        assert lines == ["cut", "connect", "RC=0", "RULES-SAVED", "0"]
+    else:
+        # The rules stay unsaved, so the next pass rewrites them, still cut off.
+        assert lines[0] == "cut"
+        assert lines[1].startswith("fail:the fence could not be saved")
+        assert lines[2:] == ["RC=1", "RULES-NOT-SAVED", "0"]
+
+
+def test_a_state_path_with_a_comma_is_refused():
+    # QEMU would read the comma in -drive file=... as the next option.
+    out = subprocess.run(
+        ["bash", "-c", 'source "$1"', "bash", str(SCRIPT)],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "CPVM_HOME": "/srv/vms,archive/cashpilot-vm"},
+    )
+    assert out.returncode == 1
+    assert "must not contain a comma" in out.stderr
+
+
+@pytest.mark.parametrize("removing", [True, False])
+def test_install_waits_for_an_unfinished_remove(removing):
+    # The marker holds the path of a disk a remove could not delete; a new
+    # install would overwrite it on its own next remove.
+    out = _run(
+        """
+REMOVING=$1
+uname() { echo x86_64; }; is_unraid() { return 1; }; has() { :; }; load_conf() { return 1; }
+CONF=$(mktemp -d)/config; [ "$REMOVING" = yes ] && echo "CPVM_HOME=/old/cashpilot-vm" >"$CONF.removing"
+# Any character device stands in for /dev/kvm.
+eval "$(declare -f preflight | sed 's|/dev/kvm|/dev/null|')"
+(preflight) 2>&1 && echo RC=0 || echo RC=1
+""",
+        "yes" if removing else "no",
+    )
+    if removing:
+        assert "a remove did not finish" in out
+        assert out.split()[-1] == "RC=1"
+    else:
+        assert out.split() == ["RC=0"]
+
+
+def test_the_guest_counts_as_provisioned_before_the_enrolment_wait():
+    # An enrolment that only finishes after the wait times out must still get
+    # the fence state and the UI's self-tests.
+    text = SCRIPT.read_text()
+    install = text[text.index("\ncmd_install() {") :]
+    assert install.index('date -Is >"$STATE/provisioned"') < install.index('wait_for 300 "the worker to enrol"')
+    assert install.index("trap - EXIT") < install.index('date -Is >"$STATE/provisioned"')
+
+
+@pytest.mark.parametrize("save", ["big", "fails"])
+def test_remove_never_calls_firewall_rules_gone_that_it_did_not_read(save):
+    # An early match must not end the read (SIGPIPE under pipefail), and a
+    # failed read is not a clean host.
+    out = _run(
+        """
+SAVE=$1
+ns_exists() { return 1; }; ip() { return 1; }; pgrep() { return 1; }; id() { return 1; }; is_unraid() { return 1; }
+firewalld_saved_trusted() { :; }
+STATE=/nonexistent/cashpilot-vm; CONF_DIR=/nonexistent/conf; BIN=/nonexistent/bin; RUN_DIR=/nonexistent/run
+iptables-save() {
+  [ "$SAVE" = fails ] && return 1
+  echo "-A FORWARD -j CPVM-FWD"; awk 'BEGIN { for (i = 0; i < 200000; i++) print "-A INPUT -j ACCEPT" }'
+}
+leftovers
+""",
+        save,
+    )
+    want = "host firewall rules" if save == "big" else "host firewall rules (they could not be read)"
+    assert out.splitlines() == [want]
+
+
+@pytest.mark.parametrize("locked", [True, False])
+def test_a_ui_selftest_runs_only_under_the_guard_lock(locked):
+    # A guard pass that timed out on the lock (a red run holds it while the
+    # fence is open) must not go on to probe for the UI.
+    out = _run(
+        """
+LOCKED=$1; CALLS=$(mktemp)
+load_conf() { :; }; CONF=$(mktemp); RUN_DIR=$(mktemp -d); echo yes >"$STATE/provisioned"; tap_up() { :; }
+flock() { [ "$LOCKED" = yes ]; }; warn() { :; }
+# Only the lock matters here: the rest of the pass is not under test.
+ns_ready() { return 1; }; net_up() { return 1; }; link_cut() { :; }; guard_fail() { :; }
+guest_ssh() { echo "ssh $*" >>"$CALLS"; }
+selftest_once() { echo probes >>"$CALLS"; SELFTEST_LINES="ok x"; }; save_selftest() { :; }; log() { :; }
+guard_pass || true; selftest_if_asked
+echo "locked=$GUARD_LOCKED"; grep -c probes "$CALLS" || true
+""",
+        "yes" if locked else "no",
+    )
+    assert out.split() == (["locked=1", "1"] if locked else ["locked=0", "0"])
