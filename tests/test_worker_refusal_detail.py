@@ -170,9 +170,23 @@ def test_non_json_error_body_is_reported_with_its_status():
 
 
 def test_timeout_says_the_worker_did_not_answer():
-    resp = _send("restart", raises=httpx.ReadTimeout("timed out"))
+    resp = _send("start", raises=httpx.ReadTimeout("timed out"))
     assert resp.status_code == 504
     assert "did not answer within 30 s" in resp.json()["detail"]
+
+
+def test_a_raw_restart_waits_as_long_as_the_restart_button():
+    # The raw command goes through _proxy_worker_command, so a restart waits for
+    # the container's clean stop, as the dashboard's own restart does.
+    from app import main
+
+    resp = _send("restart", raises=httpx.ReadTimeout("timed out"))
+    assert resp.status_code == 504
+    # It also waits for a deploy holding the route lock, as a Stop does.
+    wait = 30 + main._catalog_stop_timeout("mysterium") + main._deploy_timeout("mysterium")
+    # And for the clean stop of the new container a failed check undoes.
+    wait += main.image_updates.SETTLE_SECONDS + 30 + main._catalog_stop_timeout("mysterium")
+    assert f"did not answer within {wait} s" in resp.json()["detail"]
 
 
 def test_unreachable_worker_still_reads_communication_failed():

@@ -2063,6 +2063,10 @@
     "text": " — hilang dari mesin",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — pembaruan image",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — hilang",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "cadangan ini berisi {have}, tetapi {slug} menyimpan {want}. Ini bukan cadangan {slug}.",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "Penerapan {slug} sedang berjalan, sehingga layanan ini tidak dibaca untuk cadangan. Coba lagi setelah penerapan selesai.",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "{outer} dan {inner} sama-sama ada di {bind_mounts_env}, dan kontainer yang melakukan bind ke {outer} dapat menaruh tautan di tempat {inner} berada. Simpan hanya salah satunya di {bind_mounts_env} di file .env di samping file compose Anda, lalu jalankan docker compose up -d",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "Penghapusan {slug} sedang berjalan di mesin ini, jadi {action, select, start {layanan itu tidak dimulai} backup {layanan itu tidak dibaca untuk cadangan} other {tidak ada yang diterapkan}}. Coba lagi setelah selesai.",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "Penerapan {slug} masih berjalan, sehingga layanan ini tidak dimulai ulang. Mulai ulang setelah penerapan selesai.",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "Pemulihan {slug} tidak selesai, jadi datanya mungkin baru setengah tertulis dan {action, select, start {layanan itu tidak dimulai} backup {layanan itu tidak dibaca untuk cadangan} other {layanan itu tidak diterapkan}}. Hapus layanan beserta datanya (Hapus dari mesin ini, di panel dasbor layanan itu, menawarkannya), lalu pulihkan cadangan lagi.",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "{name} dimulai sebelum pemulihan selesai, jadi pemulihan dibatalkan",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "Penerapan {slug} masih berjalan, jadi layanan itu tidak dihentikan. Hentikan lagi setelah penerapan selesai.",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "Pembaruan sedang berjalan.",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "{hidden, plural, other {# kontainer}} di {w, plural, other {# worker yang tidak terjangkau}} tidak dihitung di atas. Kontainer itu tetap berjalan dan menghasilkan selama worker-nya offline. CashPilot hanya tidak dapat melihatnya saat ini.",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "Pembaruan image untuk {name}",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "Pembaruan image di {name}",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop memperbarui aplikasinya sendiri.",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "Docker saat ini tidak dapat dijangkau di mesin ini, sehingga aplikasinya tidak diperiksa.",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "Sedang offline.",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "Perbarui worker ini untuk mendapatkan pembaruan image.",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "Aplikasi",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "Pembaruan",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "Dari",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "Hasil",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "Ke",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "Waktu",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "Kontainer sebuah aplikasi hanya berubah jika registry-nya memiliki build baru. Kontainer baru harus berjalan selama {seconds, plural, other {# detik}} tanpa kegagalan, atau CashPilot akan mengembalikan kontainer yang lama. Build yang gagal dalam pemeriksaan ini tidak dicoba lagi di mesin tersebut.",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "Setiap aplikasi di setiap mesin",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "Apa saja yang dilakukan pembaruan",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "Pemeriksaan harian pukul",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "Cara kerjanya",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "Pemeriksaan harian terakhir: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "Tidak dapat memuat pembaruan: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "Memuat pembaruan",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "Memasang build baru dari image aplikasi Anda, satu aplikasi demi satu di setiap mesin.",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "Perbarui otomatis",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "Warisi",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "Beri tahu saja",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "Nonaktif",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "Belum ada pemeriksaan harian.",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "Belum ada aplikasi yang diterapkan.",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "Belum ada mesin.",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "Belum ada apa pun.",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "Pembaruan otomatis nonaktif di instalasi ini. Aktifkan untuk mendapatkan build baru setiap aplikasi sekali sehari.",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "Aktifkan pembaruan otomatis",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "Pilihan per mesin dan per aplikasi",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "Pilihan aplikasi itu sendiri mengalahkan pilihan mesinnya, dan pilihan mesin mengalahkan pilihan armada.",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "Build baru",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "Gagal",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "Perlu tindakan Anda",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "Dibatalkan",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "Tidak dipasang",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "Diperbarui",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "Periksa sekarang",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "Tidak dapat memulai pemeriksaan: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "Memeriksa…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "Tidak dapat menyimpan: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "Pengaturan pembaruan disimpan",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "Pemeriksaan dimulai. Hasil muncul di sini saat setiap mesin menjawab.",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "Pembaruan image aplikasi",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "Ponsel ini memakai rilis CashPilot Android yang lebih lama daripada rilis terbaru yang diterbitkan ({ref}). Pasang APK yang lebih baru dari halaman rilis GitHub.",

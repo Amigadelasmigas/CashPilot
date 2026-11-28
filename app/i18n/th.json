@@ -2063,6 +2063,10 @@
     "text": " — หายไปจากเครื่อง",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — อัปเดตอิมเมจ",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — หายไป",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "ข้อมูลสำรองนี้มี {have} แต่ {slug} เก็บ {want} จึงไม่ใช่ข้อมูลสำรองของ {slug}",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "การติดตั้งใช้งาน {slug} กำลังดำเนินอยู่ จึงไม่ได้อ่านเพื่อสร้างข้อมูลสำรอง โปรดลองอีกครั้งเมื่อการติดตั้งใช้งานเสร็จสิ้น",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "{outer} และ {inner} อยู่ใน {bind_mounts_env} ทั้งคู่ และคอนเทนเนอร์ที่ผูก {outer} อาจวางลิงก์ไว้ในตำแหน่งของ {inner} ได้ โปรดเก็บไว้เพียงรายการเดียวใน {bind_mounts_env} ในไฟล์ .env ข้างไฟล์ compose ของคุณ แล้วรัน docker compose up -d",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "การลบ {slug} กำลังทำงานอยู่บนเครื่องนี้ จึง{action, select, start {ไม่ได้เริ่มบริการ} backup {ไม่ได้อ่านข้อมูลเพื่อสำรอง} other {ไม่ได้ติดตั้งใช้งานสิ่งใด}} โปรดลองอีกครั้งเมื่อการลบเสร็จสิ้น",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "การติดตั้งใช้งาน {slug} ยังดำเนินอยู่ จึงไม่ได้รีสตาร์ต โปรดรีสตาร์ตเมื่อการติดตั้งใช้งานเสร็จสิ้น",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "การกู้คืน {slug} ไม่เสร็จสิ้น ข้อมูลจึงอาจเขียนไว้เพียงครึ่งเดียว และ{action, select, start {ไม่ได้เริ่มบริการ} backup {ไม่ได้อ่านข้อมูลเพื่อสำรอง} other {ไม่ได้ติดตั้งใช้งาน}} โปรดลบบริการพร้อมข้อมูล (“ลบออกจากเครื่องนี้” ในแผงแดชบอร์ดของบริการมีตัวเลือกนี้) แล้วกู้คืนข้อมูลสำรองอีกครั้ง",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "{name} เริ่มทำงานก่อนที่การกู้คืนจะเสร็จสิ้น จึงยกเลิกการกู้คืนแล้ว",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "การติดตั้งใช้งาน {slug} ยังดำเนินอยู่ จึงยังไม่ได้หยุด โปรดหยุดอีกครั้งเมื่อการติดตั้งใช้งานเสร็จสิ้น",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "มีการอัปเดตกำลังทำงานอยู่แล้ว",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "{hidden, plural, other {คอนเทนเนอร์ # รายการ}}บน{w, plural, other {เวิร์กเกอร์ที่เข้าถึงไม่ได้ # ตัว}}ไม่ได้นับรวมด้านบน คอนเทนเนอร์เหล่านี้ยังทำงานและสร้างรายได้ต่อไประหว่างที่เวิร์กเกอร์ออฟไลน์ เพียงแต่ CashPilot มองไม่เห็นในขณะนี้",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "การอัปเดตอิมเมจของ {name}",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "การอัปเดตอิมเมจบน {name}",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop อัปเดตแอปของตนเอง",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "ขณะนี้ไม่สามารถเข้าถึง Docker บนเครื่องนี้ได้ จึงไม่ได้ตรวจสอบแอปของเครื่องนี้",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "ออฟไลน์อยู่ในขณะนี้",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "อัปเดตเวิร์กเกอร์นี้เพื่อรับการอัปเดตอิมเมจ",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "แอป",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "การอัปเดต",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "จาก",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "ผลลัพธ์",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "เป็น",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "เวลา",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "คอนเทนเนอร์ของแอปจะเปลี่ยนก็ต่อเมื่อรีจิสทรีของแอปมีบิลด์ใหม่เท่านั้น คอนเทนเนอร์ใหม่ต้องทำงานได้ {seconds, plural, other {# วินาที}} โดยไม่ล้มเหลว มิฉะนั้น CashPilot จะนำคอนเทนเนอร์เดิมกลับมา บิลด์ที่ไม่ผ่านการตรวจสอบนี้จะไม่ถูกลองอีกบนเครื่องนั้น",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "ทุกแอปบนทุกเครื่อง",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "สิ่งที่การอัปเดตได้ทำ",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "ตรวจสอบรายวันเวลา",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "วิธีการทำงาน",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "การตรวจสอบรายวันครั้งล่าสุด: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "ไม่สามารถโหลดการอัปเดตได้: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "กำลังโหลดการอัปเดต",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "ติดตั้งบิลด์ใหม่ของอิมเมจแอป ทีละแอปบนแต่ละเครื่อง",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "อัปเดตอัตโนมัติ",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "สืบทอด",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "แจ้งเตือนเท่านั้น",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "ปิด",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "ยังไม่มีการตรวจสอบรายวัน",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "ยังไม่มีแอปที่ติดตั้งใช้งาน",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "ยังไม่มีเครื่อง",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "ยังไม่มีรายการ",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "การอัปเดตอัตโนมัติปิดอยู่ในการติดตั้งนี้ เปิดใช้เพื่อรับบิลด์ใหม่ของแต่ละแอปวันละครั้ง",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "เปิดการอัปเดตอัตโนมัติ",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "ตัวเลือกรายเครื่องและรายแอป",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "ตัวเลือกของแอปเองมีผลเหนือตัวเลือกของเครื่อง และตัวเลือกของเครื่องมีผลเหนือตัวเลือกของกลุ่มเครื่อง",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "มีบิลด์ใหม่",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "ล้มเหลว",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "ต้องดำเนินการเอง",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "ย้อนกลับแล้ว",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "ไม่ได้ติดตั้ง",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "อัปเดตแล้ว",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "ตรวจสอบตอนนี้",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "ไม่สามารถเริ่มการตรวจสอบได้: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "กำลังตรวจสอบ…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "ไม่สามารถบันทึกได้: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "บันทึกการตั้งค่าการอัปเดตแล้ว",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "เริ่มการตรวจสอบแล้ว ผลลัพธ์จะแสดงที่นี่เมื่อแต่ละเครื่องตอบกลับ",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "การอัปเดตอิมเมจแอป",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "โทรศัพท์เครื่องนี้ใช้ CashPilot Android รุ่นที่เก่ากว่ารุ่นล่าสุดที่เผยแพร่ ({ref}) โปรดติดตั้ง APK รุ่นใหม่กว่าจากหน้ารุ่นเผยแพร่ของ GitHub",

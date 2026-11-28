@@ -2063,6 +2063,10 @@
     "text": " — マシンから消失",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — イメージの更新",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": " — 消失",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "このバックアップには {have} が含まれていますが、{slug} が保持するのは {want} です。{slug} のバックアップではありません。",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "{slug} のデプロイが実行中のため、バックアップ用に読み取りませんでした。デプロイの完了後にもう一度お試しください。",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "{outer} と {inner} はどちらも {bind_mounts_env} に含まれています。{outer} をバインドするコンテナは、{inner} の場所にリンクを置くことができます。Compose ファイルの隣にある .env の {bind_mounts_env} には、どちらか一方だけを残し、docker compose up -d を実行してください",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "このマシンで {slug} の削除が実行中のため、{action, select, start {開始しませんでした} backup {バックアップ用に読み取りませんでした} other {何もデプロイしませんでした}}。終わってからもう一度お試しください。",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "{slug} のデプロイがまだ実行中のため、再起動しませんでした。デプロイの完了後に再起動してください。",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "{slug} の復元が完了しなかったため、データが中途半端に書き込まれている可能性があり、{action, select, start {開始しませんでした} backup {バックアップ用に読み取りませんでした} other {デプロイしませんでした}}。サービスをデータごと削除してから (サービスのダッシュボード パネルにある「このマシンから削除」で選べます)、もう一度バックアップを復元してください。",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "復元が完了する前に {name} が起動したため、復元は取り消されました",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "{slug} のデプロイがまだ実行中のため、停止しませんでした。デプロイが完了してから、もう一度停止してください。",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "更新はすでに実行中です。",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "到達できない {w, plural, other {# 台のワーカー}}上の {hidden, plural, other {# 個のコンテナ}}は、上の数に含まれていません。ワーカーがオフラインの間も、これらは動作して収益を得続けています。CashPilot から今は見えないだけです。",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "{name} のイメージ更新",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "{name} でのイメージ更新",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop は自分のアプリを自分で更新します。",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "現在このマシンでは Docker に接続できないため、このマシンのアプリはチェックされていません。",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "現在オフラインです。",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "イメージ更新を受けるには、このワーカーを更新してください。",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "アプリ",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "更新",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "変更前",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "結果",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "変更後",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "日時",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "アプリのコンテナが変わるのは、そのレジストリに新しいビルドがある場合だけです。新しいコンテナは {seconds, plural, other {# 秒間}}失敗なく動作する必要があり、そうでなければ CashPilot が古いコンテナに戻します。このチェックに失敗したビルドは、そのマシンでは再試行されません。",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "すべてのマシンのすべてのアプリ",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "更新で行われたこと",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "毎日のチェック時刻",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "仕組み",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "前回の毎日のチェック: {date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "更新を読み込めませんでした: {error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "更新を読み込み中",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "アプリのイメージの新しいビルドを、各マシンで 1 つのアプリずつインストールします。",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "自動で更新",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "継承",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "通知のみ",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "オフ",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "毎日のチェックはまだ実行されていません。",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "デプロイされたアプリはまだありません。",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "マシンはまだありません。",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "まだ何もありません。",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "このインストールでは自動更新がオフになっています。オンにすると、各アプリの新しいビルドを 1 日 1 回取得します。",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "自動更新をオンにする",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "マシンごと・アプリごとの選択",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "アプリ自身の選択はそのマシンの選択より優先され、マシンの選択はフリートの選択より優先されます。",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "新しいビルド",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "失敗",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "要対応",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "取り消し済み",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "未インストール",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "更新済み",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "今すぐチェック",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "チェックを開始できませんでした: {error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "チェック中…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "保存できませんでした: {error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "更新設定を保存しました",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "チェックを開始しました。各マシンが応答するたびに、ここに結果が表示されます。",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "アプリのイメージ更新",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "このスマートフォンの CashPilot Android は、公開されている最新のリリース ({ref}) より古いリリースです。GitHub のリリースページから新しい APK をインストールしてください。",

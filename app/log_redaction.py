@@ -133,6 +133,20 @@ def redact(text: str) -> str:
     return _SECRET_PARAM_RE.sub(rf"\1{_REDACTED}", text)
 
 
+# A URL scheme is case-insensitive, and Docker may quote one as written.
+_URL_QUERY_RE = re.compile(r"(https?://[^\s?#'\"]+)\?[^\s'\"]*", re.IGNORECASE)
+
+
+def redact_urls(text: str) -> str:
+    """``redact``, and the whole query of every URL: a signed link carries its credential there.
+
+    For a reason Docker gives (a failed pull quotes the registry with its
+    login, or a blob store's signed link) before it is shown or stored.
+    Redact before any cut: a cut can split a login and leave half of it.
+    """
+    return _URL_QUERY_RE.sub(rf"\1?{_REDACTED}", redact(str(text)))
+
+
 def _clean_arg(value):
     """One argument of a log call whose formatting failed, safe to print."""
     if value is None or isinstance(value, (bool, int, float)):

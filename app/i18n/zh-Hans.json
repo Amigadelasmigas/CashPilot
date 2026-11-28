@@ -2063,6 +2063,10 @@
     "text": "——已从机器上消失",
     "source": "75fc16bf92a0"
   },
+  "app.bell.s.image_update": {
+    "text": " — 镜像更新",
+    "source": "70364f6fc435"
+  },
   "app.bell.s.missing": {
     "text": "——缺失",
     "source": "4a57d5e887e9"
@@ -5803,6 +5807,10 @@
     "text": "此备份包含 {have}，但 {slug} 保存的是 {want}。它不是 {slug} 的备份。",
     "source": "9cfe3cb6772b"
   },
+  "err.orchestrator.backup_waits_for_deploy": {
+    "text": "{slug} 的部署正在进行，因此未为备份读取它。请在部署完成后重试。",
+    "source": "bcd8e9fb7be6"
+  },
   "err.orchestrator.bind_both_listed_keep_one": {
     "text": "{outer} 和 {inner} 都在 {bind_mounts_env} 中，而绑定 {outer} 的容器可能会在 {inner} 所在的位置放一个链接。请在 compose 文件旁边的 .env 中，只在 {bind_mounts_env} 里保留其中一个，然后运行 docker compose up -d",
     "source": "d7271c920b6f"
@@ -6067,6 +6075,10 @@
     "text": "这台机器上正在移除 {slug}，因此{action, select, start {它未被启动} backup {未读取它进行备份} other {未部署任何内容}}。请在移除结束后再试。",
     "source": "4a0c5934beca"
   },
+  "err.orchestrator.restart_waits_for_deploy": {
+    "text": "{slug} 的部署仍在进行，因此未重启它。请在部署完成后再重启。",
+    "source": "f88163d6f110"
+  },
   "err.orchestrator.restore_did_not_finish_data": {
     "text": "{slug} 的恢复未完成，因此其数据可能只写入了一半，{action, select, start {所以它未被启动} backup {所以未读取它进行备份} other {所以它未被部署}}。请连同数据一起移除该服务（服务仪表板面板中的“从这台机器移除”提供此选项），然后再次恢复备份。",
     "source": "a7412bdae1b1"
@@ -6162,6 +6174,10 @@
   "err.orchestrator.started_before_restore_finished_undone": {
     "text": "{name} 在恢复完成之前就启动了，因此恢复已撤销",
     "source": "6a32d4130888"
+  },
+  "err.orchestrator.stop_waits_for_deploy": {
+    "text": "{slug} 的部署仍在进行，因此未将其停止。部署完成后请再次停止它。",
+    "source": "1ad2dccfe5d1"
   },
   "err.orchestrator.update_already_running": {
     "text": "已有更新正在进行。",
@@ -7950,6 +7966,190 @@
   "fleet.unreachable_note": {
     "text": "{w, plural, other {# 个无法访问的工作节点}}上的{hidden, plural, other {# 个容器}}未计入上面的数字。在其工作节点离线期间，它们会继续运行并产生收益。CashPilot 只是暂时看不到它们。",
     "source": "38a98859656b"
+  },
+  "fleet.updates.app.aria": {
+    "text": "{name} 的镜像更新",
+    "source": "cbf7d685b18e"
+  },
+  "fleet.updates.box.aria": {
+    "text": "{name} 上的镜像更新",
+    "source": "41a0e82020e8"
+  },
+  "fleet.updates.box.desktop": {
+    "text": "CashPilot Desktop 会自行更新其应用。",
+    "source": "730aa3fb3fed"
+  },
+  "fleet.updates.box.no_docker": {
+    "text": "目前无法连接这台机器上的 Docker，因此未检查其应用。",
+    "source": "c26848cdeebf"
+  },
+  "fleet.updates.box.offline": {
+    "text": "当前离线。",
+    "source": "251ec3f80b53"
+  },
+  "fleet.updates.box.too_old": {
+    "text": "更新此工作节点以获取镜像更新。",
+    "source": "ebc2590da0a9"
+  },
+  "fleet.updates.col.app": {
+    "text": "应用",
+    "source": "0d04bfeb7d64"
+  },
+  "fleet.updates.col.choice": {
+    "text": "更新",
+    "source": "22e2bada8f1c"
+  },
+  "fleet.updates.col.from": {
+    "text": "原版本",
+    "source": "218197693424"
+  },
+  "fleet.updates.col.result": {
+    "text": "结果",
+    "source": "6e7d50e84f47"
+  },
+  "fleet.updates.col.to": {
+    "text": "新版本",
+    "source": "f4b06ef6d3c8"
+  },
+  "fleet.updates.col.when": {
+    "text": "时间",
+    "source": "cf9c7aa24a26"
+  },
+  "fleet.updates.explain": {
+    "text": "只有当应用的镜像仓库有新构建时，其容器才会更改。新容器必须无故障运行 {seconds, plural, other {# 秒}}，否则 CashPilot 会换回旧容器。未通过此检查的构建不会在该机器上再次尝试。",
+    "source": "cffc6a30db2a"
+  },
+  "fleet.updates.fleet_label": {
+    "text": "所有机器上的所有应用",
+    "source": "423f8fa9d497"
+  },
+  "fleet.updates.history": {
+    "text": "更新执行记录",
+    "source": "f0e35555e210"
+  },
+  "fleet.updates.hour_label": {
+    "text": "每日检查时间",
+    "source": "2b2d864e9659"
+  },
+  "fleet.updates.how": {
+    "text": "工作原理",
+    "source": "9c870aa6e5e9"
+  },
+  "fleet.updates.last_run": {
+    "text": "上次每日检查：{date}",
+    "source": "7ec2666a7d6a"
+  },
+  "fleet.updates.load_failed": {
+    "text": "无法加载更新：{error}",
+    "source": "93e53a1b24fc"
+  },
+  "fleet.updates.loading": {
+    "text": "正在加载更新",
+    "source": "df77ff5e32cd"
+  },
+  "fleet.updates.meta": {
+    "text": "安装应用镜像的新构建，在每台机器上一次更新一个应用。",
+    "source": "faf14cfaadc6"
+  },
+  "fleet.updates.mode.auto": {
+    "text": "自动更新",
+    "source": "9e946306e543"
+  },
+  "fleet.updates.mode.inherit": {
+    "text": "继承",
+    "source": "3f72f0385768"
+  },
+  "fleet.updates.mode.notify": {
+    "text": "仅通知",
+    "source": "a38c71d45d21"
+  },
+  "fleet.updates.mode.off": {
+    "text": "关闭",
+    "source": "ca7981b46ecf"
+  },
+  "fleet.updates.never_run": {
+    "text": "尚未进行每日检查。",
+    "source": "61666d500728"
+  },
+  "fleet.updates.no_apps": {
+    "text": "尚未部署任何应用。",
+    "source": "c035919c093c"
+  },
+  "fleet.updates.no_boxes": {
+    "text": "尚无机器。",
+    "source": "4d5b6be274ed"
+  },
+  "fleet.updates.no_history": {
+    "text": "暂无记录。",
+    "source": "e056734effa8"
+  },
+  "fleet.updates.offer": {
+    "text": "此安装已关闭自动更新。开启后，每天获取一次各应用的新构建。",
+    "source": "fa8c820bc352"
+  },
+  "fleet.updates.offer_button": {
+    "text": "开启自动更新",
+    "source": "94c25ae614e3"
+  },
+  "fleet.updates.overrides": {
+    "text": "按机器和按应用的选择",
+    "source": "75dd6b1466bf"
+  },
+  "fleet.updates.precedence": {
+    "text": "应用自身的选择优先于其所在机器的选择，机器的选择优先于机群的选择。",
+    "source": "ef6d23833d94"
+  },
+  "fleet.updates.result.available": {
+    "text": "有新构建",
+    "source": "789610a4d9ad"
+  },
+  "fleet.updates.result.failed": {
+    "text": "失败",
+    "source": "031a8f0f659d"
+  },
+  "fleet.updates.result.restore_failed": {
+    "text": "需要你处理",
+    "source": "74b6abdf5969"
+  },
+  "fleet.updates.result.rolled_back": {
+    "text": "已撤销",
+    "source": "dcccf568dff9"
+  },
+  "fleet.updates.result.skipped": {
+    "text": "未安装",
+    "source": "d177cdc09a4e"
+  },
+  "fleet.updates.result.updated": {
+    "text": "已更新",
+    "source": "3a5ecca188c0"
+  },
+  "fleet.updates.run": {
+    "text": "立即检查",
+    "source": "2937cffb37ab"
+  },
+  "fleet.updates.run_failed": {
+    "text": "无法开始检查：{error}",
+    "source": "14101d3148ee"
+  },
+  "fleet.updates.running": {
+    "text": "正在检查…",
+    "source": "ec963ffc911b"
+  },
+  "fleet.updates.save_failed": {
+    "text": "无法保存：{error}",
+    "source": "71a471a7b15e"
+  },
+  "fleet.updates.saved": {
+    "text": "更新设置已保存",
+    "source": "c146f9c59325"
+  },
+  "fleet.updates.started": {
+    "text": "检查已开始。每台机器响应后，结果会显示在此处。",
+    "source": "9a8e491060ee"
+  },
+  "fleet.updates.title": {
+    "text": "应用镜像更新",
+    "source": "798fc1886a7e"
   },
   "fleet.version.android_skew": {
     "text": "这部手机上的 CashPilot Android 版本比最新发布的版本（{ref}）旧。请从 GitHub 发行页面安装较新的 APK。",
