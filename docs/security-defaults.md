@@ -306,7 +306,9 @@ opt-in for this reason.
   uses the raw socket, and the folder's `.env` holds whatever keys you put
   there. Leave `CASHPILOT_COMPOSE_DIR` unset if you update by hand, and the
   folder is not bindable at all.
-- Create Docker networks, and attach, detach and delete the ones it created.
+- Create Docker networks, and attach, detach and delete the ones that carry
+  its owner label: the ones it made through the proxy, and the ones
+  `app/owner_migrate.py` labelled.
   The LAN fence needs this to build `cashpilot-isolated` and move earners onto
   it, and an isolated proxied copy needs an internal macvlan network with no
   parent between its tunnel and its gate
