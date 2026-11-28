@@ -8255,7 +8255,9 @@ async def _runtime_choice_for(worker_id: int, slug: str, *, routed: bool = False
     if placement.is_desktop(info) or placement.is_android(info):
         return None
     if routed:
-        if (await layers_ui.choices(worker))["earners"].get(slug) == layers_ui.GVISOR:
+        stored = (await layers_ui.choices(worker))["earners"].get(slug)
+        # A choice the catalog or an env pin overrules is not the earner's runtime: no refusal.
+        if stored == layers_ui.GVISOR and not layers_ui.overruled(slug, info, stored):
             raise HTTPException(
                 status_code=409, detail=t("api.runtime_choice_routed", worker=worker.get("name") or f"#{worker_id}")
             )
@@ -8291,11 +8293,6 @@ async def _send_worker_deploy(
     instance = _copy_number(spec) or 1
     body = {**spec, "expected_container": expected}
     body.pop("replace_existing", None)
-    # The owner's runtime choice for this earner on this worker (app/layers_ui.py).
-    if proxy_id is not None:
-        await _runtime_choice_for(worker_id, slug, routed=True)
-    elif "runtime_choice" not in body and (choice := await _runtime_choice_for(worker_id, slug)):
-        body["runtime_choice"] = choice
 
     async def send(*, checked: bool) -> dict[str, Any]:
         if proxy_id is not None:
@@ -8314,6 +8311,14 @@ async def _send_worker_deploy(
 
     locks = _worker_deploy_locks.setdefault(asyncio.get_running_loop(), {})
     async with locks.setdefault((worker_id, slug), asyncio.Lock()):
+        # The owner's runtime choice for this earner on this worker (app/layers_ui.py),
+        # picked and recorded under this lock: a second deploy of the earner reads
+        # what the first one recorded, never a default changed in between.
+        if proxy_id is not None:
+            await _runtime_choice_for(worker_id, slug, routed=True)
+        elif "runtime_choice" not in body and (choice := await _runtime_choice_for(worker_id, slug)):
+            body["runtime_choice"] = choice
+        sent = body.get("runtime_choice") if proxy_id is None else None
         # A Desktop's lookup answers checked or refuses: it never falls back to the old route.
         current, checked = await _worker_deploy_target(worker_id, slug, instance, proxy_id)
         if not checked and current != expected:
@@ -8332,7 +8337,29 @@ async def _send_worker_deploy(
         if not checked and current != "none" and proxy_id is None:
             # The intermediate worker protocol also requires this flag.
             body["replace_existing"] = True
-        return await send(checked=checked)
+        result = await send(checked=checked)
+        # The worker took it: a default this earner inherited is now its own (app/layers_ui.py).
+        await _remember_runtime_choice(worker_id, slug, sent)
+    return result
+
+
+async def _remember_runtime_choice(worker_id: int, slug: str, choice: Any) -> None:
+    """Record the choice a deploy the worker took was sent with. Never fails the deploy.
+
+    The earner already runs: a failed write only means a later change of the
+    worker default can move it, so it is logged and the deploy's own
+    bookkeeping goes on.
+    """
+    if not isinstance(choice, str):
+        return
+    try:
+        worker = await database.get_worker(worker_id)
+        if worker:
+            await layers_ui.remember(worker, slug, choice)
+    except Exception as exc:
+        logger.warning(
+            "Could not record the runtime choice of %s on worker %s: %s", slug, worker_id, type(exc).__name__
+        )
 
 
 async def _proxy_worker_deploy(
@@ -8411,30 +8438,36 @@ async def _proxy_worker_restore(
             detail=t("api.worker_has_not_finished_enrolling"),
         )
     target = step_up.restore_target(slug, client_id, restore["sha256"])
-    body = {
-        **spec,
-        "bundle_b64": restore["bundle_b64"],
-        "passphrase": restore["passphrase"],
-        "approval": step_up.sign(key, step_up.ACTION_RESTORE, target),
-    }
-    # A restore recreates the earner: it keeps the runtime the owner chose, as a deploy does.
-    if "runtime_choice" not in body and (choice := await _runtime_choice_for(worker_id, slug)):
-        body["runtime_choice"] = choice
-    # The worker pulls the image, creates the container and writes and reads
-    # the backup back before it answers; a deploy's time plus the copy.
-    result = await _proxy_to_worker(
-        worker_id,
-        "POST",
-        f"/api/containers/{slug}/restore",
-        json=body,
-        timeout=_deploy_timeout(slug) + 120,
-        marked=True,
-        # The owner's yes to plain HTTP, checked against the URL the passphrase goes to.
-        allow_plain_http=restore.get("allow_plain_http") is True,
-    )
-    # The worker restored it: whatever fails after this, the restore happened.
-    restore["answered"] = True
-    restore["state_id"] = result.get("state_id") if isinstance(result, dict) else None
+    locks = _worker_deploy_locks.setdefault(asyncio.get_running_loop(), {})
+    # Picked and recorded under the deploy lock, as a deploy does (_send_worker_deploy).
+    async with locks.setdefault((worker_id, slug), asyncio.Lock()):
+        # Signed once the lock is held: a deploy ahead of it can run for minutes,
+        # and the approval's lifetime must start when the request goes out.
+        body = {
+            **spec,
+            "bundle_b64": restore["bundle_b64"],
+            "passphrase": restore["passphrase"],
+            "approval": step_up.sign(key, step_up.ACTION_RESTORE, target),
+        }
+        # A restore recreates the earner: it keeps the runtime the owner chose, as a deploy does.
+        if "runtime_choice" not in body and (choice := await _runtime_choice_for(worker_id, slug)):
+            body["runtime_choice"] = choice
+        # The worker pulls the image, creates the container and writes and reads
+        # the backup back before it answers; a deploy's time plus the copy.
+        result = await _proxy_to_worker(
+            worker_id,
+            "POST",
+            f"/api/containers/{slug}/restore",
+            json=body,
+            timeout=_deploy_timeout(slug) + 120,
+            marked=True,
+            # The owner's yes to plain HTTP, checked against the URL the passphrase goes to.
+            allow_plain_http=restore.get("allow_plain_http") is True,
+        )
+        # The worker restored it: whatever fails after this, the restore happened.
+        restore["answered"] = True
+        restore["state_id"] = result.get("state_id") if isinstance(result, dict) else None
+        await _remember_runtime_choice(worker_id, slug, body.get("runtime_choice"))
     return result
 
 

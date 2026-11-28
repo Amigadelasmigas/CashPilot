@@ -108,6 +108,12 @@ class TestTheView:
         w = _worker(_layers(), [{"slug": "honeygain", "runtime": "runc", "network": "cashpilot-isolated"}], iso=iso)
         assert layers_ui.worker_view(w, NONE)["earners"][0]["fence"] is False
 
+    def test_a_worker_that_does_not_say_its_isolation_mode_is_unknown_not_off(self):
+        w = _worker(
+            _layers(), [{"slug": "honeygain", "runtime": "runc", "network": "cashpilot-isolated"}], iso={"x": 1}
+        )
+        assert layers_ui.worker_view(w, NONE)["earners"][0]["fence"] is None
+
     def test_unraid_says_why_and_offers_no_install(self):
         w = _worker(_layers([]), os="Linux 6.12.24-Unraid")
         state = layers_ui.worker_view(w, NONE)["gvisor"]
@@ -162,7 +168,11 @@ class TestLocks:
     def test_the_env_default_locks_the_worker_default(self):
         pins = {"default": "runsc-hostnet", "overrides": {}}
         view = layers_ui.worker_view(_worker(_layers(pins=pins)), NONE)
-        assert "CASHPILOT_CONTAINER_RUNTIME" in view["default_locked"]
+        assert "CASHPILOT_CONTAINER_RUNTIME" in view["default_locks"]["gvisor"]
+        # A stored gVisor default under that pin: runc is locked too, as the POST refuses it.
+        view = layers_ui.worker_view(_worker(_layers(pins=pins)), {"default": "gvisor", "earners": {}})
+        assert view["default_locks"]["gvisor"] is None
+        assert "CASHPILOT_CONTAINER_RUNTIME" in view["default_locks"]["runc"]
 
     def test_gvisor_without_the_runtime_asks_to_install(self):
         w = _worker(
@@ -212,9 +222,51 @@ class TestStorage:
             _run(layers_ui.set_default(w, "gvisor"))
             # Already here: keeps what it runs under, on every redeploy.
             assert _run(layers_ui.for_new_deploy(w, "earnapp")) == "runc"
-            # New: takes the default, and keeps it after.
+            # New: takes the default, recorded as its own only once the worker took it.
             assert _run(layers_ui.for_new_deploy(w, "honeygain")) == "gvisor"
+            assert "honeygain" not in json.loads(store["worker_c7_runtime_choice"])["earners"]
+            _run(layers_ui.remember(w, "honeygain", "gvisor"))
             assert json.loads(store["worker_c7_runtime_choice"])["earners"]["honeygain"] == "gvisor"
+            # A later default leaves it there.
+            _run(layers_ui.set_default(w, "runc"))
+            assert _run(layers_ui.for_new_deploy(w, "honeygain")) == "gvisor"
+
+    def test_a_refused_first_deploy_keeps_no_inherited_choice(self):
+        """The default changes after a failed first deploy: the retry takes the new default."""
+        store, g, s = self._store()
+        w = _worker(_layers())
+        with g, s:
+            _run(layers_ui.set_default(w, "gvisor"))
+            assert _run(layers_ui.for_new_deploy(w, "honeygain")) == "gvisor"
+            # No remember: the worker never took it.
+            _run(layers_ui.set_default(w, "runc"))
+            assert _run(layers_ui.for_new_deploy(w, "honeygain")) == "runc"
+
+    def test_remember_never_replaces_a_choice_already_there(self):
+        store, g, s = self._store()
+        store["worker_c7_runtime_choice"] = json.dumps({"default": "gvisor", "earners": {"honeygain": "runc"}})
+        with g, s:
+            _run(layers_ui.remember(_worker(_layers()), "honeygain", "gvisor"))
+        assert json.loads(store["worker_c7_runtime_choice"])["earners"]["honeygain"] == "runc"
+
+    def test_an_earner_already_there_with_an_unreported_runtime_keeps_dockers_default(self):
+        store, g, s = self._store()
+        w = _worker(_layers(), [{"slug": "earnapp", "network": "cashpilot-isolated"}])
+        with g, s:
+            _run(layers_ui.set_default(w, "gvisor"))
+            assert json.loads(store["worker_c7_runtime_choice"])["earners"] == {"earnapp": None}
+            assert _run(layers_ui.for_new_deploy(w, "earnapp")) is None
+
+    def test_a_reset_earner_keeps_dockers_default_under_a_gvisor_default(self):
+        store, g, s = self._store()
+        store["worker_c7_runtime_choice"] = json.dumps({"default": "gvisor", "earners": {"honeygain": "runc"}})
+        w = _worker(_layers())
+        with g, s:
+            _run(layers_ui.set_earner(w, "honeygain", None))
+            assert _run(layers_ui.for_new_deploy(w, "honeygain")) is None
+            # A later default change does not touch it either.
+            _run(layers_ui.set_default(w, "runc"))
+            assert json.loads(store["worker_c7_runtime_choice"])["earners"] == {"honeygain": None}
 
     def test_the_default_ignores_external_containers(self):
         """An external honeygain is not deployed from here, so it must not pin the managed one to runc."""
@@ -248,7 +300,9 @@ class TestStorage:
 
         async def both(w):
             await layers_ui.set_default(w, "gvisor")
-            await asyncio.gather(layers_ui.for_new_deploy(w, "honeygain"), layers_ui.for_new_deploy(w, "earnapp"))
+            await asyncio.gather(
+                layers_ui.remember(w, "honeygain", "gvisor"), layers_ui.remember(w, "earnapp", "gvisor")
+            )
 
         with (
             patch.object(database, "get_config", side_effect=get),
@@ -315,6 +369,15 @@ class TestTheRoutes:
             )
         assert resp.status_code == 200, resp.text
         assert json.loads(put.call_args.args[1])["earners"] == {"honeygain": "gvisor"}
+
+    @pytest.mark.parametrize("body", [{}, {"slug": "honeygain"}])
+    def test_a_request_without_a_choice_resets_nothing(self, body):
+        w = _worker(_layers(), [{"slug": "honeygain", "runtime": "runc", "network": "cashpilot-isolated"}])
+        patches = self._client(w)
+        with patches[0], patches[1], patches[2] as put, patches[3], patches[4]:
+            resp = TestClient(main.app).post("/api/workers/7/runtime-choice", json=body)
+        assert resp.status_code == 422, resp.text
+        put.assert_not_called()
 
     def test_an_unknown_choice_is_a_400(self):
         patches = self._client(_worker(_layers()))
@@ -411,10 +474,95 @@ class TestTheDeploySendsTheChoice:
 
         with (
             patch.object(main, "_runtime_choice_for", AsyncMock(return_value="gvisor")),
+            patch.object(main, "_remember_runtime_choice", AsyncMock()),
             patch.object(main, "_proxy_to_worker", side_effect=hop),
         ):
             _run(main._send_worker_deploy(7, "honeygain", {"image": "honeygain/honeygain"}))
         assert sent["runtime_choice"] == "gvisor"
+
+    def test_the_choice_is_remembered_only_once_the_worker_took_the_deploy(self):
+        remember = AsyncMock()
+        with (
+            patch.object(main, "_runtime_choice_for", AsyncMock(return_value="gvisor")),
+            patch.object(main, "_remember_runtime_choice", remember),
+            patch.object(main, "_proxy_to_worker", AsyncMock(return_value={"container_id": "abc123"})),
+        ):
+            _run(main._send_worker_deploy(7, "honeygain", {"image": "honeygain/honeygain"}))
+        remember.assert_awaited_once_with(7, "honeygain", "gvisor")
+
+        remember.reset_mock()
+        with (
+            patch.object(main, "_runtime_choice_for", AsyncMock(return_value="gvisor")),
+            patch.object(main, "_remember_runtime_choice", remember),
+            patch.object(main, "_proxy_to_worker", AsyncMock(side_effect=HTTPException(status_code=502))),
+            pytest.raises(HTTPException),
+        ):
+            _run(main._send_worker_deploy(7, "honeygain", {"image": "honeygain/honeygain"}))
+        remember.assert_not_called()
+
+    def test_a_second_deploy_reads_the_choice_the_first_recorded_not_a_default_changed_between(self):
+        """Pick and record run under the deploy lock: both deploys of one earner get the same runtime."""
+        store: dict[str, str] = {}
+        w = _worker(_layers())
+        bodies: list[dict] = []
+
+        async def get(key=None):
+            await asyncio.sleep(0)
+            return store.get(key)
+
+        async def put(key, value):
+            await asyncio.sleep(0)
+            store[key] = value
+
+        second: list[asyncio.Task] = []
+
+        async def hop(worker_id, method, path, *, json=None, **kwargs):
+            if method == "GET":
+                return {"expected_container": "none"}
+            bodies.append(dict(json or {}))
+            if len(bodies) == 1:
+                # While the first deploy is on its way, the owner moves the default
+                # and a second deploy of the same earner starts.
+                await layers_ui.set_default(w, "runc")
+                second.append(asyncio.create_task(deploy()))
+                for _ in range(20):
+                    await asyncio.sleep(0)
+            return {"container_id": "abc123"}
+
+        def deploy():
+            return main._send_worker_deploy(7, "honeygain", {"image": "honeygain/honeygain"})
+
+        async def both():
+            await layers_ui.set_default(w, "gvisor")
+            await deploy()
+            await second[0]
+
+        with (
+            patch.object(database, "get_config", side_effect=get),
+            patch.object(database, "set_config", side_effect=put),
+            patch.object(database, "get_worker", AsyncMock(return_value=w)),
+            patch.object(main, "_worker_is_desktop", AsyncMock(return_value=False)),
+            patch.object(main, "_proxy_to_worker", side_effect=hop),
+        ):
+            _run(both())
+        assert [b.get("runtime_choice") for b in bodies] == ["gvisor", "gvisor"]
+        assert json.loads(store["worker_c7_runtime_choice"])["earners"] == {"honeygain": "gvisor"}
+
+    def test_a_failed_record_never_fails_a_deploy_the_worker_took(self):
+        with (
+            patch.object(database, "get_worker", AsyncMock(side_effect=RuntimeError("db gone"))),
+        ):
+            assert _run(main._remember_runtime_choice(7, "honeygain", "gvisor")) is None
+
+    def test_a_routed_copy_of_an_earner_whose_gvisor_choice_a_pin_overrules_is_not_refused(self):
+        pins = {"default": None, "overrides": {"honeygain": "runc"}}
+        w = _worker(_layers(pins=pins))
+        stored = {"default": None, "earners": {"honeygain": "gvisor"}}
+        with (
+            patch.object(database, "get_worker", AsyncMock(return_value=w)),
+            patch.object(layers_ui, "choices", AsyncMock(return_value=stored)),
+        ):
+            assert _run(main._runtime_choice_for(7, "honeygain", routed=True)) is None
 
     def test_a_proxied_copy_sends_no_choice(self):
         choice = AsyncMock(return_value="gvisor")
@@ -440,10 +588,42 @@ class TestTheDeploySendsTheChoice:
             patch.object(main, "_image_for_worker", AsyncMock(side_effect=lambda w, s, spec: spec)),
             patch.object(database, "get_worker", AsyncMock(return_value={"client_id": "c7"})),
             patch.object(main, "_confirmed_worker_key", AsyncMock(return_value="k" * 32)),
+            patch.object(main, "_remember_runtime_choice", AsyncMock()) as remember,
             patch.object(main, "_proxy_to_worker", side_effect=hop),
         ):
             _run(main._proxy_worker_restore(7, "honeygain", {"image": "honeygain/honeygain"}, restore))
         assert sent["runtime_choice"] == "gvisor"
+        remember.assert_awaited_once_with(7, "honeygain", "gvisor")
+
+    def test_a_restore_signs_its_approval_only_once_the_deploy_lock_is_held(self):
+        """A deploy ahead of the restore can run for minutes; the approval's lifetime starts at the send."""
+        restore = {"sha256": "ab" * 32, "bundle_b64": "eA==", "passphrase": "p"}
+        sign = patch.object(main.step_up, "sign", return_value="approval")
+
+        async def scenario(signed):
+            locks = main._worker_deploy_locks.setdefault(asyncio.get_running_loop(), {})
+            lock = locks.setdefault((7, "honeygain"), asyncio.Lock())
+            await lock.acquire()
+            task = asyncio.create_task(
+                main._proxy_worker_restore(7, "honeygain", {"image": "honeygain/honeygain"}, restore)
+            )
+            for _ in range(20):
+                await asyncio.sleep(0)
+            assert not signed.called, "signed while another deploy still held the lock"
+            lock.release()
+            await task
+            signed.assert_called_once()
+
+        with (
+            patch.object(main, "_runtime_choice_for", AsyncMock(return_value=None)),
+            patch.object(main, "_remember_runtime_choice", AsyncMock()),
+            patch.object(main, "_image_for_worker", AsyncMock(side_effect=lambda w, s, spec: spec)),
+            patch.object(database, "get_worker", AsyncMock(return_value={"client_id": "c7"})),
+            patch.object(main, "_confirmed_worker_key", AsyncMock(return_value="k" * 32)),
+            patch.object(main, "_proxy_to_worker", AsyncMock(return_value={"state_id": 1})),
+            sign as signed,
+        ):
+            _run(scenario(signed))
 
     def test_desktop_gets_none(self):
         w = _worker(_layers(), device_type="desktop")
