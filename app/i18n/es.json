@@ -1483,6 +1483,18 @@
     "text": "{name} se ejecuta a través de un proxy en {box}. Ejecutarlo desde la IP propia de {box}{value} muestra esa dirección a {name} y a todos los que alcance su tráfico. Confírmalo con tu contraseña.",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "Esta app de ingresos está configurada para ejecutarse con gVisor en {worker}, y no puede: {why} Vuelve a ponerla en Estándar en la página Flota, o corrige eso primero. No se ha desplegado nada.",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "Esta app de ingresos está configurada para ejecutarse con gVisor en {worker}, y una copia enrutada a través de un proxy solo se ejecuta con Estándar. Vuelve a ponerla en Estándar en la página Flota para enrutarla. No se ha desplegado nada.",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "Esta app de ingresos está configurada para ejecutarse con {runtime} en {worker}, y el worker es demasiado antiguo para aceptar una elección de runtime. Actualiza el worker, o vuelve a poner la app de ingresos en Estándar en la página Flota. No se ha desplegado nada.",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "No se pudo guardar {name}.",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "No se guardó el idioma: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "Las capas tras las que se ejecuta esta copia: la barrera de LAN, y Estándar (runc) o gVisor. Se cambian en la página Flota.",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "Comprobar gVisor",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "Verde.",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "No instalado.",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "Rojo.",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "Comprobando…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "Inicia un breve contenedor de prueba con gVisor en la red de las apps de ingresos. Debe ver el kernel de gVisor y resolver un nombre.",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "Esta UI de CashPilot es una compilación de desarrollo, así que no puede fijar el comando a una versión publicada. Ejecuta una imagen publicada para obtenerlo.",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "Esta imagen de la UI de CashPilot no incluye {name}, así que no puede comprobar la descarga.",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} no es un auxiliar de CashPilot.",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "Copiado",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "Copiar",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "Esta página no usa https, así que el portapapeles está bloqueado. El comando está seleccionado: pulsa Ctrl+C o Cmd+C.",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "Predeterminado de Docker",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "Runtime para las apps de ingresos que despliegues aquí a partir de ahora",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "Las apps de ingresos que ya están aquí conservan su runtime.",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "Guardado. Se aplica a las apps de ingresos que despliegues aquí a partir de ahora.",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "Guardando…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "Qué protege cada capa",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "¿Ejecutar {service} con {runtime}?\n\nEsto vuelve a desplegar {service} ahora. Se detiene y se inicia de nuevo, normalmente en menos de un minuto. Se conserva su volumen de datos.",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "barrera desconocida",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "con barrera",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "Bloqueado",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "sin barrera",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "{runtime} en su próximo despliegue",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "Se ha vuelto a desplegar {service} con {runtime}.",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "Ejecutar de nuevo con {runtime}",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} se ejecuta con {runtime} a partir de su próximo despliegue.",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "Guardando el runtime de {service}…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "Ejecutar con gVisor",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "Ejecutar con Estándar",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Falló la barrera de la Secure VM",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "en la Secure VM",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Barrera de la Secure VM desconocida",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "Barrera de LAN",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "Instalar gVisor en este host",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor pone su propio kernel entre cada app de ingresos y el kernel de este host. Cuesta alrededor de una quinta parte del rendimiento y de seis a nueve veces más CPU. Ejecuta este comando en el host. Pregunta antes de cambiar nada, y los contenedores en ejecución siguen funcionando.",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "instalado",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "no instalado",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "Quitar gVisor de este host",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "Primero vuelve a poner en Estándar todas las apps de ingresos de este worker. El comando se niega mientras alguna siga ejecutándose con gVisor.",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "no es posible aquí",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "desactivado",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "activado",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "Proxy de socket",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "Este worker tiene acceso directo al socket de Docker, lo que equivale a root en el host. Los archivos compose incluidos ponen un proxy de socket delante de ese socket.",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "Estándar (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "Capas de seguridad",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "desconocido",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "barrera fallida",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "barrera correcta",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "barrera no comprobada recientemente",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "barrera desconocida",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "Este worker se ejecuta dentro de una Secure VM en {host}.",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM disponible",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "sin KVM",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "Está prevista una capa de VM para las apps de ingresos. Necesita KVM en el host.",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} debe ejecutarse con {runtime}: así lo indica su entrada del catálogo.",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} debe ejecutarse con {runtime}: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "Primero instala gVisor en este host.",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "gVisor no está instalado en este host.",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} necesita sockets raw, y este worker no tiene ningún runtime de gVisor registrado con --net-raw. El comando de instalación registra uno.",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "El worker no pudo preguntar a Docker qué runtimes tiene.",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor solo funciona en hosts Linux.",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "Este worker es anterior a las capas de seguridad. Actualízalo para elegir aquí un runtime.",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME en este worker es {runtime}. La variable prevalece sobre esta página.",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME_OVERRIDES en este worker establece {slug}={runtime}. La variable prevalece sobre esta página.",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid no puede ejecutar gVisor: arranca desde un sistema de archivos en RAM del que gVisor no puede salir. Ejecuta las apps de ingresos en una VM en su lugar.",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "Error: {error}",

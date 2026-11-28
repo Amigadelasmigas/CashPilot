@@ -1483,6 +1483,18 @@
     "text": "تعمل {name} عبر بروكسي على {box}. تشغيلها من عنوان IP الخاص بـ {box}{value} يكشف ذلك العنوان لـ {name} ولكل من تصل إليه حركة مرورها. أكّد بكلمة المرور.",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "ضُبط تطبيق الربح هذا ليعمل ضمن gVisor على {worker}، ولا يمكنه ذلك: {why} أعده إلى بيئة التشغيل القياسية من صفحة الأسطول، أو أصلح ذلك أولًا. لم يُنشر أي شيء.",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "ضُبط تطبيق الربح هذا ليعمل ضمن gVisor على {worker}، والنسخة الموجّهة عبر بروكسي لا تعمل إلا ضمن بيئة التشغيل القياسية. أعده إلى بيئة التشغيل القياسية من صفحة الأسطول لتوجيهه. لم يُنشر أي شيء.",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "ضُبط تطبيق الربح هذا ليعمل ضمن {runtime} على {worker}، والعامل أقدم من أن يقبل اختيار بيئة التشغيل. حدّث العامل، أو أعد تطبيق الربح إلى بيئة التشغيل القياسية من صفحة الأسطول. لم يُنشر أي شيء.",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "فشل حفظ {name}.",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "لم تُحفظ اللغة: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "الطبقات التي تعمل هذه النسخة خلفها: حاجز الشبكة المحلية، وبيئة التشغيل القياسية (runc) أو gVisor. تُغيَّر من صفحة الأسطول.",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "فحص gVisor",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "أخضر.",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "غير مثبّت.",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "أحمر.",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "جارٍ الفحص…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "تشغيل حاوية فحص قصيرة ضمن gVisor على شبكة تطبيقات الربح. يجب أن ترى نواة gVisor وأن تحلّ اسم نطاق.",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "واجهة CashPilot هذه نسخة تطوير، لذا لا يمكنها ربط الأمر بإصدار محدد. شغّل صورة حاوية من إصدار منشور للحصول عليه.",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "لا تتضمن صورة حاوية واجهة CashPilot هذه {name}، لذا لا يمكنها التحقق من التنزيل.",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} ليس أداة مساعدة من CashPilot.",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "تم النسخ",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "نسخ",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "هذه الصفحة ليست على https، لذا الحافظة محظورة. الأمر محدَّد: اضغط Ctrl+C أو Cmd+C.",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "الافتراضي في Docker",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "بيئة التشغيل لتطبيقات الربح التي تنشرها هنا من الآن فصاعدًا",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "تحتفظ تطبيقات الربح الموجودة هنا ببيئة تشغيلها.",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "تم الحفظ. ينطبق ذلك على تطبيقات الربح التي تنشرها هنا من الآن فصاعدًا.",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "جارٍ الحفظ…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "ما الذي تحميه كل طبقة",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "تشغيل {service} ضمن {runtime}؟\n\nسيُعيد هذا نشر {service} الآن. سيتوقف ثم يبدأ من جديد، عادةً في أقل من دقيقة. يُحتفظ بوحدة تخزين بياناته.",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "الحاجز غير معروف",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "خلف الحاجز",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "مقفل",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "بلا حاجز",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "{runtime} عند نشره التالي",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "أُعيد نشر {service} ضمن {runtime}.",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "التشغيل ضمن {runtime} مرة أخرى",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "سيعمل {service} ضمن {runtime} بدءًا من نشره التالي.",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "جارٍ حفظ بيئة تشغيل {service}…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "التشغيل ضمن gVisor",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "التشغيل ضمن البيئة القياسية",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "فشل حاجز Secure VM",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "داخل Secure VM",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "حاجز Secure VM غير معروف",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "حاجز الشبكة المحلية",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "تثبيت gVisor على هذا المضيف",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "يضع gVisor نواته الخاصة بين كل تطبيق ربح ونواة هذا المضيف. يكلّف ذلك نحو خُمس الإنتاجية وستة إلى تسعة أضعاف استهلاك المعالج. شغّل هذا الأمر على المضيف. يطلب التأكيد قبل أن يغيّر أي شيء، وتستمر الحاويات العاملة في العمل.",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "مثبّت",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "غير مثبّت",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "إزالة gVisor من هذا المضيف",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "أعد كل تطبيق ربح على هذا العامل إلى البيئة القياسية أولًا. يرفض الأمر العمل ما دام أحدها لا يزال يعمل ضمن gVisor.",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "غير ممكن هنا",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "معطّل",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "مفعّل",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "وكيل المقبس",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "يحمل هذا العامل مقبس Docker الخام، وهو يعادل صلاحيات root على المضيف. تضع ملفات compose المرفقة وكيل مقبس أمامه.",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "القياسية (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "طبقات الأمان",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "غير معروف",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "فشل الحاجز",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "الحاجز سليم",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "لم يُفحص الحاجز مؤخرًا",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "الحاجز غير معروف",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "يعمل هذا العامل داخل Secure VM على {host}.",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM متاح",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "لا يوجد KVM",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "طبقة آلة افتراضية لتطبيقات الربح مخطط لها. تحتاج إلى KVM على المضيف.",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "يجب أن يعمل {service} ضمن {runtime}: هذا ما ينص عليه إدخاله في الكتالوج.",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "يجب أن يعمل {service} ضمن {runtime}: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "ثبّت gVisor على هذا المضيف أولًا.",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "gVisor غير مثبّت على هذا المضيف.",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "يحتاج {service} إلى مقابس خام (raw sockets)، وليس لدى هذا العامل بيئة تشغيل gVisor مسجّلة مع --net-raw. يسجّل أمر التثبيت واحدة.",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "تعذّر على العامل أن يسأل Docker عن بيئات التشغيل المتوفرة لديه.",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "لا يعمل gVisor إلا على مضيفات Linux.",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "هذا العامل أقدم من ميزة طبقات الأمان. حدّثه لتختار بيئة التشغيل من هنا.",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "قيمة CASHPILOT_CONTAINER_RUNTIME على هذا العامل هي {runtime}. للمتغير الأولوية على هذه الصفحة.",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "يضبط CASHPILOT_CONTAINER_RUNTIME_OVERRIDES على هذا العامل {slug}={runtime}. للمتغير الأولوية على هذه الصفحة.",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "لا يستطيع Unraid تشغيل gVisor: فهو يُقلع من نظام ملفات في الذاكرة RAM لا يستطيع gVisor الخروج منه. شغّل تطبيقات الربح في آلة افتراضية بدلًا من ذلك.",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "خطأ: {error}",

@@ -1483,6 +1483,18 @@
     "text": "{name} berjalan melalui proxy di {box}. Menjalankannya dari IP {box} sendiri{value} akan menampilkan alamat itu kepada {name} dan kepada semua pihak yang dijangkau lalu lintasnya. Konfirmasi dengan kata sandi Anda.",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "Aplikasi penghasil ini diatur untuk berjalan dengan gVisor di {worker}, tetapi hal itu tidak dapat dilakukan: {why} Kembalikan ke Standar di halaman Armada, atau perbaiki hal itu terlebih dahulu. Tidak ada yang diterapkan.",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "Aplikasi penghasil ini diatur untuk berjalan dengan gVisor di {worker}, sedangkan salinan yang dialihkan melalui proxy hanya berjalan dengan Standar. Kembalikan ke Standar di halaman Armada untuk mengalihkannya. Tidak ada yang diterapkan.",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "Aplikasi penghasil ini diatur untuk berjalan dengan {runtime} di {worker}, dan worker tersebut terlalu lama untuk menerima pilihan runtime. Perbarui worker, atau kembalikan aplikasi penghasil ke Standar di halaman Armada. Tidak ada yang diterapkan.",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "Gagal menyimpan {name}.",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "Bahasa tidak disimpan: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "Lapisan yang melindungi salinan ini: pagar LAN, dan Standar (runc) atau gVisor. Halaman Armada mengubahnya.",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "Periksa gVisor",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "Hijau.",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "Tidak terpasang.",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "Merah.",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "Memeriksa…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "Jalankan kontainer probe singkat dengan gVisor di jaringan aplikasi penghasil. Kontainer itu harus melihat kernel gVisor dan dapat me-resolve sebuah nama.",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "UI CashPilot ini adalah build pengembangan, jadi tidak dapat mematok perintah ke sebuah rilis. Jalankan image yang sudah dirilis untuk mendapatkannya.",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "Image UI CashPilot ini tidak menyertakan {name}, jadi tidak dapat memeriksa unduhannya.",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} bukan helper CashPilot.",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "Disalin",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "Salin",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "Halaman ini tidak memakai https, jadi papan klip diblokir. Perintah sudah dipilih: tekan Ctrl+C atau Cmd+C.",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "Bawaan Docker",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "Runtime untuk aplikasi penghasil yang Anda terapkan di sini mulai sekarang",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "Aplikasi penghasil yang sudah ada di sini tetap memakai runtime-nya.",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "Tersimpan. Ini berlaku untuk aplikasi penghasil yang Anda terapkan di sini mulai sekarang.",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "Menyimpan…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "Apa yang dilindungi setiap lapisan",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "Jalankan {service} dengan {runtime}?\n\nIni menerapkan ulang {service} sekarang. Layanan berhenti lalu mulai lagi, biasanya dalam waktu kurang dari satu menit. Volume datanya tetap disimpan.",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "pagar tidak diketahui",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "berpagar",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "Terkunci",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "tidak berpagar",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "{runtime} pada penerapan berikutnya",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "{service} sudah diterapkan ulang dengan {runtime}.",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "Jalankan lagi dengan {runtime}",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} berjalan dengan {runtime} mulai penerapan berikutnya.",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "Menyimpan runtime {service}…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "Jalankan dengan gVisor",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "Jalankan dengan Standar",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Pagar Secure VM gagal",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "di dalam Secure VM",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Pagar Secure VM tidak diketahui",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "Pagar LAN",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "Pasang gVisor di host ini",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor menempatkan kernelnya sendiri di antara setiap aplikasi penghasil dan kernel host ini. Ini mengurangi sekitar seperlima throughput dan memakai CPU enam hingga sembilan kali lipat. Jalankan perintah ini di host. Perintah ini bertanya sebelum mengubah apa pun, dan kontainer yang sedang berjalan tetap berjalan.",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "terpasang",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "tidak terpasang",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "Hapus gVisor dari host ini",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "Kembalikan setiap aplikasi penghasil di worker ini ke Standar terlebih dahulu. Perintah ini menolak berjalan selama masih ada yang berjalan dengan gVisor.",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "tidak mungkin di sini",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "nonaktif",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "aktif",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "Proxy soket",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "Worker ini memegang soket Docker mentah, yang setara dengan root di host. File compose bawaan menempatkan proxy soket di depannya.",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "Standar (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "Lapisan keamanan",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "tidak diketahui",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "pagar gagal",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "pagar ok",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "pagar belum diperiksa akhir-akhir ini",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "pagar tidak diketahui",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "Worker ini berjalan di dalam Secure VM di {host}.",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM tersedia",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "tanpa KVM",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "Lapisan VM untuk aplikasi penghasil sedang direncanakan. Lapisan ini memerlukan KVM di host.",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} harus berjalan dengan {runtime}: entri katalognya menyatakan demikian.",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} harus berjalan dengan {runtime}: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "Pasang gVisor di host ini terlebih dahulu.",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "gVisor tidak terpasang di host ini.",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} memerlukan raw socket, dan worker ini tidak memiliki runtime gVisor yang terdaftar dengan --net-raw. Perintah pemasangan mendaftarkannya.",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "Worker tidak dapat menanyakan kepada Docker runtime apa saja yang dimilikinya.",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor hanya berjalan di host Linux.",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "Worker ini lebih lama daripada fitur lapisan keamanan. Perbarui worker untuk memilih runtime di sini.",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME di worker ini bernilai {runtime}. Variabel ini lebih diutamakan daripada halaman ini.",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME_OVERRIDES di worker ini mengatur {slug}={runtime}. Variabel ini lebih diutamakan daripada halaman ini.",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid tidak dapat menjalankan gVisor: Unraid melakukan boot dari sistem berkas RAM yang tidak dapat ditinggalkan gVisor. Jalankan aplikasi penghasil di VM sebagai gantinya.",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "Kesalahan: {error}",

@@ -1483,6 +1483,18 @@
     "text": "{name} は {box} 上でプロキシ経由で動作しています。{box} 自身の IP{value} から実行すると、そのアドレスが {name} と、そのトラフィックが届くすべての相手に見えてしまいます。パスワードで確認してください。",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "この収益アプリは {worker} で gVisor のもとで実行するよう設定されていますが、実行できません: {why} 「フリート」ページで「標準」に戻すか、先にその問題を解決してください。何もデプロイされていません。",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "この収益アプリは {worker} で gVisor のもとで実行するよう設定されていますが、プロキシ経由のコピーは「標準」でしか実行できません。プロキシ経由にするには、「フリート」ページで「標準」に戻してください。何もデプロイされていません。",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "この収益アプリは {worker} で {runtime} のもとで実行するよう設定されていますが、このワーカーは古すぎてランタイムを選択できません。ワーカーを更新するか、「フリート」ページでこの収益アプリを「標準」に戻してください。何もデプロイされていません。",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "{name} の保存に失敗しました。",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "言語を保存できませんでした: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "このコピーを守っているレイヤー: LAN フェンスと、標準 (runc) または gVisor です。「フリート」ページで変更できます。",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "gVisor を確認",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "合格。",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "インストールされていません。",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "不合格。",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "確認中…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "収益アプリのネットワーク上で、gVisor のもとで短時間の確認用コンテナを起動します。このコンテナから gVisor のカーネルが見え、名前を解決できる必要があります。",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "この CashPilot UI は開発ビルドのため、コマンドをリリースに固定できません。コマンドを取得するには、リリース済みのイメージを実行してください。",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "この CashPilot UI のイメージには {name} が含まれていないため、ダウンロードを確認できません。",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} は CashPilot のヘルパーではありません。",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "コピーしました",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "コピー",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "このページは https ではないため、クリップボードがブロックされています。コマンドは選択済みです。Ctrl+C または Cmd+C を押してください。",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "Docker の既定",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "今後ここにデプロイする収益アプリのランタイム",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "すでにここにある収益アプリは現在のランタイムのままです。",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "保存しました。今後ここにデプロイする収益アプリに適用されます。",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "保存中…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "各レイヤーが守るもの",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "{service} を {runtime} のもとで実行しますか?\n\n{service} を今すぐ再デプロイします。いったん停止して再び起動し、通常は 1 分以内に完了します。データ ボリュームは保持されます。",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "フェンス不明",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "フェンスあり",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "ロック中",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "フェンスなし",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "次回のデプロイから {runtime}",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "{service} を {runtime} のもとで再デプロイしました。",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "もう一度 {runtime} のもとで実行",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} は次回のデプロイから {runtime} のもとで実行されます。",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "{service} のランタイムを保存中…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "gVisor のもとで実行",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "標準で実行",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Secure VM のフェンスに失敗",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "Secure VM 内",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Secure VM のフェンス不明",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "LAN フェンス",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "このホストに gVisor をインストール",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor は、各収益アプリとこのホストのカーネルの間に独自のカーネルを置きます。スループットが約 2 割低下し、CPU 使用量は 6～9 倍になります。このコマンドをホストで実行してください。何かを変更する前に確認を求め、実行中のコンテナはそのまま動作し続けます。",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "インストール済み",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "未インストール",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "このホストから gVisor を削除",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "先に、このワーカーのすべての収益アプリを「標準」に戻してください。gVisor のもとで実行中の収益アプリが 1 つでもある間は、コマンドは実行を拒否します。",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "ここでは使用不可",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "オフ",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "オン",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "ソケットプロキシ",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "このワーカーは Docker の生のソケットを保持しており、これはホストの root 権限に相当します。同梱の compose ファイルでは、その前にソケットプロキシを置いています。",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "標準 (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "セキュリティレイヤー",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "不明",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "フェンス失敗",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "フェンス正常",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "フェンスは最近確認されていません",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "フェンス不明",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "このワーカーは {host} 上の Secure VM 内で動作しています。",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM 利用可能",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "KVM なし",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "収益アプリ用の VM レイヤーを計画中です。ホストに KVM が必要です。",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} は {runtime} のもとで実行する必要があります: カタログのエントリでそう指定されています。",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} は {runtime} のもとで実行する必要があります: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "先にこのホストに gVisor をインストールしてください。",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "このホストには gVisor がインストールされていません。",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} には raw ソケットが必要ですが、このワーカーには --net-raw 付きで登録された gVisor ランタイムがありません。インストール コマンドで登録されます。",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "ワーカーは、Docker にどのランタイムがあるかを問い合わせられませんでした。",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor は Linux ホストでのみ動作します。",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "このワーカーはセキュリティレイヤーより古いバージョンです。ここでランタイムを選択するには、ワーカーを更新してください。",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "このワーカーの CASHPILOT_CONTAINER_RUNTIME は {runtime} です。このページの設定より変数が優先されます。",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "このワーカーの CASHPILOT_CONTAINER_RUNTIME_OVERRIDES は {slug}={runtime} を設定しています。このページの設定より変数が優先されます。",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid では gVisor を実行できません: Unraid は RAM ファイルシステムから起動し、gVisor はそこから抜け出せません。代わりに収益アプリを VM で実行してください。",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "エラー: {error}",

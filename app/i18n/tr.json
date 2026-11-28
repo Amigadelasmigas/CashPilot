@@ -1483,6 +1483,18 @@
     "text": "{name}, {box} üzerinde bir proxy üzerinden çalışıyor. Onu {box} makinesinin kendi IP'si{value} üzerinden çalıştırmak, bu adresi {name} hizmetine ve trafiğinin ulaştığı herkese gösterir. Parolanızla onaylayın.",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "Bu kazanç uygulaması {worker} üzerinde gVisor altında çalışacak şekilde ayarlı, ancak çalışamıyor: {why} Filo sayfasında onu yeniden Standart'a alın ya da önce bunu düzeltin. Hiçbir şey dağıtılmadı.",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "Bu kazanç uygulaması {worker} üzerinde gVisor altında çalışacak şekilde ayarlı, ancak proxy üzerinden yönlendirilen bir kopya yalnızca Standart altında çalışır. Onu yönlendirmek için Filo sayfasında yeniden Standart'a alın. Hiçbir şey dağıtılmadı.",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "Bu kazanç uygulaması {worker} üzerinde {runtime} altında çalışacak şekilde ayarlı, ancak worker bir çalışma zamanı seçimini alamayacak kadar eski. Worker'ı güncelleyin ya da Filo sayfasında kazanç uygulamasını yeniden Standart'a alın. Hiçbir şey dağıtılmadı.",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "{name} kaydedilemedi.",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "Dil kaydedilmedi: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "Bu kopyanın arkasında çalıştığı katmanlar: LAN bariyeri ve Standart (runc) ya da gVisor. Bunlar Filo sayfasından değiştirilir.",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "gVisor'ı denetle",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "Yeşil.",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "Kurulu değil.",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "Kırmızı.",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "Denetleniyor…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "Kazanç uygulamalarının ağında, gVisor altında kısa süreli bir deneme konteyneri başlatır. Konteyner gVisor'ın çekirdeğini görmeli ve bir adı çözümleyebilmelidir.",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "Bu CashPilot UI bir geliştirme derlemesi, bu yüzden komutu bir sürüme sabitleyemez. Komutu almak için yayımlanmış bir imaj çalıştırın.",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "Bu CashPilot UI imajı {name} içermiyor, bu yüzden indirmeyi denetleyemez.",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} bir CashPilot yardımcısı değil.",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "Kopyalandı",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "Kopyala",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "Bu sayfa https üzerinde değil, bu yüzden panoya kopyalama engellendi. Komut seçili: Ctrl+C veya Cmd+C tuşlarına basın.",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "Docker'ın varsayılanı",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "Bundan sonra buraya dağıtacağınız kazanç uygulamalarının çalışma zamanı",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "Burada zaten bulunan kazanç uygulamaları kendi çalışma zamanlarını korur.",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "Kaydedildi. Bundan sonra buraya dağıtacağınız kazanç uygulamalarına uygulanır.",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "Kaydediliyor…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "Her katman neyi korur",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "{service} hizmeti {runtime} altında çalıştırılsın mı?\n\nBu, {service} hizmetini şimdi yeniden dağıtır. Hizmet durur ve yeniden başlar; bu genellikle bir dakikadan kısa sürer. Veri birimi korunur.",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "bariyer bilinmiyor",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "bariyerli",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "Kilitli",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "bariyersiz",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "sonraki dağıtımında {runtime}",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "{service} hizmeti {runtime} altında yeniden dağıtıldı.",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "{runtime} altında yeniden çalıştır",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} hizmeti sonraki dağıtımından itibaren {runtime} altında çalışır.",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "{service} hizmetinin çalışma zamanı kaydediliyor…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "gVisor altında çalıştır",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "Standart altında çalıştır",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Secure VM bariyeri başarısız",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "Secure VM içinde",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Secure VM bariyeri bilinmiyor",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "LAN bariyeri",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "gVisor'ı bu ana makineye kur",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor, her kazanç uygulaması ile bu ana makinenin çekirdeği arasına kendi çekirdeğini koyar. Bunun bedeli, işlem hacminin yaklaşık beşte biri ve altı ila dokuz kat CPU'dur. Bu komutu ana makinede çalıştırın. Herhangi bir şeyi değiştirmeden önce sorar ve çalışan konteynerler çalışmaya devam eder.",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "kurulu",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "kurulu değil",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "gVisor'ı bu ana makineden kaldır",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "Önce bu worker'daki her kazanç uygulamasını yeniden Standart'a geçirin. Komut, gVisor altında çalışan bir tane kaldığı sürece çalışmayı reddeder.",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "burada mümkün değil",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "kapalı",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "açık",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "Soket proxy'si",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "Bu worker ham Docker soketini tutuyor; bu, ana makinede root yetkisi demektir. Birlikte gelen compose dosyaları onun önüne bir soket proxy'si koyar.",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "Standart (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "Güvenlik katmanları",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "bilinmiyor",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "bariyer başarısız",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "bariyer tamam",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "bariyer son zamanlarda denetlenmedi",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "bariyer bilinmiyor",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "Bu worker, {host} üzerindeki bir Secure VM içinde çalışıyor.",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "KVM kullanılabilir",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "KVM yok",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "Kazanç uygulamaları için bir VM katmanı planlanıyor. Ana makinede KVM gerektirir.",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} hizmeti {runtime} altında çalışmalıdır: katalog kaydı bunu belirtiyor.",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} hizmeti {runtime} altında çalışmalıdır: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "Önce gVisor'ı bu ana makineye kurun.",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "gVisor bu ana makinede kurulu değil.",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} ham soketlere ihtiyaç duyuyor ve bu worker'da --net-raw ile kayıtlı bir gVisor çalışma zamanı yok. Kurulum komutu bir tane kaydeder.",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "Worker, Docker'a hangi çalışma zamanlarının bulunduğunu soramadı.",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor yalnızca Linux ana makinelerinde çalışır.",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "Bu worker, güvenlik katmanlarından daha eski. Burada bir çalışma zamanı seçmek için onu güncelleyin.",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "Bu worker'daki CASHPILOT_CONTAINER_RUNTIME değeri {runtime}. Değişken, bu sayfadaki seçimin önüne geçer.",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "Bu worker'daki CASHPILOT_CONTAINER_RUNTIME_OVERRIDES, {slug}={runtime} olarak ayarlıyor. Değişken, bu sayfadaki seçimin önüne geçer.",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid gVisor çalıştıramaz: gVisor'ın dışına çıkamadığı bir RAM dosya sisteminden önyükleme yapar. Bunun yerine kazanç uygulamalarını bir VM içinde çalıştırın.",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "Hata: {error}",

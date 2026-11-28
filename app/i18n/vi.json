@@ -1483,6 +1483,18 @@
     "text": "{name} chạy qua proxy trên {box}. Chạy nó từ IP riêng của {box}{value} sẽ để lộ địa chỉ đó cho {name} và cho mọi nơi mà lưu lượng của nó đi tới. Hãy xác nhận bằng mật khẩu của bạn.",
     "source": "51f1b2793f81"
   },
+  "api.runtime_choice_cannot": {
+    "text": "Ứng dụng kiếm tiền này được đặt để chạy dưới gVisor trên {worker}, nhưng không thể: {why} Hãy đặt nó lại về Tiêu chuẩn trên trang Đội máy, hoặc khắc phục điều đó trước. Chưa triển khai gì.",
+    "source": "4943619714b2"
+  },
+  "api.runtime_choice_routed": {
+    "text": "Ứng dụng kiếm tiền này được đặt để chạy dưới gVisor trên {worker}, nhưng một bản sao định tuyến qua proxy chỉ chạy dưới Tiêu chuẩn. Hãy đặt nó lại về Tiêu chuẩn trên trang Đội máy để định tuyến nó. Chưa triển khai gì.",
+    "source": "126eed652b88"
+  },
+  "api.runtime_choice_worker_too_old": {
+    "text": "Ứng dụng kiếm tiền này được đặt để chạy dưới {runtime} trên {worker}, nhưng worker quá cũ để nhận lựa chọn runtime. Hãy cập nhật worker, hoặc đặt ứng dụng kiếm tiền lại về Tiêu chuẩn trên trang Đội máy. Chưa triển khai gì.",
+    "source": "78c078b0a784"
+  },
   "api.saving_failed": {
     "text": "Lưu {name} thất bại.",
     "source": "1ccac7b3bfe9"
@@ -8330,6 +8342,286 @@
   "lang.not_saved": {
     "text": "Chưa lưu được ngôn ngữ: {error}",
     "source": "22c717c1101e"
+  },
+  "layers.badge.tip": {
+    "text": "Các lớp mà bản sao này chạy phía sau: hàng rào LAN, và Tiêu chuẩn (runc) hoặc gVisor. Trang Đội máy là nơi thay đổi chúng.",
+    "source": "6d65f83ac80f"
+  },
+  "layers.check.button": {
+    "text": "Kiểm tra gVisor",
+    "source": "e1ef2d9b7a92"
+  },
+  "layers.check.green": {
+    "text": "Xanh.",
+    "source": "210631f20ff4"
+  },
+  "layers.check.not_installed": {
+    "text": "Chưa cài đặt.",
+    "source": "9983d6fd3d02"
+  },
+  "layers.check.red": {
+    "text": "Đỏ.",
+    "source": "4ae4080442e5"
+  },
+  "layers.check.running": {
+    "text": "Đang kiểm tra…",
+    "source": "ec963ffc911b"
+  },
+  "layers.check.tip": {
+    "text": "Khởi động một container đầu dò ngắn hạn dưới gVisor trên mạng của các ứng dụng kiếm tiền. Nó phải thấy kernel của gVisor và phân giải được một tên miền.",
+    "source": "d92a6475eea2"
+  },
+  "layers.cmd.dev_build": {
+    "text": "Giao diện CashPilot này là một bản dựng phát triển, nên không thể ghim lệnh vào một bản phát hành. Hãy chạy một image đã phát hành để có lệnh.",
+    "source": "518777060326"
+  },
+  "layers.cmd.not_shipped": {
+    "text": "Image giao diện CashPilot này không có {name}, nên không thể kiểm tra bản tải xuống.",
+    "source": "62b36a4ab7b5"
+  },
+  "layers.cmd.unknown": {
+    "text": "{name} không phải là một trình trợ giúp của CashPilot.",
+    "source": "295acdc22e01"
+  },
+  "layers.copied": {
+    "text": "Đã sao chép",
+    "source": "8d525e5f158b"
+  },
+  "layers.copy": {
+    "text": "Sao chép",
+    "source": "e21f935f11d7"
+  },
+  "layers.copy_fallback": {
+    "text": "Trang này không dùng https, nên bộ nhớ tạm bị chặn. Lệnh đã được chọn: hãy nhấn Ctrl+C hoặc Cmd+C.",
+    "source": "76f5bd26ecc2"
+  },
+  "layers.default.docker": {
+    "text": "Mặc định của Docker",
+    "source": "cd2f16293859"
+  },
+  "layers.default.label": {
+    "text": "Runtime cho các ứng dụng kiếm tiền bạn triển khai ở đây từ nay về sau",
+    "source": "111a8e31fe18"
+  },
+  "layers.default.note": {
+    "text": "Các ứng dụng kiếm tiền đã có ở đây giữ nguyên runtime của chúng.",
+    "source": "45a17adfe098"
+  },
+  "layers.default.saved": {
+    "text": "Đã lưu. Thiết lập áp dụng cho các ứng dụng kiếm tiền bạn triển khai ở đây từ nay về sau.",
+    "source": "a8fc278f734b"
+  },
+  "layers.default.saving": {
+    "text": "Đang lưu…",
+    "source": "23e39291d613"
+  },
+  "layers.docs": {
+    "text": "Mỗi lớp bảo vệ điều gì",
+    "source": "4cad0a8cda27"
+  },
+  "layers.earner.confirm": {
+    "text": "Chạy {service} dưới {runtime}?\n\nViệc này triển khai lại {service} ngay bây giờ. Nó sẽ dừng rồi khởi động lại, thường trong chưa đến một phút. Volume dữ liệu của nó được giữ lại.",
+    "source": "3a2faaa44b48"
+  },
+  "layers.earner.fence_unknown": {
+    "text": "hàng rào không xác định",
+    "source": "e44527aee4c2"
+  },
+  "layers.earner.fenced": {
+    "text": "có hàng rào",
+    "source": "d0ba5c8411f1"
+  },
+  "layers.earner.locked": {
+    "text": "Đã khóa",
+    "source": "a424e33d9093"
+  },
+  "layers.earner.not_fenced": {
+    "text": "không có hàng rào",
+    "source": "73198db0a883"
+  },
+  "layers.earner.pending": {
+    "text": "{runtime} từ lần triển khai tiếp theo",
+    "source": "d5d03ffcf7cd"
+  },
+  "layers.earner.redeployed": {
+    "text": "{service} đã được triển khai lại dưới {runtime}.",
+    "source": "bb6c02bf4320"
+  },
+  "layers.earner.retry": {
+    "text": "Chạy lại dưới {runtime}",
+    "source": "439282f7545e"
+  },
+  "layers.earner.saved": {
+    "text": "{service} sẽ chạy dưới {runtime} từ lần triển khai tiếp theo.",
+    "source": "52cec6ce1593"
+  },
+  "layers.earner.saving": {
+    "text": "Đang lưu runtime của {service}…",
+    "source": "a5682e810f93"
+  },
+  "layers.earner.to_gvisor": {
+    "text": "Chạy dưới gVisor",
+    "source": "d507eadf290a"
+  },
+  "layers.earner.to_runc": {
+    "text": "Chạy dưới Tiêu chuẩn",
+    "source": "6976cf203229"
+  },
+  "layers.earner.vm_failed": {
+    "text": "Hàng rào Secure VM thất bại",
+    "source": "aaf51036bd2f"
+  },
+  "layers.earner.vm_ok": {
+    "text": "trong Secure VM",
+    "source": "97e2b8de7cfc"
+  },
+  "layers.earner.vm_unknown": {
+    "text": "Hàng rào Secure VM không xác định",
+    "source": "72741f78b76f"
+  },
+  "layers.fence": {
+    "text": "Hàng rào LAN",
+    "source": "02642a803e31"
+  },
+  "layers.gvisor.install": {
+    "text": "Cài gVisor trên máy chủ này",
+    "source": "96148e86fa6e"
+  },
+  "layers.gvisor.install_intro": {
+    "text": "gVisor đặt kernel riêng của nó giữa mỗi ứng dụng kiếm tiền và kernel của máy chủ này. Nó tốn khoảng một phần năm thông lượng và gấp sáu đến chín lần CPU. Hãy chạy lệnh này trên máy chủ. Lệnh sẽ hỏi trước khi thay đổi bất cứ thứ gì, và các container đang chạy vẫn tiếp tục chạy.",
+    "source": "7dbcd26421fc"
+  },
+  "layers.gvisor.installed": {
+    "text": "đã cài đặt",
+    "source": "a51a6c19a1ff"
+  },
+  "layers.gvisor.missing": {
+    "text": "chưa cài đặt",
+    "source": "e9363f76e114"
+  },
+  "layers.gvisor.undo": {
+    "text": "Gỡ gVisor khỏi máy chủ này",
+    "source": "97e23d8c78df"
+  },
+  "layers.gvisor.undo_note": {
+    "text": "Trước tiên, hãy chuyển mọi ứng dụng kiếm tiền trên worker này về lại Tiêu chuẩn. Lệnh sẽ từ chối chạy khi vẫn còn một ứng dụng chạy dưới gVisor.",
+    "source": "98433db5d975"
+  },
+  "layers.gvisor.unsupported": {
+    "text": "không khả thi ở đây",
+    "source": "845f15559082"
+  },
+  "layers.off": {
+    "text": "tắt",
+    "source": "b4dc66dde806"
+  },
+  "layers.on": {
+    "text": "bật",
+    "source": "b8d31e852725"
+  },
+  "layers.proxy": {
+    "text": "Socket proxy",
+    "source": "06b928254af6"
+  },
+  "layers.proxy.off_tip": {
+    "text": "Worker này giữ Docker socket gốc, tương đương quyền root trên máy chủ. Các file compose đi kèm đặt một socket proxy phía trước nó.",
+    "source": "ce63b4b37170"
+  },
+  "layers.runtime.gvisor": {
+    "text": "gVisor",
+    "source": "3e41408ab65a"
+  },
+  "layers.runtime.runc": {
+    "text": "Tiêu chuẩn (runc)",
+    "source": "a0d00a354bd0"
+  },
+  "layers.title": {
+    "text": "Các lớp bảo mật",
+    "source": "6773aa4aae58"
+  },
+  "layers.unknown": {
+    "text": "không xác định",
+    "source": "b23a6a8439c0"
+  },
+  "layers.vm": {
+    "text": "Secure VM",
+    "source": "78c6df4c1c58"
+  },
+  "layers.vm.fence_failed": {
+    "text": "hàng rào thất bại",
+    "source": "923b9ca1b324"
+  },
+  "layers.vm.fence_ok": {
+    "text": "hàng rào ổn",
+    "source": "0ee9466d7c90"
+  },
+  "layers.vm.fence_stale": {
+    "text": "hàng rào gần đây chưa được kiểm tra",
+    "source": "2f859e70855d"
+  },
+  "layers.vm.fence_unknown": {
+    "text": "hàng rào không xác định",
+    "source": "e44527aee4c2"
+  },
+  "layers.vm.inside": {
+    "text": "Worker này chạy bên trong một Secure VM trên {host}.",
+    "source": "352a378ba593"
+  },
+  "layers.vm.kvm": {
+    "text": "Có KVM",
+    "source": "4a439d5737c5"
+  },
+  "layers.vm.no_kvm": {
+    "text": "không có KVM",
+    "source": "c74f0b085505"
+  },
+  "layers.vm.tip": {
+    "text": "Một lớp VM cho các ứng dụng kiếm tiền đang được lên kế hoạch. Nó cần KVM trên máy chủ.",
+    "source": "cab06afd97ea"
+  },
+  "layers.why.catalog": {
+    "text": "{service} phải chạy dưới {runtime}: mục danh mục của nó yêu cầu như vậy.",
+    "source": "8b8cf1af716b"
+  },
+  "layers.why.catalog_reason": {
+    "text": "{service} phải chạy dưới {runtime}: {reason}",
+    "source": "057ed2643fc9"
+  },
+  "layers.why.install_first": {
+    "text": "Hãy cài gVisor trên máy chủ này trước.",
+    "source": "d3a2e699e492"
+  },
+  "layers.why.missing": {
+    "text": "gVisor chưa được cài trên máy chủ này.",
+    "source": "c64dfda2bdb7"
+  },
+  "layers.why.net_raw_missing": {
+    "text": "{service} cần raw socket, nhưng worker này không có runtime gVisor nào được đăng ký với --net-raw. Lệnh cài đặt sẽ đăng ký một runtime như vậy.",
+    "source": "2d79383a55e3"
+  },
+  "layers.why.no_docker": {
+    "text": "Worker không thể hỏi Docker xem nó có những runtime nào.",
+    "source": "bb2bacdc7dcd"
+  },
+  "layers.why.not_linux": {
+    "text": "gVisor chỉ chạy trên máy chủ Linux.",
+    "source": "66f31aeab8a3"
+  },
+  "layers.why.old_worker": {
+    "text": "Worker này cũ hơn tính năng các lớp bảo mật. Hãy cập nhật nó để chọn runtime ở đây.",
+    "source": "313c298bb988"
+  },
+  "layers.why.pin_default": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME trên worker này là {runtime}. Biến này được ưu tiên hơn trang này.",
+    "source": "f674def62d03"
+  },
+  "layers.why.pin_override": {
+    "text": "CASHPILOT_CONTAINER_RUNTIME_OVERRIDES trên worker này đặt {slug}={runtime}. Biến này được ưu tiên hơn trang này.",
+    "source": "07504fae9f95"
+  },
+  "layers.why.unraid": {
+    "text": "Unraid không thể chạy gVisor: nó khởi động từ một hệ thống file trong RAM mà gVisor không thể thoát ra. Thay vào đó, hãy chạy các ứng dụng kiếm tiền trong một VM.",
+    "source": "123c6f4feea5"
   },
   "logs.failed": {
     "text": "Lỗi: {error}",
