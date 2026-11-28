@@ -2127,6 +2127,7 @@
   "layers.gvisor.undo": "Remove gVisor from this host",
   "layers.gvisor.undo_note": "Switch every earner on this worker back to Standard first. The command refuses while one still runs under gVisor.",
   "layers.gvisor.unsupported": "not possible here",
+  "layers.load_failed": "The security layers could not be loaded.",
   "layers.off": "off",
   "layers.on": "on",
   "layers.proxy": "Socket proxy",

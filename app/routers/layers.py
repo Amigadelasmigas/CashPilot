@@ -16,7 +16,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from app import catalog, database, deps, layers_ui, placement
+from app import catalog, custom_services, database, deps, layers_ui, placement
 
 router = APIRouter()
 
@@ -40,6 +40,13 @@ async def api_layers(request: Request) -> dict[str, Any]:
     return {"workers": views, "commands": layers_ui.commands()}
 
 
+async def _known_service(slug: str) -> bool:
+    """A catalog service, or a custom one the owner registered. Only its existence is read."""
+    if catalog.get_service(slug):
+        return True
+    return custom_services.is_custom_slug(slug) and await database.get_custom_service(slug) is not None
+
+
 class RuntimeChoice(BaseModel):
     # An earner's slug, or None for the worker's runtime for new earners.
     slug: str | None = None
@@ -58,7 +65,7 @@ async def api_runtime_choice(request: Request, worker_id: int, body: RuntimeChoi
     if worker is None:
         raise HTTPException(status_code=404, detail="Worker not found")
     info = placement.system_info(worker)
-    if body.slug is not None and not catalog.get_service(body.slug):
+    if body.slug is not None and not await _known_service(body.slug):
         raise HTTPException(status_code=404, detail=f"Service '{body.slug}' not found")
     if body.choice is not None and (why := layers_ui.locked(body.slug or "", info, body.choice)):
         raise HTTPException(status_code=409, detail=why)

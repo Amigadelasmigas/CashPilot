@@ -77,16 +77,26 @@ async def save(worker: dict[str, Any], data: dict[str, Any]) -> None:
     await database.set_config(config_key(worker), json.dumps(data, sort_keys=True))
 
 
-def kind(runtime: str | None, report: dict[str, Any] | None) -> str | None:
+def _runtime_facts(report: Any) -> list[dict[str, Any]]:
+    """The runtimes a worker reported, or none when its report has any other shape.
+
+    ``system_info`` is stored as the worker sent it, so one malformed report
+    must read as "no facts", never fail the page for every worker.
+    """
+    runtimes = report.get("runtimes") if isinstance(report, dict) else None
+    return [f for f in runtimes if isinstance(f, dict)] if isinstance(runtimes, list) else []
+
+
+def kind(runtime: str | None, report: Any) -> str | None:
     """``gvisor``, ``runc`` or None (unknown) for the runtime a container got.
 
     Judged from the worker's own list, which looks at the binary; a name the
     list does not hold is judged by its name.
     """
-    if not runtime:
+    if not isinstance(runtime, str) or not runtime:
         return None
-    for fact in (report or {}).get("runtimes") or []:
-        if isinstance(fact, dict) and fact.get("name") == runtime:
+    for fact in _runtime_facts(report):
+        if fact.get("name") == runtime:
             return GVISOR if fact.get("gvisor") else RUNC
     return GVISOR if runtime.startswith("runsc") else RUNC
 
@@ -97,11 +107,12 @@ def gvisor_ready(report: dict[str, Any] | None, net_raw: bool = False) -> bool:
     ``net_raw``: the earner declares NET_RAW (Bitping), so it needs the variant
     registered with --net-raw too, as layers.pick on the worker does.
     """
-    runtimes = (report or {}).get("runtimes") or []
-    allowed = (report or {}).get("proxy_runtimes")
+    runtimes = _runtime_facts(report)
+    allowed = report.get("proxy_runtimes") if isinstance(report, dict) else None
+    if not isinstance(allowed, list):
+        allowed = None
     return any(
-        isinstance(f, dict)
-        and f.get("gvisor")
+        f.get("gvisor")
         and f.get("hostnet")
         and (f.get("net_raw") or not net_raw)
         and (allowed is None or f.get("name") in allowed)
@@ -152,11 +163,17 @@ def _pin(slug: str, report: dict[str, Any] | None, network_mode: str | None) -> 
     return None
 
 
-def overruled(slug: str, info: dict[str, Any], choice: str) -> str | None:
+#: ``network_mode`` not given: judge by the catalog's network mode.
+CATALOG = object()
+
+
+def overruled(slug: str, info: dict[str, Any], choice: str, network_mode: Any = CATALOG) -> str | None:
     """Why the catalog or an env pin decides ``slug``'s runtime instead of ``choice``, or None.
 
     These win on the worker whatever the owner chose, so a stored choice they
     overrule is not sent: the worker applies them, as the Fleet page says.
+    ``network_mode`` is the one the deploy sends, which can be a recorded mode
+    and not the catalog's: the worker applies a pin to bridge networking only.
     """
     report = info.get("layers") if isinstance(info.get("layers"), dict) else None
     name = (catalog.get_service(slug) or {}).get("name") or slug
@@ -167,13 +184,14 @@ def overruled(slug: str, info: dict[str, Any], choice: str) -> str | None:
             reason = catalog.translate(f"{slug}.docker.runtime_reason", reason, i18n.current())
             return i18n.t("layers.why.catalog_reason", service=name, runtime=required, reason=reason.strip())
         return i18n.t("layers.why.catalog", service=name, runtime=required)
-    network_mode = ((catalog.get_service(slug) or {}).get("docker") or {}).get("network_mode")
+    if network_mode is CATALOG:
+        network_mode = ((catalog.get_service(slug) or {}).get("docker") or {}).get("network_mode")
     return _pin(slug, report, network_mode)
 
 
-def locked(slug: str, info: dict[str, Any], choice: str) -> str | None:
+def locked(slug: str, info: dict[str, Any], choice: str, network_mode: Any = CATALOG) -> str | None:
     """Why ``choice`` cannot be made for ``slug`` on this worker, or None when it can."""
-    if why := overruled(slug, info, choice):
+    if why := overruled(slug, info, choice, network_mode):
         return why
     state = gvisor_state(info)
     if state["state"] in ("unknown", "unsupported"):
@@ -339,7 +357,7 @@ async def set_earner(worker: dict[str, Any], slug: str, choice: str | None) -> d
         return stored
 
 
-async def for_new_deploy(worker: dict[str, Any], slug: str) -> str | None:
+async def for_new_deploy(worker: dict[str, Any], slug: str, network_mode: Any = CATALOG) -> str | None:
     """The choice a deploy sends: the earner's own, else the worker's default.
 
     Nothing is written here: ``remember`` records an inherited default as the
@@ -355,14 +373,14 @@ async def for_new_deploy(worker: dict[str, Any], slug: str) -> str | None:
         stored = await choices(worker)
         if slug in stored["earners"]:
             choice = stored["earners"][slug]
-            return None if choice is None or overruled(slug, info, choice) else choice
+            return None if choice is None or overruled(slug, info, choice, network_mode) else choice
         default = stored["default"]
         if default is None:
             return None
-        if overruled(slug, info, default):
+        if overruled(slug, info, default, network_mode):
             # The default does not fit this earner (Mysterium, a pin): Docker's default, as before.
             return None
-        if locked(slug, info, default):
+        if locked(slug, info, default, network_mode):
             # gVisor is gone or not ready on this worker: the deploy refuses and says
             # why, rather than run the earner without the layer the owner chose.
             return default if default == GVISOR else None
@@ -372,10 +390,12 @@ async def for_new_deploy(worker: dict[str, Any], slug: str) -> str | None:
 async def remember(worker: dict[str, Any], slug: str, choice: str | None) -> None:
     """Record the choice a deploy the worker took was sent with, for an earner with none yet.
 
+    None (Docker's default) is recorded too: a gVisor default set before the
+    next heartbeat lists this earner must not move it on its next redeploy.
     A later change of the worker default then leaves this earner where it is.
     An earner that already has a choice, the owner's or a recorded one, keeps it.
     """
-    if choice is None:
+    if choice is not None and choice not in CHOICES:
         return
     async with _lock():
         stored = await choices(worker)
