@@ -66,7 +66,7 @@ const opened = () => { const o = {}; o.promise = new Promise((resolve, reject) =
 
 const fillNeeds = new Function(
   'document', 'CP', 'esc', 't',
-  `let _needsAsked = 0;\nlet _needsFor = '';\n${extract('ackText')}\nreturn async ${extract('fillNeeds')};`,
+  `let _needsAsked = 0;\nlet _needsFor = '';\nlet _needsTicked = new Set();\n${extract('ackText')}\nreturn async ${extract('fillNeeds')};`,
 )(document, CP, esc, globalThis.t);
 
 await fillNeeds();
@@ -107,6 +107,26 @@ await retryHandler();
 assert.equal(run.disabled, false, 'a retry that works turns Run back on');
 assert.match(box.innerHTML, /data-ack="net_admin"/);
 
+// The owner ticks, a refresh of the same service and proxy fails, and Try again works: the tick is still there.
+tick('net_admin');
+answer = new Error('worker offline');
+await fillNeeds();
+assert.equal(run.disabled, true, 'Run stays off while the needs are unknown');
+answer = {needs: ['net_admin'], volumes: []};
+await retryHandler();
+assert.deepEqual(
+  box.querySelectorAll('input[data-ack]:checked').map(el => el.dataset.ack), ['net_admin'],
+  'a failed refresh and its retry keep the ticks',
+);
+
+// The account risk's line names the service and its terms, not another service's.
+proxy.value = '5';
+answer = {needs: ['account_risk'], volumes: [], name: 'Packetwave', risk_source: 'https://packetwave.example/terms'};
+await fillNeeds();
+assert.match(box.innerHTML, /Your Packetwave account may be suspended/, 'the account risk names its own service');
+assert.match(box.innerHTML, /https:\/\/packetwave\.example\/terms/, 'and links its terms');
+assert.doesNotMatch(box.innerHTML, /Honeygain/, 'never Honeygain\'s');
+
 // A refusal keeps Run off.
 answer = {refusal: 'Storj needs inbound connections on a published port.'};
 await fillNeeds();
@@ -125,3 +145,27 @@ for (const late of [o => o.resolve({needs: ['net_admin'], volumes: []}), o => o.
   assert.equal(run.disabled, false, 'Run stays as the empty selection left it');
 }
 console.log('Copy form: the ticks survive a refresh, a failed lookup is shown with a retry, and Run waits for the needs.');
+
+// ---- The copy list: the "reduced isolation" badge and Withdraw are for isolation ticks only ----
+const listBox = {innerHTML: ''};
+const render = new Function(
+  'document', 'esc', 't', 'ackText', 'workerName', 'capLine', 'copyStatus', '_proxies',
+  `return ${extract('render')};`,
+)(
+  {getElementById: id => (id === 'proxy-list' ? listBox : null)}, esc, globalThis.t,
+  new Function('t', `${extract('ackText')}\nreturn ackText;`)(globalThis.t),
+  () => 'box1', () => '', () => ({status: 'running', via: ''}),
+  [{id: 3, name: 'Gate', kind: 'socks5', host: 'h', port: 1, cap: {}, copies: [
+    {worker_id: 1, slug: 'honeygain', acknowledged: ['account_risk']},
+    {worker_id: 1, slug: 'bitping', acknowledged: ['net_raw']},
+  ]}],
+);
+render();
+const rows = listBox.innerHTML.split('<div>').slice(1);
+const honeygainRow = rows.find(r => r.includes('data-copy="3:1:honeygain"'));
+const bitpingRow = rows.find(r => r.includes('data-copy="3:1:bitping"'));
+assert.doesNotMatch(honeygainRow, /reduced isolation/, 'the account risk is no reduced isolation');
+assert.match(honeygainRow, /data-cmd="remove">Remove</, 'and its copy is removed, not withdrawn');
+assert.match(bitpingRow, /reduced isolation/, 'NET_RAW still shows the badge');
+assert.match(bitpingRow, /data-cmd="remove">Withdraw</, 'and Withdraw');
+console.log('Copy list: only isolation ticks show the badge and Withdraw.');

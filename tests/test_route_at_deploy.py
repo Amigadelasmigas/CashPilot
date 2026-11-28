@@ -1512,6 +1512,45 @@ class TestTheUiDeploysARoute:
         assert refused.status_code == 400 and refused.detail["needs"] == ["account_risk"]
         assert sent["acknowledged"] == ["account_risk"]
 
+    @pytest.mark.real_honeygain_terms
+    def test_a_route_recorded_before_its_tick_existed_asks_for_it_under_keep(self, db):
+        """Its record has no ticks: "Keep" was refused with a message pointing at ticks the form did not show."""
+        from app import catalog
+
+        ui = _Ui()
+        svc = catalog._by_slug["honeygain"]
+        reqs = svc["requirements"]
+
+        async def go():
+            pid = await ui.proxy()
+            svc["requirements"] = {k: v for k, v in reqs.items() if k != "proxy_risk"}
+            try:
+                await ui.deploy(main.DeployRequest(env=ENV, route=pid))  # before Honeygain needed the tick
+            finally:
+                svc["requirements"] = reqs
+            assert "acknowledged" not in (await database.get_deployment_spec("honeygain", worker_id=1))["route"]
+            with (
+                patch.object(main, "_require_auth_api", lambda r: None),
+                patch.object(main.database, "get_deployments", AsyncMock(return_value=[])),
+                patch.object(main, "_get_all_worker_containers", AsyncMock(return_value=[])),
+            ):
+                page = await main.api_get_service(MagicMock(), "honeygain")
+            ui.calls.clear()
+            with pytest.raises(HTTPException) as exc:
+                await ui.deploy(main.DeployRequest(env={}))  # "Keep", as an identity change or restore sends
+            refused = exc.value
+            assert ui.calls == []
+            await ui.deploy(main.DeployRequest(env={}, route_acknowledged=["account_risk"]))  # ticked under "Keep"
+            sent = ui.calls[-1][2]
+            return pid, page, refused, sent, await database.get_deployment_spec("honeygain", worker_id=1)
+
+        pid, page, refused, sent, record = _run(go)
+        assert page["route_acks_missing"] == {"1": ["account_risk"]}
+        assert refused.status_code == 400 and refused.detail["needs"] == ["account_risk"]
+        assert "Keep" in refused.detail["message"]
+        assert sent["routed"] is True and sent["acknowledged"] == ["account_risk"]
+        assert record["route"]["acknowledged"] == ["account_risk"] and proxies.route_of(record) == pid
+
     def test_a_service_that_lowers_its_isolation_is_routed_only_with_its_tick(self, db):
         ui = _Ui(_worker_row(features=("proxy_tunnel", "route_at_deploy", "proxied_isolation")))
         env = {"BITPING_EMAIL": "a@b.c", "BITPING_PASSWORD": "pw"}

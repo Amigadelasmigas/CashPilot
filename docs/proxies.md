@@ -475,7 +475,7 @@ follow it there. Others cannot, and the form says why before anything starts.
 
 | The service needs | Behind a proxy |
 | --- | --- |
-| Terms that forbid proxies or VPNs (`requirements.proxy_prohibited`), or forbid Docker, VMs or hosting (`requirements.container_prohibited`) | Refused. The form shows the reason and a link to the provider's terms. |
+| Terms that forbid proxies or VPNs (`requirements.proxy_prohibited`), or forbid Docker, VMs or hosting (`requirements.container_prohibited`) | Refused. The form shows the reason, with a link to the provider's terms where the catalog names them. |
 | Terms that forbid VPNs and can suspend the account, where the owner may still choose that risk (`requirements.proxy_risk`) | Runs after you tick that the provider may suspend your account. The tick cites the provider's terms. |
 | The host's own network | Refused. The form offers the closest option: run it directly on the box. |
 | A published port (inbound connections) | Refused. Those connections reach the box, never the proxy's address. Run it directly on the box. |
@@ -506,8 +506,12 @@ https://support.honeygain.com/hc/en-us/articles/30688484350492-Does-Honeygain-wo
 
 So a Honeygain copy or route runs only after you tick that your Honeygain
 account may be suspended. A copy that already runs keeps running. Its next
-rebuild asks you to add it again with the tick. The tick needs no worker
-update. The UI checks it, and an updated worker checks it too.
+rebuild asks you to add it again with the tick. A route made before the tick
+runs on too. Its next deploy, identity change or restore asks for the tick:
+on the service's page, leave the Route box on **Keep**, tick the line under
+it, and deploy again. The tick needs no worker update. The UI checks it, and
+an updated worker checks it too. A dashboard older than the worker cannot ask
+for the tick, so update the dashboard first.
 
 ### Volumes of its own
 

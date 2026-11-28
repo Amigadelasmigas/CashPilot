@@ -603,6 +603,7 @@ const env = {
   console: { warn() {} },
   toast(text, kind) { toasts.push({ text, kind }); }, _showDeviceLink() {}, _imageChoice: () => undefined, _instancesFor: () => undefined,
   _confirmPreflight: async () => true, wizardState: { deployed: [] }, _routeChoice: () => undefined,
+  _routeAcks: () => [],
   _walletRequest: () => undefined, _walletBox: () => null, showWalletPhrase: async () => true,
   runsOn: (w, slug) => (w.containers || []).some(c => c.slug === slug),
   escapeHtml: (t) => String(t), loadServicesTable() {}, openServiceDetail() {}, _showDeviceLink() {},

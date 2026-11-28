@@ -67,8 +67,10 @@ while sleep 5; do
         rm -f "$PROBE" "$PROBE.rc"
         probe_pid=
     elif [ -n "$probe_pid" ] && [ $((n - probe_at)) -ge "$STALE" ]; then
+        # Waited for, so it cannot publish a result after the files go.
         kill "$probe_pid" 2>/dev/null
-        rm -f "$PROBE" "$PROBE.tmp"
+        wait "$probe_pid" 2>/dev/null
+        rm -f "$PROBE" "$PROBE.tmp" "$PROBE.rc"
         probe_pid=
     fi
     n=$((n + 1))

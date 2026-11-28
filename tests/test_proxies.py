@@ -213,8 +213,8 @@ class TestEarner:
         assert urllib.parse.urlparse(source).hostname == "support.honeygain.com"
         # The tick says plainly what the owner risks, and cites the catalog's source.
         en = json.loads((Path(__file__).resolve().parent.parent / "app" / "i18n" / "en.json").read_text())
-        text = en["app.route.ack.account_risk"]
-        assert "account may be suspended" in text and text.endswith(source)
+        shown = en["app.route.ack.account_risk"].replace("{name}", honeygain["name"]).replace("{source}", source)
+        assert "account may be suspended" in shown and shown.endswith(source)
 
     def test_the_catalog_locks_earnapp_by_its_terms(self):
         from app import catalog
@@ -2574,8 +2574,24 @@ class TestReducedIsolation:
             return created["id"], needs, refused
 
         pid, needs, refused = _run(go)
-        assert needs == {"refusal": None, "needs": ["net_raw"], "volumes": [f"bitping-data-p{pid}"]}
+        assert needs == {
+            "refusal": None,
+            "needs": ["net_raw"],
+            "volumes": [f"bitping-data-p{pid}"],
+            "name": BITPING["name"],
+            "risk_source": "",
+        }
         assert refused["refusal"] and refused["needs"] == [] and refused["volumes"] == []
+
+    @pytest.mark.real_honeygain_terms
+    def test_the_needs_endpoint_names_the_service_and_its_terms_for_the_account_risk(self, db):
+        async def go():
+            created = await main.api_create_proxy(_Req(_socks(username=USERNAME, password=PASSWORD)), {})
+            return await main.api_proxied_copy_needs(created["id"], "honeygain", {})
+
+        needs = _run(go)
+        assert needs["needs"] == ["account_risk"] and needs["name"] == "Honeygain"
+        assert needs["risk_source"].startswith("https://support.honeygain.com/")
 
     def test_an_old_database_gets_the_acknowledged_column_with_nothing_acknowledged(self, db):
         import aiosqlite
@@ -2679,6 +2695,8 @@ class TestWorkerChecksTheAcknowledgements:
         assert refused.detail["error"] == "acknowledge_reduced_isolation"
         assert refused.detail["needs"] == ["account_risk"]
         assert self._check("honeygain", self._spec("honeygain", acknowledged=["account_risk"])) is None
+        # A dashboard older than this worker never sends the tick: the refusal says to update it.
+        assert "update the dashboard" in refused.detail["message"]
 
     def test_no_host_device_but_the_tun_device(self):
         refused = self._check(

@@ -87,7 +87,12 @@ trim() {
 ip=""
 for url in https://api.ipify.org https://ifconfig.me/ip https://icanhazip.com; do
     # An answer over 64 bytes is no address, even if its first 64 hold one.
-    raw=$(curl -fsS --max-time "$(cap 8)" "$url" 2>/dev/null | head -c 65)
+    # The "x" keeps trailing line breaks in the count: $(...) drops them.
+    raw=$(
+        curl -fsS --max-time "$(cap 8)" "$url" 2>/dev/null | head -c 65
+        echo x
+    )
+    raw=${raw%x}
     ip=""
     [ "${#raw}" -le 64 ] && ip=$(trim "$raw")
     is_ip "$ip" && break

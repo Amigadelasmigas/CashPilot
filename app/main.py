@@ -4410,6 +4410,19 @@ async def api_get_service(request: Request, slug: str) -> dict[str, Any]:
     svc["route_needs"] = proxies.acknowledgements(svc)
     svc["route_udp"] = bool((svc.get("docker") or {}).get("udp_port_range"))
     svc["routes"] = (await _recorded_routes(slug)).get(slug, {})
+    # Worker id -> the ticks its recorded route lacks (one recorded before its
+    # service needed them): the Route box asks for them under "Keep" too.
+    svc["route_acks_missing"] = {
+        str(row["worker_id"]): missing
+        for row in await database.list_worker_specs(slug)
+        if row["slug"] == slug
+        and proxies.route_of(row["spec"]) is not None
+        and (
+            missing := proxies.missing_acknowledgements(
+                svc, ((row["spec"] or {}).get("route") or {}).get("acknowledged")
+            )
+        )
+    }
     return svc
 
 
@@ -4934,9 +4947,16 @@ async def _deploy(
         raise HTTPException(status_code=400, detail=t("api.route_proxy_id_0_worker"))
     route = recorded_route if asked_route is None else (asked_route or None)
     route_acks = getattr(body, "route_acknowledged", None)
+    recorded_acks = ((recorded or {}).get("route") or {}).get("acknowledged") if route == recorded_route else None
+    recorded_acks = [str(a) for a in recorded_acks] if isinstance(recorded_acks, list) else []
+    # "Keep" sends no route: the route on record runs on, with the ticks on record.
+    kept = asked_route is None and route is not None
     if route_acks is None:
-        recorded_acks = ((recorded or {}).get("route") or {}).get("acknowledged") if route == recorded_route else None
-        route_acks = [str(a) for a in recorded_acks] if isinstance(recorded_acks, list) else []
+        route_acks = recorded_acks
+    elif kept:
+        # A tick given under "Keep" (a route recorded before its service needed
+        # one) adds to the ticks on record; it takes none of them back.
+        route_acks = sorted({*recorded_acks, *(str(a) for a in route_acks)})
 
     # What the operator actually TYPED on this deploy. The dashboard has no
     # separate redeploy action: it posts the deploy form, and the form posts
@@ -4982,7 +5002,7 @@ async def _deploy(
     instances = body.instances if body.instances is not None else int((recorded or {}).get("instances") or 1)
     _instance_param(instances)
     if route is not None:
-        await _check_route(slug, svc, worker_id, route, recorded_route, instances, acknowledged=route_acks)
+        await _check_route(slug, svc, worker_id, route, recorded_route, instances, acknowledged=route_acks, kept=kept)
     expected = body.expected_containers or {}
     if body.replace_existing and body.expected_containers is None and restore is None:
         keys = [f"p{route}"] if route is not None else [str(n) for n in range(1, instances + 1)]
@@ -5658,13 +5678,19 @@ async def _check_route(
     instances: int,
     *,
     acknowledged: list[str] | None = None,
+    kept: bool = False,
 ) -> None:
-    """Refuse a deploy through ``route`` that cannot run as one routed service on this worker."""
+    """Refuse a deploy through ``route`` that cannot run as one routed service on this worker.
+
+    ``kept``: the deploy keeps the route on record (no route sent). A route
+    recorded before its service needed a tick has none, and the deploys that
+    send no Route choice (an identity change, a restore) cannot give one, so
+    the refusal says where to give it."""
     name = svc.get("name") or slug
     if why := proxies.refusal(svc, routed=True):
         raise HTTPException(status_code=400, detail=why)
     if missing := proxies.missing_acknowledgements(svc, acknowledged):
-        raise _acknowledge_refusal(name, missing)
+        raise _acknowledge_refusal(name, missing, kept=kept)
     if f"-{slug}".endswith(("-next", "-moving")):
         # Its own tunnel would be cashpilot-tunnel-p<id>-<slug>, which reads as a
         # staged or aside tunnel (proxy_tunnel.STAGED_SUFFIX, MOVING_SUFFIX) and
@@ -5714,14 +5740,18 @@ async def _check_route(
     await _require_isolation_feature(svc, features)
 
 
-def _acknowledge_refusal(name: str, missing: list[str]) -> HTTPException:
-    """The 400 a deploy or a copy gets without an acknowledgement it needs; the form lists ``needs``."""
+def _acknowledge_refusal(name: str, missing: list[str], *, kept: bool = False) -> HTTPException:
+    """The 400 a deploy or a copy gets without an acknowledgement it needs; the form lists ``needs``.
+
+    ``kept``: for a route kept from its record, which names where the ticks are."""
     return HTTPException(
         status_code=400,
         detail={
             "error": "acknowledge_reduced_isolation",
             "needs": missing,
-            "message": t("api.lowers_isolation_tick_each", name=name),
+            "message": t("api.route_kept_needs_tick", name=name)
+            if kept
+            else t("api.lowers_isolation_tick_each", name=name),
         },
     )
 
@@ -5729,7 +5759,9 @@ def _acknowledge_refusal(name: str, missing: list[str]) -> HTTPException:
 async def _require_isolation_feature(svc: dict[str, Any], features: Any) -> None:
     """A service with volumes, or one that needs an acknowledgement, runs behind a proxy only on a worker that can."""
     docker_conf = svc.get("docker") or {}
-    # The account risk asks a worker nothing new: the UI's own check is enough there.
+    # The account risk asks a worker nothing new to run it. An older worker
+    # takes it on this UI's check alone; an updated one checks the tick too, and
+    # tells a dashboard older than it, which cannot send the tick, to update.
     isolation = [key for key in proxies.acknowledgements(svc) if key != "account_risk"]
     if (docker_conf.get("volumes") or isolation) and "proxied_isolation" not in features:
         raise HTTPException(
@@ -9014,10 +9046,14 @@ async def api_proxied_copy_needs(
     if not svc:
         raise HTTPException(status_code=404, detail=t("api.service_not_found", slug=slug))
     refusal = proxies.refusal(svc, kind=(proxy.get("definition") or {}).get("kind"))
+    risk = (svc.get("requirements") or {}).get("proxy_risk")
     return {
         "refusal": refusal,
         "needs": [] if refusal else proxies.acknowledgements(svc),
         "volumes": [] if refusal else proxies.copy_volume_names(svc, proxy_id),
+        # For the account risk's line: whose terms, and where they are.
+        "name": svc.get("name") or slug,
+        "risk_source": str(risk.get("source") or "") if isinstance(risk, dict) else "",
     }
 
 

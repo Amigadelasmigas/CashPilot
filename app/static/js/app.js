@@ -2213,11 +2213,14 @@ const CP = (() => {
       : `<option value="">${t('app.route.direct')}</option>`;
     // What lowers its isolation behind a proxy: one checkbox each, shown once a
     // proxy is chosen. The server refuses the route without every one of them.
+    // Under "Keep" too where a box's recorded route lacks one (recorded before
+    // its service needed it): the ticks given there add to the recorded ones.
     const needs = svc.route_needs || [];
+    const keepAsks = routed && Object.values(svc.route_acks_missing || {}).some((missing) => (missing || []).length);
     const acks = needs.length ? `
-        <div class="route-acks" data-slug="${slug}" style="display:none;">
+        <div class="route-acks" data-slug="${slug}"${keepAsks ? ' data-keep="1"' : ' style="display:none;"'}>
           <div class="form-hint">${t('app.route.ack_title')}</div>
-          ${needs.map((key) => `<label class="form-hint" style="display:block;"><input type="checkbox" data-route-ack="${escapeHtml(key)}"> ${escapeHtml(routeAckText(key))}</label>`).join('')}
+          ${needs.map((key) => `<label class="form-hint" style="display:block;"><input type="checkbox" data-route-ack="${escapeHtml(key)}"> ${escapeHtml(routeAckText(key, svc))}</label>`).join('')}
         </div>` : '';
     return `
       <div class="form-group route-choice">
@@ -2231,13 +2234,15 @@ const CP = (() => {
       </div>`;
   }
 
-  function routeAckText(key) {
+  // ``svc`` names the service whose terms the account risk is about, and links them.
+  function routeAckText(key, svc = {}) {
+    const risk = ((svc.requirements || {}).proxy_risk) || {};
     return {
       net_admin: t('app.route.ack.net_admin'),
       net_raw: t('app.route.ack.net_raw'),
       tun_device: t('app.route.ack.tun_device'),
       no_inbound: t('app.route.ack.no_inbound'),
-      account_risk: t('app.route.ack.account_risk'),
+      account_risk: t('app.route.ack.account_risk', { name: svc.name || svc.slug || '', source: risk.source || '' }),
     }[key] || key;
   }
 
@@ -2284,7 +2289,7 @@ const CP = (() => {
     const scope = (select.closest && select.closest('.route-choice') || {}).parentElement || document;
     const switching = select.value === '0';
     const acks = select.closest && select.closest('.route-choice') && select.closest('.route-choice').querySelector('.route-acks');
-    if (acks) acks.style.display = parseInt(select.value, 10) > 0 ? '' : 'none';
+    if (acks) acks.style.display = parseInt(select.value, 10) > 0 || (select.value === '' && acks.dataset.keep === '1') ? '' : 'none';
     for (const cb of scope.querySelectorAll(`input[data-routed="1"][data-slug="${select.dataset.slug}"]`)) {
       cb.disabled = !switching;
       cb.checked = !switching;
@@ -4403,7 +4408,8 @@ const CP = (() => {
     // Read once, before anything waits: a Route box changed while the first
     // box deploys must not send another route (or none) to the next one.
     const route = _routeChoice(routeRoot, slug);
-    const routeAcks = route > 0 ? _routeAcks(routeRoot, slug) : [];
+    // Under "Keep" (no route) only ticks given there go, and add to the recorded ones.
+    const routeAcks = route === 0 ? [] : _routeAcks(routeRoot, slug);
     if (workerIds.length === 0) {
       toast(t('app.dep.pick_worker'), 'warning');
       if (statusEl) statusEl.textContent = t('app.dep.pick_node');
@@ -4482,7 +4488,7 @@ const CP = (() => {
         const instances = _instancesFor(slug, wid);
         if (instances !== undefined) body.instances = instances;
         if (route !== undefined) body.route = route;
-        if (route > 0) body.route_acknowledged = routeAcks;
+        if (route > 0 || (route === undefined && routeAcks.length)) body.route_acknowledged = routeAcks;
         const res = await api(`/api/deploy/${slug}?worker_id=${wid}`, { method: 'POST', body });
         ok++;
         if (res && res.wallet && res.wallet.phrase) newWallets.push({ wid, wallet: res.wallet });

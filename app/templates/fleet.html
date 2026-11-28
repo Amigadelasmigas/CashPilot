@@ -1570,8 +1570,10 @@ CASHPILOT_WORKER_NAME=server-name</code>
           // Asked to remove, worker not confirmed yet: no buttons, it goes once the worker confirms.
           if (c.removing) return `<div>${esc(t('fleet.proxy.copy_on', { slug: c.slug, box: workerName(c.worker_id) }))} <span class="muted">${t('fleet.proxy.removing')}</span></div>`;
           const capped = c.stopped_by_cap ? ` <span class="muted">${t('fleet.proxy.stopped_by_cap')}</span>` : '';
-          // What its owner acknowledged, and how to take it back: removing the copy (its volume stays).
-          const acks = c.acknowledged || [];
+          // What its owner acknowledged that lowers its isolation, and how to take
+          // it back: removing the copy (its volume stays). The account risk is no
+          // isolation: it gets neither the badge nor the Withdraw label.
+          const acks = (c.acknowledged || []).filter((k) => ['net_admin', 'net_raw', 'tun_device'].includes(k));
           const reduced = acks.length ? ` <span class="badge badge-warning" title="${esc(acks.map((k) => ackText(k)).join(' ') + ' ' + t('fleet.copy.withdraw_hint'))}">${t('fleet.copy.reduced')}</span>` : '';
           const trip = st.tripped ? `<div class="text-warn">${t('fleet.copy.tripped')}</div>` : '';
           return `<div>${esc(t('fleet.proxy.copy_on', { slug: c.slug, box: workerName(c.worker_id) }))} ${esc(t('fleet.proxy.copy_via', { status: st.status, via: st.via }))}${capped}${reduced}
@@ -1622,13 +1624,16 @@ CASHPILOT_WORKER_NAME=server-name</code>
     fillNeeds();
   }
 
-  function ackText(key) {
+  // ``svc`` ({name, risk_source}, from the copy form's needs) names the service
+  // whose terms the account risk is about.
+  function ackText(key, svc) {
+    const named = svc || {};
     return {
       net_admin: t('app.route.ack.net_admin'),
       net_raw: t('app.route.ack.net_raw'),
       tun_device: t('app.route.ack.tun_device'),
       no_inbound: t('app.route.ack.no_inbound'),
-      account_risk: t('app.route.ack.account_risk'),
+      account_risk: t('app.route.ack.account_risk', { name: named.name || '', source: named.risk_source || '' }),
     }[key] || key;
   }
 
@@ -1637,6 +1642,9 @@ CASHPILOT_WORKER_NAME=server-name</code>
   // the copy without every one of them (api_add_proxied_copy).
   let _needsAsked = 0;
   let _needsFor = '';
+  // The ticks of the service and proxy shown, kept here too: a failed refresh
+  // replaces the boxes with its message, and the retry must not lose them.
+  let _needsTicked = new Set();
   async function fillNeeds() {
     const box = document.getElementById('copy-needs');
     const run = document.getElementById('copy-run');
@@ -1646,9 +1654,13 @@ CASHPILOT_WORKER_NAME=server-name</code>
     // clears them, since they answer that one's needs.
     const key = `${slug}|${proxyId}`;
     const same = key === _needsFor;
-    const ticked = same
-      ? new Set([...box.querySelectorAll('input[data-ack]:checked')].map((el) => el.dataset.ack))
-      : new Set();
+    let ticked = new Set();
+    if (same) {
+      ticked = box.querySelectorAll('input[data-ack]').length
+        ? new Set([...box.querySelectorAll('input[data-ack]:checked')].map((el) => el.dataset.ack))
+        : new Set(_needsTicked);
+    }
+    _needsTicked = ticked;
     _needsFor = key;
     // Counted before any return: an empty selection also outdates a request still out.
     const asked = ++_needsAsked;
@@ -1685,7 +1697,7 @@ CASHPILOT_WORKER_NAME=server-name</code>
     if ((out.volumes || []).length) parts.push(`<p class="muted">${esc(t('fleet.copy.own_volume', { names: out.volumes.join(', ') }))}</p>`);
     if ((out.needs || []).length) {
       parts.push(`<p class="form-label">${t('app.route.ack_title')}</p>`);
-      out.needs.forEach((need) => parts.push(`<label class="form-label" style="display:block;font-weight:normal;"><input type="checkbox" data-ack="${esc(need)}"${ticked.has(need) ? ' checked' : ''}> ${esc(ackText(need))}</label>`));
+      out.needs.forEach((need) => parts.push(`<label class="form-label" style="display:block;font-weight:normal;"><input type="checkbox" data-ack="${esc(need)}"${ticked.has(need) ? ' checked' : ''}> ${esc(ackText(need, out))}</label>`));
     }
     box.innerHTML = parts.join('');
   }
