@@ -6296,6 +6296,34 @@ class TestIsolatedTunnel:
         assert "cashpilot-honeygain-p3" in proxy_tunnel.held()
         assert docker.named("cashpilot-honeygain-p3").status != "running"
 
+    def test_a_trip_just_before_the_rollback_stops_the_tunnel_still_holds_the_other_copies(self, docker):
+        """The watchdog trips after the wait failed, as the rollback stops the tunnel: its exit status is read after."""
+        _deploy("earnfm")
+        _deploy("honeygain")
+        tunnel = docker.named("cashpilot-tunnel-p3")
+        real_wait, real_stop = proxy_tunnel._wait_ready, tunnel.stop
+        failed = []
+
+        def wait_ready(container, *args, **kwargs):
+            if container.name == tunnel.name and not failed:
+                failed.append(True)
+                raise proxy_tunnel.ProxyTunnelError("the new settings did not come up")
+            return real_wait(container, *args, **kwargs)
+
+        def stop(*args, **kwargs):
+            if failed and tunnel.status == "running":
+                _tripped(tunnel)  # cp-watch trips as the stop begins
+            return real_stop(*args, **kwargs)
+
+        with (
+            patch.object(proxy_tunnel, "_wait_ready", wait_ready),
+            patch.object(tunnel, "stop", stop),
+            pytest.raises(proxy_tunnel.ProxyTunnelError),
+        ):
+            _deploy("earnfm", proxy=_socks(password="changed"))
+        assert "cashpilot-honeygain-p3" in proxy_tunnel.held()
+        assert docker.named("cashpilot-honeygain-p3").status != "running"
+
     def test_a_copy_replaced_since_the_beat_listed_it_is_not_held(self, docker):
         """The beat read the trip; a deploy replaced the copy under its name before the beat took the lock."""
         _deploy("earnfm")

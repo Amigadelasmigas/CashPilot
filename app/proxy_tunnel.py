@@ -1908,12 +1908,13 @@ def _in_place(
                 # and its copies back inside it. A trip while the new settings
                 # came up (still under the proxy's lock, so the heartbeat could
                 # not hold the copies) holds them first: the restart below then
-                # leaves them stopped.
+                # leaves them stopped. Read after the stop, as above: a trip up
+                # to the stop keeps its exit status, and none can land after it.
+                current.stop(timeout=SIDECAR_STOP_SECONDS)
                 with contextlib.suppress(APIError):
                     current.reload()
                 if tripped(client, current):
                     _hold_others(client, current, chosen)
-                current.stop(timeout=SIDECAR_STOP_SECONDS)
                 current.put_archive(SECRET_DIR, _secret_tar(previous))
                 _gate_up(client, current)
                 current.start()
