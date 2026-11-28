@@ -14,7 +14,7 @@ runc) or under gVisor.
 | Socket proxy | Docker on the host, from the worker: no privileged containers, no host folders, only CashPilot's own containers | On in the shipped compose files | Nothing |
 | LAN fence | Your LAN, this host, your tailnet and cloud metadata, from each earner | On for new installs. An upgraded install turns it on with one click on the Fleet page | Nothing |
 | gVisor | The host's kernel, from an earner that escapes its container | Off. You install it and choose it per earner | Throughput close to Standard, and about six times the CPU for the same traffic ([measured](home-network-security.md#what-it-costs)) |
-| Secure VM | The host's kernel, files and passwords | Not available yet. The Fleet page shows whether the host has KVM, which it needs | RAM for the VM |
+| Secure VM | The host's kernel, files and passwords, your LAN and your tailnet | One command from the Fleet page, on a Linux host with KVM: [The Secure VM on Linux](secure-vm.md) | 580 to 810 MB of RAM and 1.6 GB of disk |
 
 Nothing turns a layer on by itself. An upgrade offers a new layer and leaves your
 earners as they are.
@@ -85,5 +85,9 @@ container in a VM. The helper refuses both and says why.
 ## The Secure VM
 
 A Secure VM runs the earners in a fenced VM on the same host, so an escape lands
-in the VM, not on your computer. It is not available yet. The Fleet page shows
-**KVM available** or **no KVM** for each worker, because the VM needs it.
+in the VM, not on your computer. The VM reaches the UI and the internet and
+nothing else. On a Linux host with KVM, the Fleet page shows the command that
+adds it, and the commands that check and remove it. It also shows the VM's
+fence and its last self-test, with a button that asks the host for a new one.
+How it works, what it needs and what it costs:
+[The Secure VM on Linux](secure-vm.md).
