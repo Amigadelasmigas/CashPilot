@@ -140,9 +140,10 @@ class Hooks:
 class DeployRefused(Exception):
     """The deploy did not go through.
 
-    ``rolled_back`` when the worker undid an update that failed its check;
-    ``restore_failed`` when it undid it but the old container did not start
-    again. Both hold the build. Any other refusal is tried again the next day.
+    ``rolled_back`` when the worker undid an update whose new build failed its
+    check: that build is held. ``restore_failed`` when the old container did not
+    start again: the owner is needed, with or without ``rolled_back``. Any other
+    refusal is tried again the next day.
     """
 
     def __init__(self, message: str, *, rolled_back: bool, restore_failed: bool = False) -> None:
@@ -172,12 +173,22 @@ async def _record_hold(hooks: Hooks, worker_id: int, slug: str, result: str, fac
     _unsaved_holds.pop(key, None)
 
 
+async def _flush_holds(hooks: Hooks, worker_id: int, slug: str) -> None:
+    """Write the holds of this service on this box that are still unsaved, whatever the tag names now."""
+    for key in [k for k in _unsaved_holds if k[:2] == (worker_id, slug)]:
+        try:
+            await _record_hold(hooks, worker_id, slug, *_unsaved_holds[key])
+        except Exception as exc:  # noqa: BLE001 - still held; written on a later check
+            logger.warning("Could not save the hold of %s on worker %s yet: %s", slug, worker_id, exc)
+
+
 def _short(digest: str) -> str:
     return digest.split(":", 1)[-1][:12] if digest else ""
 
 
 async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> str:
     """Check one service on one box and act on the mode. Returns what happened, for the log and the tests."""
+    await _flush_holds(hooks, worker_id, slug)
     if mode == OFF:
         return "off"
     answer = await hooks.check(worker_id, slug)
@@ -194,11 +205,7 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
     old_id, old_digest = str(stale[0].get("image_id") or ""), str(stale[0].get("digest") or "")
     facts = {"old_image": old_id, "new_image": new_id, "old_digest": old_digest, "new_digest": new_digest}
     # A build that already failed here is never tried again; a newer one is.
-    if unsaved := _unsaved_holds.get((worker_id, slug, new_id)):
-        try:
-            await _record_hold(hooks, worker_id, slug, *unsaved)
-        except Exception as exc:  # noqa: BLE001 - still held; written on a later check
-            logger.warning("Could not save the hold of %s on worker %s yet: %s", slug, worker_id, exc)
+    if (worker_id, slug, new_id) in _unsaved_holds:
         return "held"
     if await hooks.seen(worker_id, slug, new_id, HOLDS):
         return "held"
@@ -230,9 +237,16 @@ async def update_service(hooks: Hooks, worker_id: int, slug: str, mode: str) -> 
             await hooks.record(worker_id, slug, AVAILABLE, **facts)
         return "available"
     except DeployRefused as exc:
-        if exc.restore_failed or exc.rolled_back:
-            result = RESTORE_FAILED if exc.restore_failed else ROLLED_BACK
-            await _record_hold(hooks, worker_id, slug, result, {**facts, "detail": str(exc)})
+        result = RESTORE_FAILED if exc.restore_failed else ROLLED_BACK
+        if exc.rolled_back:
+            try:
+                await _record_hold(hooks, worker_id, slug, result, {**facts, "detail": str(exc)})
+            except Exception as write:  # noqa: BLE001 - held in memory, written on a later check
+                logger.warning("Could not save the hold of %s on worker %s yet: %s", slug, worker_id, write)
+            return result
+        if exc.restore_failed:
+            # The owner is needed, but nobody judged the build: no image ID, so no hold.
+            await hooks.record(worker_id, slug, RESTORE_FAILED, detail=str(exc), **{**facts, "new_image": ""})
             return result
         await hooks.record(worker_id, slug, FAILED, detail=str(exc), **facts)
         return "failed"

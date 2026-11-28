@@ -4855,10 +4855,11 @@ async def _deploy(
     confirm_proxied: bool = False,
     settle_seconds: int = 0,
     expect_image: str = "",
-    custom_svc: dict[str, Any] | None = None,
+    checked_svc: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    # ``custom_svc``: the revealed definition of a custom service the caller
-    # already checked (_image_update_deploy), so the deploy sends that one.
+    # ``checked_svc``: the definition the caller already checked
+    # (_image_update_deploy): the catalog's, or a custom service's revealed one,
+    # so the deploy builds from that one and not from one read later.
     # ``settle_seconds``: an image update (app/image_updates.py); each copy must
     # stay healthy that long on its worker, or the worker undoes it.
     # ``expect_image``: the build its check found, the only one it may install.
@@ -4867,7 +4868,7 @@ async def _deploy(
     # the deploy has run and persisted — a stricter type turns the successful
     # deployments that had something to report into 500s.
     worker_id = await _resolve_worker_id(worker_id)
-    svc = catalog.get_service(slug) or custom_svc or await _custom_service(slug, reveal=True)
+    svc = checked_svc or catalog.get_service(slug) or await _custom_service(slug, reveal=True)
     if not svc:
         raise HTTPException(status_code=404, detail=t("api.service_not_found", slug=slug))
     # A custom service is deployed from its stored definition and nothing else:
@@ -7670,6 +7671,7 @@ def _safe_worker_detail(resp: Any) -> dict[str, Any] | None:
         "image_update_rolled_back",
         # The same, but the old container did not start again: the owner is needed.
         "image_update_restore_failed",
+        "image_update_restore_failed_unverified",
         # Docker could not show how the new container did; it was undone, and the
         # build is tried again the next day.
         "image_update_unverified",
@@ -13749,6 +13751,8 @@ _image_update_lock = asyncio.Lock()
 #: an owner's save never overwrite each other. Never held during a check.
 _image_update_settings_lock = asyncio.Lock()
 _image_update_bell_lock = asyncio.Lock()
+#: The catalog definition each blocker judged, by (worker id, slug), for its deploy.
+_image_update_checked: dict[tuple[int, str], dict[str, Any]] = {}
 #: Config key of the bell rows a later check answered: "<worker id>|<slug>" ->
 #: the row id. It keeps a cleared row out of the bell after a restart too.
 _IMAGE_UPDATE_CLEARED_KEY = "image_updates_cleared"
@@ -13828,6 +13832,9 @@ async def _image_update_blocker(worker_id: int, slug: str, answer: dict[str, Any
     svc = await _custom_service(slug, reveal=False) if is_custom else catalog.get_service(slug)
     if not svc:
         return "it is no longer in the catalog"
+    if not is_custom:
+        # The definition judged here is the one the update deploys (_image_update_deploy).
+        _image_update_checked[(worker_id, slug)] = svc
     if svc.get("status") in _UNDEPLOYABLE_STATUSES:
         return "the catalog no longer deploys it"
     recorded = await database.get_deployment_spec(slug, worker_id=worker_id)
@@ -13899,7 +13906,9 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
         if slug in _custom_deleting:
             raise image_updates.DeployRefused(f"{slug} is being deleted", rolled_back=False)
         _custom_deploying[slug] += 1
-    snapshot = None
+    # The catalog definition the blocker compared, so a catalog reloaded since
+    # cannot bring in a command it never looked at.
+    snapshot = None if custom else _image_update_checked.pop((worker_id, slug), None)
     try:
         if custom:
             # Again here, on the one copy of the definition the deploy then sends:
@@ -13923,7 +13932,7 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
             worker_id,
             settle_seconds=image_updates.SETTLE_SECONDS,
             expect_image=new_image,
-            custom_svc=snapshot,
+            checked_svc=snapshot,
         )
     except HTTPException as exc:
         detail = exc.detail
@@ -13931,8 +13940,9 @@ async def _image_update_deploy(worker_id: int, slug: str, expected: dict[str, st
         error = _worker_error(exc)
         raise image_updates.DeployRefused(
             message,
-            rolled_back=error == "image_update_rolled_back",
-            restore_failed=error == "image_update_restore_failed",
+            # Held: the worker judged the new build bad.
+            rolled_back=error in ("image_update_rolled_back", "image_update_restore_failed"),
+            restore_failed=error in ("image_update_restore_failed", "image_update_restore_failed_unverified"),
         ) from None
     finally:
         if custom:

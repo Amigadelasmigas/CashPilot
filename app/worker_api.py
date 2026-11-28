@@ -3018,7 +3018,8 @@ async def _deploy_container(request: Request, slug: str, spec: CheckedDeploySpec
         # build back (app/image_updates.py), unless Docker never described it.
         # A previous container that is not back as it was needs the owner.
         if not exc.restored:
-            error = "image_update_restore_failed"
+            # Held only when the build was judged bad (image_updates.update_service).
+            error = "image_update_restore_failed" if exc.verified else "image_update_restore_failed_unverified"
         elif not exc.verified:
             error = "image_update_unverified"
         else:

@@ -56,7 +56,8 @@ to turn the updates on. CashPilot never turns them on for you.
    the old and the new container use the same volume, so anything the new
    build wrote there stays.
    If the old container does not start again either, the table and the bell
-   show **Needs you**. The app is down on that box until you start or
+   show **Needs you**. The same goes for an update that Docker refused after
+   it had set the old container aside. The app is down on that box until you start or
    redeploy it from the dashboard.
    Sometimes Docker cannot show how the new container did. Then the worker
    undoes it the same way, but the table shows **Failed**. The next daily
@@ -64,8 +65,8 @@ to turn the updates on. CashPilot never turns them on for you.
 5. If the new container passes, the worker removes the old container and its
    image.
 
-CashPilot never tries a build that was undone (or that needed you) again on
-that box. It tries the next new build. So an app that fails after each update cannot go round in a
+CashPilot never tries a build that failed its check again on that box, even
+when it also needed you. It tries the next new build. So an app that fails after each update cannot go round in a
 loop.
 
 Each box updates one app at a time, with a minute between two updates. All
@@ -117,7 +118,14 @@ These are known limits of this release:
 - **A worker that stops during the check period.** The worker can restart
   during the 2 minutes. Then the new container keeps running without the rest
   of its check. The old one stays stopped as `<name>-replaced`. Remove that
-  container when the new build works, or start it again by hand.
+  container when the new build works. To go back to the old build, stop the
+  new container first, because it still holds the app's ports, and then start
+  the old one.
+- **A dashboard that restarts before it can save an undo.** The database
+  can fail to save the row of an undone update. Then the dashboard keeps the
+  hold in memory and saves it on a later check. If the dashboard restarts
+  before that, the hold is lost. The next daily run then tries that build once
+  more, and its check undoes it again.
 
 ## What CashPilot does not update
 

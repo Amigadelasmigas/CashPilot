@@ -1808,6 +1808,12 @@ def deploy_raw(
         )
         if isinstance(exc, ImageUpdateFailed) and not undo["restored"]:
             exc.restored = False
+        elif settle_seconds > 0 and replaced is not None and not undo["restored"]:
+            # Any other failure of an update that left the old container down needs
+            # the owner too. Nobody judged the new build, so it is not held.
+            raise ImageUpdateFailed(
+                f"{_deploy_failure(exc, restored, slug)}", 409, verified=False, restored=False
+            ) from exc
         if secrets_plan is not None:
             # The refused container is gone (_roll_back), so its credentials go too.
             secret_env.remove_volume(client, secrets_plan.volume)
@@ -2185,9 +2191,10 @@ def _settle(container: Any, slug: str, seconds: float, since: float, name: str) 
         if problem:
             logger.warning("%s failed its check after the update: it %s", name, problem)
             raise ImageUpdateFailed(f"The new {name} {problem} within its {int(seconds)} s check, so it was undone.")
-        if final and seen and not late:
-            return
         now = time.monotonic()
+        # The look must also end within the grace: Docker can take long to answer one.
+        if final and seen and not late and now <= cutoff:
+            return
         if late or now >= cutoff:
             if isinstance(unreadable, _SettleStarting):
                 # Docker answered the last look: the build's own check had not passed in time.
@@ -2266,7 +2273,7 @@ def check_image(slug: str, timeout: float = 900) -> dict[str, Any]:
         raise ContainerRuntimeError(str(exc), 503) from exc
     # A previous container that a cleanup could not remove is not a copy: it is
     # stopped and keeps the old build, and would hold every later update back.
-    found = [c for c in service_instances(slug, client) if not str(getattr(c, "name", "")).endswith(REPLACED_SUFFIX)]
+    found = [c for c in service_instances(slug, client) if not _is_set_aside(c, slug)]
     if not found:
         raise ContainerNotFoundError(f"Container for {slug} not found")
     refs = {str(((c.attrs or {}).get("Config") or {}).get("Image") or "") for c in found}
@@ -2307,6 +2314,14 @@ def check_image(slug: str, timeout: float = 900) -> dict[str, Any]:
         "latest": {"id": latest.id, "digest": _repo_digest(latest, ref)},
         "containers": copies,
     }
+
+
+def _is_set_aside(container: Any, slug: str) -> bool:
+    """Whether ``container`` is the previous container a deploy set aside: stopped, under its copy's set-aside name."""
+    name = str(getattr(container, "name", "") or "")
+    return name == _container_name(slug, _instance_of(container)) + REPLACED_SUFFIX and (
+        getattr(container, "status", "") != "running"
+    )
 
 
 def _deploy_failure(exc: BaseException, restored: str, slug: str = "") -> ContainerRuntimeError:

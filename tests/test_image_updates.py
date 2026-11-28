@@ -164,37 +164,43 @@ class TestCheckPeriod:
         _deploy(docker, old, settle_seconds=0.01)
         assert old.removed
 
-    def test_an_unless_line_written_later_in_the_period_still_cancels_the_signal(self, markers, fast, monkeypatch):
+    def test_an_unless_line_written_later_in_the_period_still_cancels_the_signal(self, markers, monkeypatch):
         # The failure line is in the log from the start, its unless line only
-        # from halfway through the period. The log is judged once the period is
-        # over, so the later line counts.
-        import time as clock
-
+        # from halfway through the 60 s period, on a simulated clock. The log is
+        # judged once the period is over, so the later line counts.
+        clock = [0.0]
+        monkeypatch.setattr(orchestrator.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(orchestrator.time, "sleep", lambda s: clock.__setitem__(0, clock[0] + max(s, 0)))
+        monkeypatch.setattr(orchestrator, "_SETTLE_POLL_SECONDS", 5.0)
         signal = {"pattern": "cannot be reached", "unless": "connected to server", "means": "It cannot start."}
         monkeypatch.setattr(orchestrator, "get_service", lambda slug: {"docker": {"health_signals": [signal]}})
-        monkeypatch.setattr(orchestrator, "_SETTLE_POLL_SECONDS", 0.005)
-        # Timed from the start of the check period itself, not from the test's
-        # own setup, so the first look never already holds the later line.
         began: list[float] = []
         real_settle = orchestrator._settle
 
         def settle(*args, **kwargs):
-            began.append(clock.monotonic())
+            began.append(clock[0])
             return real_settle(*args, **kwargs)
 
         monkeypatch.setattr(orchestrator, "_settle", settle)
-        reads: list[bool] = []
 
-        def logs(**kwargs):
-            later = bool(began) and clock.monotonic() - began[0] > 0.05
-            reads.append(later)
-            return b"update server cannot be reached\n" + (b"connected to server\n" if later else b"")
+        def run(written_at: float) -> tuple:
+            began.clear()
 
-        old, docker = _docker()
-        docker.created.logs.side_effect = logs
-        _deploy(docker, old, settle_seconds=0.1)
-        assert old.removed
-        assert began and reads and reads[-1]
+            def logs(**kwargs):
+                later = bool(began) and clock[0] - began[0] >= written_at
+                return b"update server cannot be reached\n" + (b"connected to server\n" if later else b"")
+
+            old, docker = _docker()
+            docker.created.logs.side_effect = logs
+            docker.created.reload.side_effect = lambda: clock.__setitem__(0, clock[0] + 0.1)
+            _deploy(docker, old, settle_seconds=60)
+            return old, docker
+
+        old, _ = run(30)
+        assert began and old.removed
+        # Control: the same line written only after the period does not count.
+        with pytest.raises(orchestrator.ImageUpdateFailed, match="It cannot start"):
+            run(200)
 
     def test_a_failure_line_with_no_unless_line_by_the_end_fails_the_check(self, markers, fast, monkeypatch):
         signal = {"pattern": "cannot be reached", "unless": "connected to server", "means": "It cannot start."}
@@ -404,6 +410,51 @@ class TestCheckPeriod:
         assert failed.value.verified is False
         assert docker.get("cashpilot-honeygain") is old and not old.removed
 
+    def test_a_refused_update_that_leaves_the_old_container_down_needs_the_owner(self, markers, fast):
+        old, docker = _docker()
+        docker.client.containers.create.side_effect = orchestrator.APIError("500 Server Error")
+        docker.client.containers.run.side_effect = orchestrator.APIError("500 Server Error")
+        old.start.side_effect = orchestrator.APIError("500 Server Error")
+        with pytest.raises(orchestrator.ImageUpdateFailed) as failed:
+            _deploy(docker, old, settle_seconds=0.01)
+        # Nobody judged the build, so it is not held, but the owner is told.
+        assert failed.value.restored is False and failed.value.verified is False
+        assert "500 Server Error" in str(failed.value)
+        # Control: the same refusal with the old container back is a plain refusal.
+        old, docker = _docker()
+        docker.client.containers.create.side_effect = orchestrator.APIError("500 Server Error")
+        docker.client.containers.run.side_effect = orchestrator.APIError("500 Server Error")
+        with pytest.raises(orchestrator.ContainerRuntimeError) as refused:
+            _deploy(docker, old, settle_seconds=0.01)
+        assert not isinstance(refused.value, orchestrator.ImageUpdateFailed)
+
+    def test_a_final_look_that_ends_after_the_grace_does_not_pass(self, markers, monkeypatch):
+        # The look after the 120 s period starts at 122 s, and Docker answers it 31 s
+        # later, after the 150 s grace. It cannot pass: undone, and not held.
+        clock = [0.0]
+        monkeypatch.setattr(orchestrator.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(orchestrator.time, "sleep", lambda s: clock.__setitem__(0, clock[0] + max(s, 0)))
+        monkeypatch.setattr(orchestrator, "_SETTLE_POLL_SECONDS", 5.0)
+        old, docker = _docker()
+        began: list[float] = []
+        real_settle = orchestrator._settle
+
+        def settle(*args, **kwargs):
+            began.append(clock[0])
+            return real_settle(*args, **kwargs)
+
+        monkeypatch.setattr(orchestrator, "_settle", settle)
+
+        def reload():
+            late = bool(began) and clock[0] - began[0] >= 120
+            clock[0] += 31 if late else 0.1
+
+        docker.created.reload.side_effect = reload
+        with pytest.raises(orchestrator.ImageUpdateFailed) as failed:
+            _deploy(docker, old, settle_seconds=120)
+        assert failed.value.verified is False
+        assert docker.get("cashpilot-honeygain") is old and not old.removed
+
     def test_an_old_container_that_does_not_start_again_needs_the_owner(self, markers, fast):
         old, docker = _docker("exited", State={"Status": "exited", "ExitCode": 1})
         old.start.side_effect = orchestrator.APIError("500 Server Error")
@@ -590,6 +641,32 @@ class TestCheckImage:
         with patch.object(orchestrator, "_get_client", return_value=client):
             answer = orchestrator.check_image("honeygain")
         assert [c["container_id"] for c in answer["containers"]] == ["c1"]
+        # A copy renamed by hand, or one that runs under that name, is still a copy.
+        for name, status in (("cashpilot-honeygain-manually-replaced", "exited"), (left.name, "running")):
+            other = MagicMock(id="c2", status=status, labels=HONEYGAIN)
+            other.name = name
+            other.attrs = left.attrs
+            client.containers.list.return_value = [live, other]
+            with patch.object(orchestrator, "_get_client", return_value=client):
+                answer = orchestrator.check_image("honeygain")
+            assert [c["container_id"] for c in answer["containers"]] == ["c1", "c2"], name
+
+    def test_a_stopped_copy_of_an_app_whose_name_ends_in_replaced_is_a_copy(self):
+        # A custom app named "Foo Replaced" gets the slug custom-foo-replaced, so
+        # its own container name ends in -replaced. Only its set-aside name is skipped.
+        slug = "custom-foo-replaced"
+        client = self._client("sha256:new", "sha256:new")
+        copy = client.containers.list.return_value[0]
+        copy.name, copy.status = orchestrator._container_name(slug), "exited"
+        aside = MagicMock(id="c0", status="exited", labels=HONEYGAIN)
+        aside.name = copy.name + orchestrator.REPLACED_SUFFIX
+        aside.attrs = {"Image": "sha256:old", "Config": copy.attrs["Config"]}
+        with (
+            patch.object(orchestrator, "_get_client", return_value=client),
+            patch.object(orchestrator, "service_instances", return_value=[copy, aside]),
+        ):
+            answer = orchestrator.check_image(slug)
+        assert [c["container_id"] for c in answer["containers"]] == ["c1"]
 
     @pytest.mark.parametrize("ref", ["honeygain/honeygain@sha256:" + "a" * 64, "sha256:" + "b" * 64])
     def test_a_pinned_image_is_not_pulled(self, ref):
@@ -704,12 +781,22 @@ class TestDecisions:
         assert state.rows[-1][0] == "updated" and state.rows[-1][1]["new_image"] == "sha256:newer"
 
     async def test_an_old_container_that_did_not_start_again_holds_the_build_and_says_so(self):
-        refused = image_updates.DeployRefused("not started again", rolled_back=False, restore_failed=True)
+        refused = image_updates.DeployRefused("not started again", rolled_back=True, restore_failed=True)
         state = _Hooks(_answer(), deploy=refused)
         assert await _run(state, image_updates.AUTO) == image_updates.RESTORE_FAILED
         assert state.rows[0][0] == image_updates.RESTORE_FAILED and state.rows[0][1]["detail"] == "not started again"
         assert await _run(state, image_updates.AUTO) == "held"
         assert len(state.deploys) == 1
+
+    async def test_a_failed_restore_of_a_build_nobody_judged_needs_the_owner_and_holds_nothing(self):
+        refused = image_updates.DeployRefused("refused, not started again", rolled_back=False, restore_failed=True)
+        state = _Hooks(_answer(), deploy=refused)
+        assert await _run(state, image_updates.AUTO) == image_updates.RESTORE_FAILED
+        result, facts = state.rows[0]
+        assert result == image_updates.RESTORE_FAILED and facts["new_image"] == "" and facts["new_digest"]
+        # Once the owner has it running again, the same build is tried.
+        state._deploy = None
+        assert await _run(state, image_updates.AUTO) == "updated"
 
     async def test_a_hold_whose_row_fails_to_save_still_holds_and_is_saved_later(self):
         state = _Hooks(_answer(), deploy=image_updates.DeployRefused("undone", rolled_back=True))
@@ -723,8 +810,8 @@ class TestDecisions:
             await real_record(*args, **kwargs)
 
         hooks.record = record
-        with pytest.raises(RuntimeError, match="locked"):
-            await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO)
+        # The undo is reported as such, so the box still pauses after it (run_worker).
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "rolled_back"
         # The write keeps failing: the build is still held, not deployed again.
         assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "held"
         assert len(state.deploys) == 1 and not state.rows
@@ -735,6 +822,40 @@ class TestDecisions:
         assert not image_updates._unsaved_holds
         assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "held"
         assert len(state.deploys) == 1 and len(state.rows) == 1
+
+    async def test_an_unsaved_hold_is_written_whatever_the_tag_names_now(self):
+        state = _Hooks(_answer(), deploy=image_updates.DeployRefused("undone", rolled_back=True))
+        hooks = state.hooks()
+        real_record = hooks.record
+        writes = {"fail": True}
+
+        async def record(*args, **kwargs):
+            if writes["fail"]:
+                raise RuntimeError("database is locked")
+            await real_record(*args, **kwargs)
+
+        hooks.record = record
+        await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO)
+        writes["fail"] = False
+        # The tag went back to the running build: the row of the undone one is written anyway.
+        state._answer = _answer(latest="sha256:old")
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "current"
+        assert [(r[0], r[1]["new_image"]) for r in state.rows] == [("rolled_back", "sha256:new")]
+        # And a newer build is not held by it.
+        state._answer, state._deploy = _answer(latest="sha256:newer"), None
+        assert await image_updates.update_service(hooks, 1, "honeygain", image_updates.AUTO) == "updated"
+
+    async def test_a_box_pauses_after_an_undo_whose_row_could_not_be_written(self):
+        state = _Hooks(_answer(), deploy=image_updates.DeployRefused("undone", rolled_back=True))
+        hooks = state.hooks()
+
+        async def record(*args, **kwargs):
+            raise RuntimeError("database is locked")
+
+        hooks.record = record
+        done = await image_updates.run_worker(hooks, {"mode": "auto", "workers": {}, "services": {}}, 1, ["honeygain"])
+        assert done == {"honeygain": "rolled_back"}
+        hooks.sleep.assert_awaited_once_with(image_updates.GAP_SECONDS)
 
     async def test_a_mode_changed_during_the_check_deploys_and_records_nothing(self):
         state = _Hooks(_answer(), deploy=image_updates.ModeChanged("off"))
@@ -940,7 +1061,8 @@ class TestTheDashboardSide:
     @pytest.mark.parametrize(
         ("code", "rolled_back", "restore_failed"),
         [
-            ("image_update_restore_failed", False, True),
+            ("image_update_restore_failed", True, True),
+            ("image_update_restore_failed_unverified", False, True),
             ("image_update_unverified", False, False),
             ("image_update_unsupported", False, False),
         ],
@@ -1022,7 +1144,46 @@ class TestTheDashboardSide:
             patch.object(main, "_deploy", deploy),
         ):
             await main._image_update_deploy(1, "custom-mine", {"1": "abc"}, "sha256:" + "a" * 64)
-        assert deploy.await_args.kwargs["custom_svc"] is checked
+        assert deploy.await_args.kwargs["checked_svc"] is checked
+
+    async def test_the_update_deploys_the_catalog_definition_the_blocker_judged(self):
+        """A catalog reloaded between the blocker and the deploy cannot bring in a command."""
+        from app import main
+
+        judged = {"slug": "honeygain", "docker": {"image": "honeygain/honeygain", "command": "old"}}
+        reloaded = {"slug": "honeygain", "docker": {"image": "honeygain/honeygain", "command": "new"}}
+        with (
+            patch.object(main.catalog, "get_service", return_value=judged),
+            patch.object(main.database, "get_deployment_spec", AsyncMock(return_value=None)),
+        ):
+            assert "no deployment record" in await main._image_update_blocker(1, "honeygain", {})
+        deploy = AsyncMock(return_value={})
+        auto = {"mode": "auto", "workers": {}, "services": {}}
+        with (
+            patch.object(main.catalog, "get_service", return_value=reloaded),
+            patch.object(main, "_image_update_settings", AsyncMock(return_value=auto)),
+            patch.object(main, "_deploy", deploy),
+        ):
+            await main._image_update_deploy(1, "honeygain", {"1": "abc"}, "sha256:" + "a" * 64)
+        assert deploy.await_args.kwargs["checked_svc"] is judged
+        assert (1, "honeygain") not in main._image_update_checked
+
+    async def test_a_catalog_deploy_builds_from_the_definition_it_is_given(self):
+        """The catalog reloaded after the check: the deploy still builds from the checked copy."""
+        from app import main
+
+        judged = {"slug": "honeygain", "docker": {"image": "honeygain/honeygain", "command": "old"}}
+        reloaded = {"slug": "honeygain", "docker": {"image": "honeygain/honeygain", "command": "new"}}
+        built = AsyncMock(side_effect=RuntimeError("stop here"))
+        with (
+            patch.object(main, "_resolve_worker_id", AsyncMock(return_value=1)),
+            patch.object(main.catalog, "get_service", return_value=reloaded),
+            patch.object(main.database, "get_deployment_spec", AsyncMock(return_value=None)),
+            patch.object(main, "_device_names", built),
+            pytest.raises(RuntimeError, match="stop here"),
+        ):
+            await main._deploy("honeygain", main.DeployRequest(), 1, checked_svc=judged)
+        assert built.await_args.args[1] is judged["docker"]
 
     async def test_the_deploy_uses_the_definition_it_is_given(self):
         from app import main
@@ -1037,7 +1198,7 @@ class TestTheDashboardSide:
         ):
             # An image in the body of a custom deploy is refused right after the
             # definition is read, so the deploy stops there.
-            await main._deploy("custom-mine", main.DeployRequest(image="other/image"), 1, custom_svc=given)
+            await main._deploy("custom-mine", main.DeployRequest(image="other/image"), 1, checked_svc=given)
         assert "read the definition again" not in str(stopped.value)
         reread.assert_not_awaited()
 
@@ -1342,7 +1503,7 @@ class TestImageCheckEndpoint:
             (True, True, "image_update_rolled_back"),
             (False, True, "image_update_restore_failed"),
             (True, False, "image_update_unverified"),
-            (False, False, "image_update_restore_failed"),
+            (False, False, "image_update_restore_failed_unverified"),
         ],
     )
     def test_the_worker_names_how_an_undone_update_ended(self, monkeypatch, restored, verified, code):
