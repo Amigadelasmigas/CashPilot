@@ -1015,6 +1015,26 @@ def is_empty(value) -> bool:
     return not value.strip()
 
 
+def _without_extra_counts(source: frozenset, target: frozenset) -> set:
+    """The target's signature without the plural counts (#) the source does not show.
+
+    A plural may show its count where the English does not: CLDR puts more
+    than 1 in some locales' "one" (21 in Russian, 0 in French), so a form the
+    English writes as "it" must say the number there. This holds inside each
+    select branch too. Dropping a count the English shows is still a mismatch.
+    """
+    branches = {t[1]: t[2] for t in source if t[0] == "select-branch"}
+    out = set()
+    for x in target:
+        if x[0] == "plural-number" and x not in source:
+            continue
+        if x[0] == "select-branch":
+            mine = branches.get(x[1], frozenset())
+            x = (x[0], x[1], frozenset(y for y in x[2] if y[0] != "plural-number" or y in mine))
+        out.add(x)
+    return out
+
+
 def check_target(source: dict, target: dict, hashes: dict | None) -> dict:
     """Compare one target with the source. Returns lists of findings by kind."""
     found: dict[str, list] = {k: [] for k in ("missing", "placeholder", "extra", "stale", "unstamped")}
@@ -1046,7 +1066,7 @@ def check_target(source: dict, target: dict, hashes: dict | None) -> dict:
         if no_other:
             # Reported even when the English lacks it too: ICU needs "other".
             found["placeholder"].append((key, f"no 'other' branch in {', '.join(no_other)}"))
-        elif s_sig != t_sig:
+        elif s_sig != _without_extra_counts(s_sig, t_sig):
             found["placeholder"].append((key, f"source {_describe(s_sig)}; target {_describe(t_sig)}"))
         if hashes is not None:
             stored = hashes.get(key)

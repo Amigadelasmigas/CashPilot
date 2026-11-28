@@ -602,6 +602,25 @@ def test_a_dropped_plural_number_is_a_mismatch(tmp_path):
     assert run(en, es)[0] == 1
 
 
+def test_a_plural_may_show_a_count_the_english_leaves_out(tmp_path):
+    """Russian "one" also takes 21, so its form says the number where English says "it"."""
+    en = write(tmp_path / "en.json", json.dumps({"a": "Remove {n, plural, =1 {it} other {them}}."}))
+    ru = write(tmp_path / "ru.json", json.dumps({"a": "Удалите {n, plural, =1 {его} one {# шт.} other {их}}."}))
+    assert run(en, ru)[0] == 0
+    write(ru, json.dumps({"a": "Удалите {n, plural, =1 {его} one {{m} шт.} other {их}}."}))
+    assert run(en, ru)[0] == 1
+    # The same inside a select branch.
+    en = write(
+        tmp_path / "en.json", json.dumps({"b": "{g, select, x {{n, plural, =1 {it} other {them}}} other {Skip}}"})
+    )
+    write(ru, json.dumps({"b": "{g, select, x {{n, plural, =1 {его} one {# шт.} other {их}}} other {Пропустить}}"}))
+    assert run(en, ru)[0] == 0
+    # A count the English shows may not be dropped, in a branch either.
+    write(en, json.dumps({"b": "{g, select, x {{n, plural, one {# item} other {# items}}} other {Skip}}"}))
+    write(ru, json.dumps({"b": "{g, select, x {{n, plural, one {штука} other {штуки}}} other {Пропустить}}"}))
+    assert run(en, ru)[0] == 1
+
+
 def test_escaped_percent_is_not_a_named_conversion(tmp_path):
     en = write(tmp_path / "en.json", json.dumps({"a": "100%%(name)s and %(user)s"}))
     es = write(tmp_path / "es.json", json.dumps({"a": "100%%(nombre)s y %(user)s"}))
