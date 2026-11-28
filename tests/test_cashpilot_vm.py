@@ -253,6 +253,9 @@ write_seed 0123456789abcdef0123
     # Nothing is pulled unpinned: the gVisor check reuses the worker's image.
     assert "hello-world" not in provision
     assert ":latest" not in provision
+    # Every download retries on any error: curl --retry skips a connection reset.
+    downloads = [ln.strip() for ln in provision.splitlines() if "curl " in ln and not ln.strip().startswith("#")]
+    assert downloads and all(ln.startswith("retry curl ") for ln in downloads), downloads
 
 
 @pytest.mark.parametrize(
@@ -575,7 +578,14 @@ cmd_verify --json --prove-red 2>/dev/null && echo RC=0 || echo RC=1
 
 @pytest.mark.parametrize(
     ("left", "ok"),
-    [("none", True), ("drift", False), ("host-rule", False), ("cut", False), ("no-lock", False), ("guard-failed", False)],
+    [
+        ("none", True),
+        ("drift", False),
+        ("host-rule", False),
+        ("cut", False),
+        ("no-lock", False),
+        ("guard-failed", False),
+    ],
 )
 def test_the_red_run_reports_the_fence_back_only_when_it_reads_back(left, ok):
     # A guard pass that cannot take the lock (a second red run holds it)

@@ -1264,6 +1264,7 @@ write_files:
       exec >>/var/log/cashpilot-vm-provision.log 2>&1
       # The host waits for one of the two markers, so a failure ends its wait.
       trap 'echo "provision failed at line \$LINENO"; date -Is >/var/lib/cashpilot-vm-provision-failed' ERR
+      # curl --retry does not retry a connection reset, which ended a first boot once.
       retry() { local i; for i in 1 2 3 4 5; do "\$@" && return 0; sleep 15; done; return 1; }
       echo "provision start \$(date -Is)"
       ${hosts_line:+grep -qF "$hosts_line" /etc/hosts || echo "$hosts_line" >>/etc/hosts}
@@ -1272,7 +1273,7 @@ write_files:
       arch=\$(uname -m)
       url=https://storage.googleapis.com/gvisor/releases/release/$GVISOR_RELEASE/\$arch
       cd /tmp
-      curl -fsSL --retry 3 -o gvisor.tar.zstd "\$url/gvisor.tar.zstd"
+      retry curl -fsSL -o gvisor.tar.zstd "\$url/gvisor.tar.zstd"
       echo "$GVISOR_SHA512_X86_64  gvisor.tar.zstd" | sha512sum -c --quiet -
       tar --zstd -xf gvisor.tar.zstd -C /usr/local/bin
       rm -f gvisor.tar.zstd
@@ -1292,7 +1293,7 @@ write_files:
       JSON
       systemctl restart docker
       cd /opt/cashpilot
-      curl -fsSL --retry 3 -o docker-compose.worker.yml https://raw.githubusercontent.com/GeiserX/CashPilot/$REF/docker-compose.worker.yml
+      retry curl -fsSL -o docker-compose.worker.yml https://raw.githubusercontent.com/GeiserX/CashPilot/$REF/docker-compose.worker.yml
       echo "$COMPOSE_SHA256  docker-compose.worker.yml" | sha256sum -c --quiet -
       mkdir -p /run/cashpilot-vm
       if docker compose version >/dev/null 2>&1; then dc="docker compose"; else dc=docker-compose; fi
