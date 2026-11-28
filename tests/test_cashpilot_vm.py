@@ -253,6 +253,11 @@ write_seed 0123456789abcdef0123
     # Nothing is pulled unpinned: the gVisor check reuses the worker's image.
     assert "hello-world" not in provision
     assert ":latest" not in provision
+    # Every download retries on any error: curl --retry skips a connection reset.
+    downloads = [ln.strip() for ln in provision.splitlines() if "curl " in ln and not ln.strip().startswith("#")]
+    assert downloads and all(ln.startswith("retry curl ") for ln in downloads), downloads
+    # Under pipefail, a reader that stops early fails the command that feeds it.
+    assert not re.search(r"\|\s*(grep -m|head\b)", provision)
 
 
 @pytest.mark.parametrize(
@@ -575,12 +580,17 @@ cmd_verify --json --prove-red 2>/dev/null && echo RC=0 || echo RC=1
 
 @pytest.mark.parametrize(
     ("left", "ok"),
-    [("none", True), ("drift", False), ("host-rule", False), ("cut", False), ("no-lock", False), ("guard-failed", False)],
+    [
+        ("none", True),
+        ("drift", False),
+        ("host-rule", False),
+        ("cut", False),
+        ("guard-failed", False),
+    ],
 )
 def test_the_red_run_reports_the_fence_back_only_when_it_reads_back(left, ok):
-    # A guard pass that cannot take the lock (a second red run holds it)
-    # returns without checking anything. The tap stays up while the fence is
-    # open, so only the fence itself can say it is back.
+    # The tap stays up while the fence is open, so only the fence itself can
+    # say it is back, and a guard pass that failed checked nothing.
     out = _run(
         """
 LEFT=$1
@@ -588,7 +598,6 @@ need_root() { :; }; load_conf() { :; }; guest_pid() { echo 1; }; nsx() { :; }; f
 save_selftest() { :; }
 guard_pass() {
   case "$LEFT" in
-    no-lock) return 0 ;;  # waited out another red run: took no lock, checked nothing
     guard-failed) GUARD_LOCKED=1; return 1 ;;
     *) GUARD_LOCKED=1 ;;
   esac
@@ -802,6 +811,8 @@ rm() { if [ "$DELETES" = no ] && [ "$*" = "-rf $DISK" ]; then return 1; fi; comm
 (real_cmd_remove --yes) >/dev/null 2>&1 && echo RC=0 || echo RC=1
 [ -f "$CONF.removing" ] && grep -q "$DISK" "$CONF.removing" && echo MARKER || echo NO-MARKER
 [ -e "$CONF_DIR" ] && echo CONF_DIR-KEPT || echo CONF_DIR-GONE
+# The message says to run the command again, so it must still be there.
+[ -e "$BIN" ] && echo BIN-KEPT || echo BIN-GONE
 # The retry finds the disk through the marker.
 unset -f rm; DELETES=yes
 (real_cmd_remove --yes) >/dev/null 2>&1 && echo RETRY=0 || echo RETRY=1
@@ -810,6 +821,44 @@ unset -f rm; DELETES=yes
         "yes" if disk_deletes else "no",
     )
     if disk_deletes:
-        assert out.split()[:3] == ["RC=0", "NO-MARKER", "CONF_DIR-GONE"]
+        assert out.split()[:4] == ["RC=0", "NO-MARKER", "CONF_DIR-GONE", "BIN-GONE"]
     else:
-        assert out.split() == ["RC=1", "MARKER", "CONF_DIR-KEPT", "RETRY=0", "DISK-GONE"]
+        assert out.split() == ["RC=1", "MARKER", "CONF_DIR-KEPT", "BIN-KEPT", "RETRY=0", "DISK-GONE"]
+
+
+def test_the_red_run_never_lets_go_of_the_lock_while_the_fence_is_open():
+    # A plain verify waiting for the lock got in between the red run letting
+    # go and the guard pass taking it, and probed the open fence (our test
+    # host, 14 false FAIL lines). The red run takes the lock once, and its
+    # repair and green run run under it.
+    out = _run(
+        """
+CALLS=$(mktemp)
+need_root() { :; }; load_conf() { :; }; guest_pid() { echo 1; }; nsx() { :; }; tap_up() { :; }
+save_selftest() { :; }; iptables() { :; }; RUN_DIR=$(mktemp -d); echo golden >"$STATE/fence.golden"
+ns_fingerprint() { echo golden; }
+flock() { echo "flock $*" >>"$CALLS"; }
+guard_pass() { echo "guard_pass locked=$GUARD_LOCKED" >>"$CALLS"; }
+selftest_once() { echo "probes locked=$GUARD_LOCKED" >>"$CALLS"; SELFTEST_LINES="FAIL lan 192.168.1.1:80 answered the guest (reached)"; }
+(cmd_verify --prove-red) >/dev/null 2>&1; echo "RC=$?" >>"$CALLS"
+cat "$CALLS"
+"""
+    )
+    assert out.splitlines() == [
+        "flock -w 50 9",
+        "probes locked=1",
+        "guard_pass locked=1",
+        "probes locked=1",
+        "RC=0",
+    ]
+
+
+def test_a_guard_pass_in_a_process_that_holds_the_lock_does_not_lock_again():
+    out = _run(
+        """
+load_conf() { :; }; CONF=$(mktemp); RUN_DIR=$(mktemp -d); flock() { echo flock; }
+GUARD_LOCKED=1; touch "$RUN_DIR/hold"; hold_is_live() { :; }
+guard_pass; echo done
+"""
+    )
+    assert out.split() == ["done"]
