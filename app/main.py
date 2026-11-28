@@ -8438,15 +8438,17 @@ async def _proxy_worker_restore(
             detail=t("api.worker_has_not_finished_enrolling"),
         )
     target = step_up.restore_target(slug, client_id, restore["sha256"])
-    body = {
-        **spec,
-        "bundle_b64": restore["bundle_b64"],
-        "passphrase": restore["passphrase"],
-        "approval": step_up.sign(key, step_up.ACTION_RESTORE, target),
-    }
     locks = _worker_deploy_locks.setdefault(asyncio.get_running_loop(), {})
     # Picked and recorded under the deploy lock, as a deploy does (_send_worker_deploy).
     async with locks.setdefault((worker_id, slug), asyncio.Lock()):
+        # Signed once the lock is held: a deploy ahead of it can run for minutes,
+        # and the approval's lifetime must start when the request goes out.
+        body = {
+            **spec,
+            "bundle_b64": restore["bundle_b64"],
+            "passphrase": restore["passphrase"],
+            "approval": step_up.sign(key, step_up.ACTION_RESTORE, target),
+        }
         # A restore recreates the earner: it keeps the runtime the owner chose, as a deploy does.
         if "runtime_choice" not in body and (choice := await _runtime_choice_for(worker_id, slug)):
             body["runtime_choice"] = choice
