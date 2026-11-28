@@ -1841,6 +1841,51 @@ class TestTheTunnelEndsWithItsWatchdog:
         assert "the tunnel process exited" in proc.stderr
 
 
+_CP_INNER = (Path(__file__).resolve().parent.parent / "tunnel" / "cp-inner").read_text()
+
+
+def _run_leave(tmp_path: Path, entrypoint: str, watch: str, tunnel: str = "sleep 30") -> subprocess.CompletedProcess:
+    """Run ``leave()`` of ``entrypoint`` as a stop would, with ``watch`` as the running watchdog."""
+    start = entrypoint.index("leave() {")
+    body = entrypoint[start : entrypoint.index("\n}\n", start) + 3].replace("/run/", f"{tmp_path}/")
+    # cp-inner has no tunnel process of its own: nothing would stop that one, and its open pipes would hold the run.
+    if "TPID" not in body:
+        tunnel = "true"
+    script = f"set -eu\nKIND=wireguard\n{body}{tunnel} &\nTPID=$!\n{watch} &\nWPID=$!\nsleep 0.3\nleave\n"
+    env = {**os.environ, "T": str(tmp_path)}
+    return subprocess.run(["sh", "-c", script], env=env, capture_output=True, text=True, timeout=20)
+
+
+# A watchdog in the middle of its trip when the stop comes: it records the trip as it ends.
+_WATCH_FINISHING_A_TRIP = 'sh -c \'trap ": >\\"$T/tripped\\"; exit 86" TERM; while :; do sleep 0.1; done\''
+
+
+@pytest.mark.parametrize("entrypoint", [_CP_TUNNEL, _CP_INNER], ids=["cp-tunnel", "cp-inner"])
+class TestAStopDuringATripKeepsTheTripsExitCode:
+    """leave() exited 0 on a stop: a trip recorded just before the stop read as a plain stop, so the
+    worker's tripped() check after its own stop missed it and the other copies were started again."""
+
+    def test_a_trip_recorded_before_the_stop_ends_with_86(self, tmp_path, entrypoint):
+        (tmp_path / "tripped").write_text("")
+        proc = _run_leave(tmp_path, entrypoint, "sleep 30")
+        assert proc.returncode == 86, proc.stderr
+
+    def test_a_trip_the_watchdog_records_as_it_stops_ends_with_86(self, tmp_path, entrypoint):
+        proc = _run_leave(tmp_path, entrypoint, _WATCH_FINISHING_A_TRIP)
+        assert proc.returncode == 86, proc.stderr
+
+    def test_a_trip_that_already_stopped_the_tunnel_process_ends_with_86(self, tmp_path, entrypoint):
+        """The trip kills the tunnel process first; under set -e the failed kill in leave() ended the run."""
+        (tmp_path / "tripped").write_text("")
+        proc = _run_leave(tmp_path, entrypoint, "sleep 30", tunnel="true")
+        assert proc.returncode == 86, proc.stderr
+
+    def test_a_stop_with_no_trip_ends_with_0(self, tmp_path, entrypoint):
+        proc = _run_leave(tmp_path, entrypoint, "sleep 30")
+        assert proc.returncode == 0, proc.stderr
+        assert not (tmp_path / "tripped").exists()
+
+
 def _stub_clock_bin(tmp_path: Path, curl_cases: str) -> tuple[Path, Path]:
     """Stub date, sleep and curl on a clock that a wait moves on; ``curl_cases`` is a case body on the URL ($*)."""
     bin_dir = tmp_path / "bin"
@@ -1906,6 +1951,13 @@ class TestTheProbeNeverRunsPastTheWorkersWait:
             "1:2:3:4:5:6:7:8::",
             "::1:2:3:4:5:6:7:8",
             "1:2:3:4::5:6:7:8",
+            "203.0.113.007",
+            "01.2.3.4",
+            "::ffff:1.2.3",
+            "::ffff:1.2.3.04",
+            "::ffff:1.2.3.4.5",
+            "1:2:3:4:5:6:7:1.2.3.4",
+            "1.2.3.4::",
         ],
     )
     def test_an_answer_that_is_no_address_gives_the_next_endpoint_its_turn(self, tmp_path, answer):
@@ -1936,6 +1988,10 @@ class TestTheProbeNeverRunsPastTheWorkersWait:
             "1:2:3:4:5:6:7::",
             "::2:3:4:5:6:7:8",
             "1:2:3::5:6:7:8",
+            "100.0.0.1",
+            "::ffff:203.0.113.7",
+            "::1.2.3.4",
+            "1:2:3:4:5:6:1.2.3.4",
         ],
     )
     def test_an_address_is_the_answer(self, tmp_path, answer):

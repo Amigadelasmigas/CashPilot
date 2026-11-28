@@ -1632,6 +1632,7 @@ def _ensure_tunnel(
     # yet. A deploy of one copy is no Start of the others: their holds go in
     # before this tunnel runs again. ``starting`` is the copy the owner's Start
     # is for, which is no Start of the others either.
+    tripped_before = tripped(client, current)
     _hold_others_if_tripped(client, current, keep or starting)
     broken = False
     # An older worker's tunnel, which Docker restarts on its own, is never used
@@ -1692,6 +1693,14 @@ def _ensure_tunnel(
     try:
         with _swap_lock:
             if current is not None:
+                # A trip of the old tunnel while start_sidecar proved the new
+                # one: this deploy holds the proxy's lock, so the heartbeat could
+                # not hold the other copies (_hold_tripped), and the move below
+                # would start them in the new tunnel. Held first, as in place.
+                with contextlib.suppress(APIError):
+                    current.reload()
+                if not tripped_before and tripped(client, current):
+                    _hold_others(client, current, keep or starting)
                 members = _members(client, current)
                 if expected_container is not None and any(m.id != expected_container for m in members):
                     raise ProxyTunnelError(t("err.proxy_tunnel.deploy_cannot_replace_other_containers"))
@@ -1871,6 +1880,11 @@ def _in_place(
         # (_hold_tripped), and the restart below would start them again.
         if tripped(client, current):
             _hold_others(client, current, chosen)
+    else:
+        # Exited after _ensure_tunnel looked and before the reload above: the
+        # same rule as there, or the start below would clear the trip's exit
+        # code with the other copies free to start again.
+        _hold_others_if_tripped(client, current, chosen)
     # Replacing the tunnel recreates every copy in it (a new device to each
     # provider), so a Docker error gets a second try first: only a container
     # Docker refuses twice is taken for broken.
@@ -2961,11 +2975,30 @@ def _start(
                 # The ready run read below must be the one the earner joins.
                 raise ProxyTunnelError(t("err.proxy_tunnel.not_started_not_tunnel_proved", name=name))
         else:
+            if tunnel.status == "running" and is_isolated(tunnel) and not _gate_running(client, tunnel):
+                # An isolated tunnel's /run/ready outlives its gate (as in
+                # _in_place): a new run with a new gate, never the old file.
+                logger.warning("The gate of %s is down; restarting the tunnel with a new gate", tunnel.name)
+                with contextlib.suppress(APIError):
+                    tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
+                tunnel.reload()
+                if tunnel.status == "running":
+                    raise ProxyTunnelError(t("err.proxy_tunnel.docker_did_not_stop_gate_down", name=tunnel.name))
             if tunnel.status != "running":
                 _hold_others_if_tripped(client, tunnel, name)
                 refresh_proxy_ip(tunnel)
                 _gate_up(client, tunnel)
-                tunnel.start()
+                try:
+                    tunnel.start()
+                except Exception:
+                    # As the heartbeat does: the new gate holds a proxy session
+                    # or a tailnet device, so it goes down again unless the
+                    # inner runs after all (a start that timed out).
+                    with contextlib.suppress(Exception):
+                        tunnel.reload()
+                        if tunnel.status not in _LIVE:
+                            _stop_gate(client, tunnel)
+                    raise
             exit_info = _wait_ready(tunnel)
     current = shared if proxy is not None else tunnel
     try:

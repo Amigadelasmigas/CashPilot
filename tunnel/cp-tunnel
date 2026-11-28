@@ -275,13 +275,22 @@ probe_until_ready() {
 # exits and the kernel kills tailscaled before it can log out: its offline
 # device stays in the tailnet until Tailscale reaps it, and the next start of
 # the same copy joins as "<name>-1". Logging an ephemeral node out deletes it.
+#
+# A stop that comes during a trip keeps the trip's exit code 86: the watchdog
+# stops first and is waited for, so its /run/tripped is final when it is read.
 leave() {
     trap - TERM INT
+    if [ -n "${WPID:-}" ]; then
+        kill "$WPID" 2>/dev/null || true
+        wait "$WPID" 2>/dev/null || true
+    fi
     if [ "$KIND" = tailscale ] && [ -S /run/ts/ts.sock ]; then
         timeout 5 tailscale --socket=/run/ts/ts.sock logout >/dev/null 2>&1 ||
             echo "cp-tunnel: could not log out of the tailnet; Tailscale removes this ephemeral device once it has been offline a while" >&2
     fi
-    [ -n "${TPID:-}" ] && kill "$TPID" 2>/dev/null
+    # Under set -e a failed kill (the watchdog's trip has already stopped it) would end here.
+    [ -z "${TPID:-}" ] || kill "$TPID" 2>/dev/null || true
+    [ -f /run/tripped ] && exit 86
     exit 0
 }
 trap leave TERM INT

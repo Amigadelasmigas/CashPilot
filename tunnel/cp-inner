@@ -71,8 +71,20 @@ done
 # code but 86, which is the watchdog's).
 [ -f /run/ready ] || die "no working exit through the gate within 120 s"
 
-trap 'exit 0' TERM INT
+# A stop that comes during a trip keeps the trip's exit code 86: the watchdog
+# stops first and is waited for, so its /run/tripped is final when it is read.
+leave() {
+    trap - TERM INT
+    if [ -n "${WPID:-}" ]; then
+        kill "$WPID" 2>/dev/null || true
+        wait "$WPID" 2>/dev/null || true
+    fi
+    [ -f /run/tripped ] && exit 86
+    exit 0
+}
+trap leave TERM INT
 cp-watch 0 egress &
-wait $! || true
+WPID=$!
+wait "$WPID" || true
 [ -f /run/tripped ] && exit 86
 die "the watchdog exited; the copy stays cut off until this container restarts"

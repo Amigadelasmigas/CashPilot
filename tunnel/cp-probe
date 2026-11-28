@@ -18,23 +18,47 @@ cap() {
     elif [ "$left" -lt 1 ]; then echo 1; else echo "$left"; fi
 }
 
+# Four decimal octets of 0 to 255. A leading zero ("007") is refused, as the
+# worker's parser (Python's ipaddress) refuses it; a single "0" is an octet.
+is_ipv4() {
+    case "$1" in *[!0-9.]* | *..* | .* | *.) return 1 ;; esac
+    old_ifs=$IFS
+    IFS=.
+    # shellcheck disable=SC2086 # split on the dots
+    set -- $1
+    IFS=$old_ifs
+    [ "$#" -eq 4 ] || return 1
+    for octet in "$@"; do
+        case "$octet" in 0?*) return 1 ;; esac
+        [ "${#octet}" -le 3 ] && [ "$octet" -le 255 ] || return 1
+    done
+}
+
 # An address, or nothing: an error page cut down to its hex letters ("e") is
 # no exit, and the next endpoint gets its turn.
 is_ip() {
     case "$1" in
     *:*:*)
+        addr=$1
+        # The last 32 bits may be written as IPv4 (::ffff:203.0.113.7, RFC 4291
+        # 2.2): checked as IPv4, then counted as the two groups it stands for.
+        case "$addr" in *.*)
+            is_ipv4 "${addr##*:}" || return 1
+            addr="${addr%:*}:0:0"
+            ;;
+        esac
         # Hex groups of up to 4 between colons: 8 groups (7 colons), or at most
         # 7 around one "::", which stands for one or more zero groups (RFC 4291
         # 2.2), so "1:2:3:4:5:6:7::" is one. ":::" and a lone edge colon are not.
-        case "$1" in *[!0-9a-fA-F:]* | *:::* | *::*::* | :[!:]* | *[!:]:) return 1 ;; esac
+        case "$addr" in *[!0-9a-fA-F:]* | *:::* | *::*::* | :[!:]* | *[!:]:) return 1 ;; esac
         compressed=no
-        case "$1" in *::*) compressed=yes ;; esac
-        colons=$(printf '%s' "$1" | tr -cd ':' | wc -c)
+        case "$addr" in *::*) compressed=yes ;; esac
+        colons=$(printf '%s' "$addr" | tr -cd ':' | wc -c)
         if [ "$compressed" = no ] && [ "$colons" -ne 7 ]; then return 1; fi
         old_ifs=$IFS
         IFS=:
         # shellcheck disable=SC2086 # split on the colons
-        set -- $1
+        set -- $addr
         IFS=$old_ifs
         groups=0
         for group in "$@"; do
@@ -43,18 +67,7 @@ is_ip() {
         done
         if [ "$compressed" = yes ] && [ "$groups" -gt 7 ]; then return 1; fi
         ;;
-    *.*.*.*)
-        case "$1" in *[!0-9.]* | *..* | .* | *.) return 1 ;; esac
-        old_ifs=$IFS
-        IFS=.
-        # shellcheck disable=SC2086 # split on the dots
-        set -- $1
-        IFS=$old_ifs
-        [ "$#" -eq 4 ] || return 1
-        for octet in "$@"; do
-            [ "${#octet}" -le 3 ] && [ "$octet" -le 255 ] || return 1
-        done
-        ;;
+    *.*.*.*) is_ipv4 "$1" ;;
     *) return 1 ;;
     esac
 }

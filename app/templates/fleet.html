@@ -1650,6 +1650,8 @@ CASHPILOT_WORKER_NAME=server-name</code>
       ? new Set([...box.querySelectorAll('input[data-ack]:checked')].map((el) => el.dataset.ack))
       : new Set();
     _needsFor = key;
+    // Counted before any return: an empty selection also outdates a request still out.
+    const asked = ++_needsAsked;
     if (!same) box.innerHTML = '';
     if (!slug || !proxyId) {
       box.innerHTML = '';
@@ -1658,7 +1660,6 @@ CASHPILOT_WORKER_NAME=server-name</code>
     }
     // Off until the needs are known: without them the copy would go out unticked.
     run.disabled = true;
-    const asked = ++_needsAsked;
     let out;
     try {
       out = await CP.api(`/api/proxies/${proxyId}/copies/needs?slug=${encodeURIComponent(slug)}`);

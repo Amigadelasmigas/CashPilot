@@ -55,7 +55,14 @@ const document = {
 };
 let answer = {needs: ['net_admin', 'tun_device', 'no_inbound'], volumes: ['mysterium-data-p3']};
 let during = null; // runs while the request is out, as an owner's click would
-const CP = {api: async () => { if (during) { during(); during = null; } if (answer instanceof Error) throw answer; return answer; }};
+let hold = null; // a request left open until the check answers it, as a slow worker would
+const CP = {api: async () => {
+  if (hold) { const open = hold; hold = null; return open.promise; }
+  if (during) { during(); during = null; }
+  if (answer instanceof Error) throw answer;
+  return answer;
+}};
+const opened = () => { const o = {}; o.promise = new Promise((resolve, reject) => { o.resolve = resolve; o.reject = reject; }); return o; };
 
 const fillNeeds = new Function(
   'document', 'CP', 'esc', 't',
@@ -104,4 +111,17 @@ assert.match(box.innerHTML, /data-ack="net_admin"/);
 answer = {refusal: 'Storj needs inbound connections on a published port.'};
 await fillNeeds();
 assert.equal(run.disabled, true, 'a refused service cannot be run');
+// A worker change empties the service list while a lookup is out: its late answer is dropped.
+for (const late of [o => o.resolve({needs: ['net_admin'], volumes: []}), o => o.reject(new Error('worker offline'))]) {
+  slug.value = 'mysterium';
+  hold = opened();
+  const open = hold;
+  const out = fillNeeds();
+  slug.value = '';
+  await fillNeeds();
+  late(open);
+  await out;
+  assert.equal(box.innerHTML, '', 'a late answer or failure for the old service leaves the cleared panel');
+  assert.equal(run.disabled, false, 'Run stays as the empty selection left it');
+}
 console.log('Copy form: the ticks survive a refresh, a failed lookup is shown with a retry, and Run waits for the needs.');

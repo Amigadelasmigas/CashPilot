@@ -120,6 +120,7 @@ class FakeContainer:
                 raise RuntimeError(f"cannot join network of a non running container: {joined}")
         self.status = "running"
         self.starts += 1
+        self._d.steps.append(("start", self.id))
         self.attrs["State"]["StartedAt"] = _now()
 
     def stop(self, timeout=None):
@@ -160,6 +161,7 @@ class FakeContainer:
         with tarfile.open(fileobj=io.BytesIO(blob)) as tar:
             for m in tar.getmembers():
                 self.files[m.name] = tar.extractfile(m).read().decode()
+                self._d.steps.append((f"file {m.name}", self.id))
         return True
 
     def get_archive(self, path):
@@ -180,6 +182,7 @@ class FakeContainer:
 
     def exec_run(self, cmd, demux=False):
         if self.status == "running" and self.labels.get(LABEL_ROLE) == "tunnel" and self._d.ready(self):
+            self._d.steps.append(("ready", self.id))
             return 0, json.dumps(EXIT).encode()
         return 1, b""
 
@@ -238,6 +241,8 @@ class FakeDocker:
         self.ids = itertools.count(1)
         self.by_id: dict[str, FakeContainer] = {}
         self.events: list[tuple[str, str]] = []
+        # Starts, ready reads that found an exit, and files written, by container id (a staged one is renamed).
+        self.steps: list[tuple[str, str]] = []
         self.removals: list[tuple[str, bool]] = []  # (name, whether its volumes went too)
         self.broken_auth: set[str] = set()  # proxy_auth values whose tunnel never gets an exit
         self.broken: set[str] = set()  # container ids Docker can no longer write to or start
@@ -5933,8 +5938,10 @@ class TestIsolatedTunnel:
         assert "role" not in gate.files
         assert (name, gate.name) in docker.networks.connected
         assert tunnel.files["gate_ip"] == gate.attrs["NetworkSettings"]["Networks"][name]["IPAddress"]
-        # The gate is up and ready before the tunnel starts: the tunnel reads gate_ip at start.
-        assert docker.events.index(("create", gate.name)) < docker.events.index(("create", earner.name))
+        # The gate is up and ready, and its address written, before the tunnel starts: it reads gate_ip at start.
+        steps = docker.steps
+        inner_start = steps.index(("start", tunnel.id))
+        assert steps.index(("ready", gate.id)) < steps.index(("file gate_ip", tunnel.id)) < inner_start
 
     def test_a_plain_copy_never_shares_the_isolated_tunnel_and_the_reverse(self, docker):
         _deploy("earnfm")
@@ -6340,6 +6347,59 @@ class TestIsolatedTunnel:
         assert "cashpilot-honeygain-p3" in proxy_tunnel.held()
         assert docker.named("cashpilot-honeygain-p3").status != "running"
 
+    def test_a_trip_after_the_deploy_looked_and_before_it_restarts_the_tunnel_holds_the_other_copies(self, docker):
+        """The tunnel exits on a trip between the deploy's first look and its own reload: it is found exited."""
+        _deploy("earnfm")
+        _deploy("honeygain")
+        tunnel = docker.named("cashpilot-tunnel-p3")
+        real = proxy_tunnel._hold_others_if_tripped
+        looked = []
+
+        def hold_others_if_tripped(client, current, chosen):
+            real(client, current, chosen)
+            if not looked:
+                looked.append(True)
+                _tripped(tunnel)  # cp-watch trips just after the first look
+
+        with patch.object(proxy_tunnel, "_hold_others_if_tripped", hold_others_if_tripped):
+            _deploy("earnfm")
+        assert looked and docker.named("cashpilot-tunnel-p3").id == tunnel.id, "started in place"
+        assert "cashpilot-honeygain-p3" in proxy_tunnel.held()
+        assert docker.named("cashpilot-honeygain-p3").status != "running"
+        assert "cashpilot-earnfm-p3" not in proxy_tunnel.held()
+
+    def test_a_trip_of_the_old_tunnel_while_its_replacement_is_proven_holds_the_other_copies(self, docker):
+        """An older worker's tunnel is replaced; it trips while the new one comes up, under the proxy's lock."""
+        _deploy("earnfm")
+        _deploy("honeygain")
+        old = docker.named("cashpilot-tunnel-p3")
+        real = proxy_tunnel.start_sidecar
+
+        def start_sidecar(*args, **kwargs):
+            started = real(*args, **kwargs)
+            _tripped(old)
+            return started
+
+        _made_by_an_older_worker(old)  # replaced, never started in place
+        with patch.object(proxy_tunnel, "start_sidecar", start_sidecar):
+            _deploy("earnfm")
+        (new,) = docker.tunnels()
+        assert new.id != old.id, "replaced"
+        assert "cashpilot-honeygain-p3" in proxy_tunnel.held()
+        assert docker.named("cashpilot-honeygain-p3").status != "running"
+        assert "cashpilot-earnfm-p3" not in proxy_tunnel.held()
+
+    def test_control_a_replacement_with_no_trip_holds_no_copy(self, docker):
+        _deploy("earnfm")
+        _deploy("honeygain")
+        old = docker.named("cashpilot-tunnel-p3")
+        _made_by_an_older_worker(old)
+        _deploy("earnfm")
+        (new,) = docker.tunnels()
+        assert new.id != old.id, "replaced"
+        assert not proxy_tunnel.held()
+        assert docker.named("cashpilot-honeygain-p3").status == "running"
+
     def test_a_copy_replaced_since_the_beat_listed_it_is_not_held(self, docker):
         """The beat read the trip; a deploy replaced the copy under its name before the beat took the lock."""
         _deploy("earnfm")
@@ -6361,6 +6421,30 @@ class TestIsolatedTunnel:
             pytest.raises(proxy_tunnel.ProxyTunnelError),
         ):
             proxy_tunnel.start("bitping", 3, _socks(), None)
+        assert tunnel.status == "exited"
+        assert _gate(docker, tunnel).status != "running"
+
+    def test_a_start_without_settings_with_the_gate_down_restarts_the_inner_with_a_new_gate(self, docker):
+        """The gate exited before the heartbeat saw it; the inner still runs and keeps the old /run/ready."""
+        _deploy_isolated()
+        tunnel = docker.named(OWN_TUNNEL)
+        _gate(docker, tunnel).stop()
+        starts = tunnel.starts
+        proxy_tunnel.start("bitping", 3, None, None)
+        assert tunnel.starts == starts + 1, "a new run of the inner"
+        assert _gate(docker, tunnel).status == "running"
+
+    def test_a_start_without_settings_whose_inner_docker_refuses_stops_its_gate(self, docker):
+        _deploy_isolated()
+        tunnel = docker.named(OWN_TUNNEL)
+        proxy_tunnel.stop("bitping", 3)
+        tunnel.stop()
+
+        def refuse():
+            raise APIError("the daemon refused the start")
+
+        with patch.object(tunnel, "start", refuse), pytest.raises(APIError):
+            proxy_tunnel.start("bitping", 3, None, None)
         assert tunnel.status == "exited"
         assert _gate(docker, tunnel).status != "running"
 

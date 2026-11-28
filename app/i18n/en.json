@@ -1621,6 +1621,7 @@
   "err.proxy_tunnel.disappeared_while_tunnel_replaced": "{name} disappeared while its tunnel was replaced",
   "err.proxy_tunnel.docker_could_not_start_not": "Docker could not start {name} ({exc}), so {name2} was not started",
   "err.proxy_tunnel.docker_did_not_remove": "Docker did not remove {left}",
+  "err.proxy_tunnel.docker_did_not_stop_gate_down": "The gate of {name} is down and Docker did not stop {name}, so it was not started again. Try again in a minute.",
   "err.proxy_tunnel.docker_did_not_stop_settings": "Docker did not stop {name}, so its settings were not changed",
   "err.proxy_tunnel.docker_did_not_take_settings": "Docker did not take the settings files",
   "err.proxy_tunnel.expected_full_docker_ids_all": "Expected full Docker IDs for all copies in the Start approval.",
