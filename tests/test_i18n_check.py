@@ -602,6 +602,25 @@ def test_a_dropped_plural_number_is_a_mismatch(tmp_path):
     assert run(en, es)[0] == 1
 
 
+def test_a_plural_may_show_a_count_the_english_leaves_out(tmp_path):
+    """Russian "one" also takes 21, so its form says the number where English says "it"."""
+    en = write(tmp_path / "en.json", json.dumps({"a": "Remove {n, plural, =1 {it} other {them}}."}))
+    ru = write(tmp_path / "ru.json", json.dumps({"a": "Удалите {n, plural, =1 {его} one {# шт.} other {их}}."}))
+    assert run(en, ru)[0] == 0
+    write(ru, json.dumps({"a": "Удалите {n, plural, =1 {его} one {{m} шт.} other {их}}."}))
+    assert run(en, ru)[0] == 1
+    # The same inside a select branch.
+    en = write(
+        tmp_path / "en.json", json.dumps({"b": "{g, select, x {{n, plural, =1 {it} other {them}}} other {Skip}}"})
+    )
+    write(ru, json.dumps({"b": "{g, select, x {{n, plural, =1 {его} one {# шт.} other {их}}} other {Пропустить}}"}))
+    assert run(en, ru)[0] == 0
+    # A count the English shows may not be dropped, in a branch either.
+    write(en, json.dumps({"b": "{g, select, x {{n, plural, one {# item} other {# items}}} other {Skip}}"}))
+    write(ru, json.dumps({"b": "{g, select, x {{n, plural, one {штука} other {штуки}}} other {Пропустить}}"}))
+    assert run(en, ru)[0] == 1
+
+
 def test_escaped_percent_is_not_a_named_conversion(tmp_path):
     en = write(tmp_path / "en.json", json.dumps({"a": "100%%(name)s and %(user)s"}))
     es = write(tmp_path / "es.json", json.dumps({"a": "100%%(nombre)s y %(user)s"}))
@@ -998,6 +1017,18 @@ def test_a_keyword_given_twice_in_one_select_or_plural_fails(tmp_path, kind):
     es = write(tmp_path / "es.json", json.dumps({"k": f"{{g, {kind}, one {{{{q}}}} one {{{{p}}}} other {{{{q}}}}}}"}))
     code, out = run(en, es)
     assert code == 1 and "malformed braces" in out
+
+
+@pytest.mark.parametrize("junk", ["\x02", "\x020\x03", "\x029\x03"])
+def test_the_texts_own_marker_characters_are_text(tmp_path, junk):
+    # The check marks placeholders with \x02<n>\x03, so a string that holds
+    # those characters itself must not be read as a marker.
+    en = write(tmp_path / "en.json", json.dumps({"k": f"a {junk} {{g, select, x {{{{p}}}} other {{b}}}}"}))
+    es = write(tmp_path / "es.json", json.dumps({"k": f"a {junk} {{g, select, x {{{{p}}}} other {{c}}}}"}))
+    assert run(en, es)[0] == 0
+    write(es, json.dumps({"k": f"a {junk} {{g, select, x {{c}} other {{{{p}}}}}}"}))
+    code, out = run(en, es)
+    assert code == 1 and "g = x" in out
 
 
 def test_plural_forms_join_what_they_render_for_each_select_keyword():
