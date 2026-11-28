@@ -610,10 +610,13 @@ guard_fail() {
 guard_pass() {
   local desired golden live reason
   load_conf || { warn "not installed"; return 0; }
-  exec 9>"$RUN_DIR.lock"
-  flock -w 50 9 || { warn "another guard pass is still running"; return 0; }
-  # This process holds the guard lock from here on (fd 9 stays open).
-  GUARD_LOCKED=1
+  # A red run calls this while it holds the lock, so it never lets go of it.
+  if [ "$GUARD_LOCKED" != 1 ]; then
+    exec 9>"$RUN_DIR.lock"
+    flock -w 50 9 || { warn "another guard pass is still running"; return 0; }
+    # This process holds the guard lock from here on (fd 9 stays open).
+    GUARD_LOCKED=1
+  fi
   # remove holds this lock while it takes the host rules out: a pass that
   # loaded the config before that must not put them back.
   [ -f "$CONF" ] || return 0
@@ -1300,7 +1303,10 @@ write_files:
       retry \$dc -f docker-compose.worker.yml -f docker-compose.override.yml pull -q
       # gVisor must start a container before any earner relies on it. The
       # worker's own pinned image serves; nothing else is pulled.
-      img=\$(\$dc -f docker-compose.worker.yml -f docker-compose.override.yml config --images | grep -m1 cashpilot-worker)
+      # Captured first: grep -m1 at the end of a pipe can exit before compose
+      # has written all its lines, and pipefail then fails the first boot.
+      imgs=\$(\$dc -f docker-compose.worker.yml -f docker-compose.override.yml config --images)
+      img=\$(grep -m1 cashpilot-worker <<<"\$imgs")
       docker run --rm --runtime=runsc --network=none --entrypoint /bin/true "\$img"
       \$dc -f docker-compose.worker.yml -f docker-compose.override.yml up -d
       touch /etc/cloud/cloud-init.disabled
@@ -1703,14 +1709,13 @@ cmd_verify() {
     if [ "$json" = 1 ]; then exec 3>&1 1>&2; fi
     # Only on a throwaway host: the fence is opened for the length of one probe run.
     say "RED: opening the fence for one probe run. Nothing else changes; the guard writes it back."
-    # The guard lock is held from here until the fence is put back, so no
-    # guard pass runs in between. If this process dies, the lock goes with it,
-    # and the next guard pass finds the hold abandoned and repairs the fence.
-    mkdir -p "$RUN_DIR"
-    exec 8>"$RUN_DIR.lock"
-    flock -w 50 8 || die "a guard pass is still running; try again in a minute"
+    # The guard lock is held from here through the repair and the green run,
+    # with no gap: no guard pass, plain verify or other red run gets in while
+    # the fence is open. If this process dies, the lock goes with it, and the
+    # next guard pass finds the hold abandoned and repairs the fence.
+    verify_lock
     echo "$$ $(date +%s)" >"$RUN_DIR/hold"
-    trap 'rm -f "$RUN_DIR/hold"; exec 8>&-; guard_pass >/dev/null || true' EXIT
+    trap 'rm -f "$RUN_DIR/hold"; guard_pass >/dev/null || true' EXIT
     nsx iptables -P FORWARD ACCEPT
     nsx iptables -I FORWARD 1 -m comment --comment cpvm:red-test -j ACCEPT
     # The host's own drop for the veth is a second layer; open it too.
@@ -1725,12 +1730,9 @@ cmd_verify() {
       red_failed=1
     fi
     rm -f "$RUN_DIR/hold"
-    exec 8>&-
-    # The guard pass must take the lock and succeed: one that waited out
-    # another red run, or could not write the fence, checked nothing. It keeps
-    # the lock, so the green run below sees the fence it checked.
-    GUARD_LOCKED=0
-    if ! guard_pass >/dev/null || [ "$GUARD_LOCKED" != 1 ]; then
+    # The repair runs under the lock this run holds. A pass that could not
+    # write the fence checked nothing.
+    if ! guard_pass >/dev/null; then
       trap - EXIT
       die "the guard could not check the fence after the red run; it writes it back within a minute (see: cashpilot-vm status)"
     fi
@@ -1872,15 +1874,19 @@ cmd_remove() {
   ns_exists && ip netns del "$NS"
   ip link del "$VETH_HOST" 2>/dev/null || true
   if has semanage && [ -n "$STATE" ]; then semanage fcontext -d "$STATE(/.*)?" 2>/dev/null || true; fi
+  # The config marker and this command stay until the disk is gone, so the
+  # second run that the message asks for can find both.
+  local disk_gone=0
   if rm -rf "$STATE"; then
     rm -rf "$CONF_DIR"
+    disk_gone=1
   else
-    say "Could not delete $STATE. Run remove again once it can be written: it still knows where the disk is."
+    say "Could not delete $STATE. Run \"sudo $BIN remove\" again once it can be written: it still knows where the disk is."
   fi
   rm -rf "$RUN_DIR" "$RUN_DIR.lock"
   # The domains share's folder is the user's: install never makes it, so remove never takes it.
   if is_unraid; then unraid_remove; fi
-  rm -f "$BIN"
+  [ "$disk_gone" = 0 ] || rm -f "$BIN"
   if id "$SVC_USER" >/dev/null 2>&1; then userdel "$SVC_USER" 2>/dev/null || true; fi
   local left
   left=$(leftovers)
