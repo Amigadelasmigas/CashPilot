@@ -1886,6 +1886,86 @@ class TestAStopDuringATripKeepsTheTripsExitCode:
         assert not (tmp_path / "tripped").exists()
 
 
+def _inner_probe_deadlines(tmp_path: Path, entrypoint: str) -> list[tuple[int, int]]:
+    """Run cp-inner's probe loop on a stub clock where every probe fails after 10 s: (start, CP_DEADLINE) of each."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    clock, log = tmp_path / "clock", tmp_path / "probes"
+    clock.write_text("1000")
+    stubs = {
+        "date": f"cat {clock}",
+        "sleep": f"echo $(($(cat {clock}) + $1)) >{clock}",
+        "cp-probe": f'echo "$(cat {clock}) $CP_DEADLINE" >>{log}\necho $(($(cat {clock}) + 10)) >{clock}\nexit 1',
+    }
+    for name, body in stubs.items():
+        (bin_dir / name).write_text(f"#!/bin/sh\n{body}\n")
+        (bin_dir / name).chmod(0o755)
+    start = entrypoint.index("\n", entrypoint.index('ip route replace default via "$GATE_IP"')) + 1
+    loop = entrypoint[start : entrypoint.index("\ndone\n", start) + 6].replace("/run/", f"{tmp_path}/")
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    subprocess.run(["sh", "-c", f"OWN_IP=198.51.100.9\n{loop}"], env=env, capture_output=True, text=True, timeout=30)
+    return [(int(a) - 1000, int(b) - 1000) for a, b in (line.split() for line in log.read_text().splitlines())]
+
+
+class TestTheInnersProbesFitTheWorkersWait:
+    """cp-inner gave every probe the 120 s deadline of all its attempts, so a probe started near the worker's 45 s
+    wait ran its full caps and an exit it found was written after the worker had removed the tunnel."""
+
+    def test_a_probe_started_inside_the_wait_ends_by_40_seconds_and_later_ones_get_their_full_time(self, tmp_path):
+        probes = _inner_probe_deadlines(tmp_path, _CP_INNER)
+        assert [d for t, d in probes if t <= 45] == [40] * len([t for t, _ in probes if t <= 45])
+        assert {d for t, d in probes if t > 45} == {120}
+        assert probes[-1][0] < 120
+
+
+_CP_WATCH = (Path(__file__).resolve().parent.parent / "tunnel" / "cp-watch").read_text()
+
+
+def _run_egress_watch(tmp_path: Path, mv_fails_once: bool) -> subprocess.CompletedProcess:
+    """cp-watch in egress mode, a probe every tick, a probe that answers from the box's own IP.
+
+    ``mv_fails_once``: the first probe job cannot publish its result. sleep is a
+    stub that ends the loop after 200 ticks, so a watchdog that stopped probing
+    ends with 0 instead of tripping."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (tmp_path / "cashpilot-secret").mkdir()
+    (tmp_path / "cashpilot-secret" / "own_ip").write_text("198.51.100.9")
+    stubs = {
+        "sleep": f'n=$(cat {tmp_path}/ticks 2>/dev/null || echo 0); echo $((n + 1)) >{tmp_path}/ticks; [ "$n" -lt 200 ]',
+        "cp-probe": 'echo \'{"ip":"198.51.100.9"}\'',
+        "mv": (
+            f"if [ ! -e {tmp_path}/mv-failed ]; then : >{tmp_path}/mv-failed; exit 1; fi\n"
+            'PATH=/usr/bin:/bin exec mv "$@"'
+        )
+        if mv_fails_once
+        else 'PATH=/usr/bin:/bin exec mv "$@"',
+    }
+    for name, body in stubs.items():
+        (bin_dir / name).write_text(f"#!/bin/sh\n{body}\n")
+        (bin_dir / name).chmod(0o755)
+    script = _CP_WATCH.replace("/run/", f"{tmp_path}/")
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_WATCH_PROBE_EVERY": "1"}
+    return subprocess.run(
+        ["sh", "-c", script, "cp-watch", "0", "egress"], env=env, capture_output=True, text=True, timeout=60
+    )
+
+
+class TestAProbeThatEndsWithoutItsResultDoesNotEndTheChecks:
+    """A probe job that could not write its result left the watchdog waiting for it for good: in egress mode
+    it then checked nothing more, and a leak from the box's own address never tripped it."""
+
+    def test_the_next_probe_runs_and_trips(self, tmp_path):
+        proc = _run_egress_watch(tmp_path, mv_fails_once=True)
+        assert proc.returncode == 86, proc.stderr
+        assert (tmp_path / "tripped").exists()
+
+    def test_control_a_probe_that_publishes_trips_at_once(self, tmp_path):
+        proc = _run_egress_watch(tmp_path, mv_fails_once=False)
+        assert proc.returncode == 86, proc.stderr
+        assert int((tmp_path / "ticks").read_text()) < 5
+
+
 def _stub_clock_bin(tmp_path: Path, curl_cases: str) -> tuple[Path, Path]:
     """Stub date, sleep and curl on a clock that a wait moves on; ``curl_cases`` is a case body on the URL ($*)."""
     bin_dir = tmp_path / "bin"
@@ -1974,6 +2054,34 @@ class TestTheProbeNeverRunsPastTheWorkersWait:
         proc = subprocess.run(["sh", str(bin_dir / "cp-probe")], env=env, capture_output=True, text=True, timeout=30)
         assert proc.returncode == 0, proc.stderr
         assert '"ip":"203.0.113.7"' in proc.stdout
+
+    @pytest.mark.parametrize(
+        "body",
+        ["198.51.100.7\\n8\\n", "<p>198.51.100.7</p>", "ip=198.51.100.7", "198.51.100.7 198.51.100.8"],
+    )
+    def test_an_answer_with_more_than_an_address_gives_the_next_endpoint_its_turn(self, tmp_path, body):
+        """The probe kept only address characters: a second line "8" made 198.51.100.7 into 198.51.100.78."""
+        import subprocess
+
+        bin_dir, clock = _stub_clock_bin(
+            tmp_path,
+            f"*https://api.ipify.org*) printf '{body}'; exit 0 ;;\n"
+            "*https://ifconfig.me/ip*) echo 203.0.113.7; exit 0 ;;\n",
+        )
+        clock.write_text("46")
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_DEADLINE": "40"}
+        proc = subprocess.run(["sh", str(bin_dir / "cp-probe")], env=env, capture_output=True, text=True, timeout=30)
+        assert proc.returncode == 0, proc.stderr
+        assert '"ip":"203.0.113.7"' in proc.stdout
+
+    def test_an_address_with_a_windows_line_end_is_the_answer(self, tmp_path):
+        import subprocess
+
+        bin_dir, clock = _stub_clock_bin(tmp_path, "*https://api.ipify.org*) printf '198.51.100.7\\r\\n'; exit 0 ;;\n")
+        clock.write_text("46")
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_DEADLINE": "40"}
+        proc = subprocess.run(["sh", str(bin_dir / "cp-probe")], env=env, capture_output=True, text=True, timeout=30)
+        assert '"ip":"198.51.100.7"' in proc.stdout
 
     @pytest.mark.parametrize(
         "answer",

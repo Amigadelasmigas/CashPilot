@@ -1626,7 +1626,7 @@ def _ensure_tunnel(
             raise ProxyTunnelError(t("err.proxy_tunnel.wait_worker_recover_previous_tunnel"))
         # A change that died after it began moving copies: finish it first.
         with _swap_lock:
-            current = _finish_staged(client, leftover, current, final, target=move_target)
+            current = _finish_staged(client, leftover, current, final, target=move_target, chosen=keep or starting)
     # A tunnel its watchdog stopped holds its copies until their owner starts
     # each one (_hold_tripped), and the heartbeat may not have seen the trip
     # yet. A deploy of one copy is no Start of the others: their holds go in
@@ -2078,7 +2078,13 @@ def _moving(client: Any, proxy_id: str) -> list[str]:
 
 
 def _finish_staged(
-    client: Any, staged: Any, current: Any | None, final: str, *, target: _StartApproval | None = None
+    client: Any,
+    staged: Any,
+    current: Any | None,
+    final: str,
+    *,
+    target: _StartApproval | None = None,
+    chosen: str | None = None,
 ) -> Any:
     """Finish a tunnel change a worker died in: the staged tunnel had proved its
     exit before any copy moved into it, so the copies left in ``current`` move
@@ -2087,7 +2093,10 @@ def _finish_staged(
     instead (see _undo_staged).
 
     Refused while a copy of the proxy is still half moved: recover_moves must
-    settle it first, or its container aside would be taken for a copy."""
+    settle it first, or its container aside would be taken for a copy.
+
+    ``chosen`` is the copy a deploy or Start is for (_hold_others_if_tripped):
+    when ``current`` tripped, every other copy in it moves across held."""
     if half := _moving(client, _labels(staged).get(LABEL_PROXY, "")):
         raise RecoveryConflict(
             t(
@@ -2132,6 +2141,14 @@ def _finish_staged(
             return _undo_staged(client, staged, current, f"The new tunnel of {final} {why}")
         run = True
     if current is not None:
+        # The current tunnel tripped with a copy still running in its old
+        # namespace: once moved, nothing would show the trip. Its copies are
+        # held first, as the heartbeat holds a tripped tunnel's, and move
+        # across stopped, for their owner's Start.
+        with contextlib.suppress(APIError):
+            current.reload()
+        if tripped(client, current):
+            _hold_others(client, current, chosen)
         members = _members(client, current)
         _check_move_targets(client, members, target)
         for member in members:
@@ -2999,7 +3016,12 @@ def _start(
                         if tunnel.status not in _LIVE:
                             _stop_gate(client, tunnel)
                     raise
-            exit_info = _wait_ready(tunnel)
+            try:
+                exit_info = _wait_ready(tunnel)
+            except ProxyTunnelError:
+                # As below: down again with its gate unless another copy in it should run.
+                _stop_if_unwanted(client, tunnel)
+                raise
     current = shared if proxy is not None else tunnel
     try:
         if proxy is not None:

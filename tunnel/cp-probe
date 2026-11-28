@@ -34,8 +34,8 @@ is_ipv4() {
     done
 }
 
-# An address, or nothing: an error page cut down to its hex letters ("e") is
-# no exit, and the next endpoint gets its turn.
+# An address, or nothing: an error page ("e", or a line more) is no exit,
+# and the next endpoint gets its turn.
 is_ip() {
     case "$1" in
     *:*:*)
@@ -74,7 +74,10 @@ is_ip() {
 
 ip=""
 for url in https://api.ipify.org https://ifconfig.me/ip https://icanhazip.com; do
-    ip=$(curl -fsS --max-time "$(cap 8)" "$url" 2>/dev/null | tr -cd '0-9a-fA-F.:' | cut -c1-45)
+    # The whole answer must be the address, a line break or blanks around it
+    # aside: dropping every other character would join "203.0.113.7" and a
+    # stray "8" on the next line into another address.
+    ip=$(curl -fsS --max-time "$(cap 8)" "$url" 2>/dev/null | head -c 64 | tr -d ' \t\r')
     is_ip "$ip" && break
     ip=""
 done

@@ -2215,6 +2215,22 @@ class TestAStuckTunnelChangeIsReported:
         assert current.id not in docker.by_id
         assert _member_ids(docker, staged) == ["cashpilot-m1-p3", "cashpilot-m2-p3"]
 
+    def test_a_working_tunnel_that_tripped_moves_its_running_copies_across_held(self, docker):
+        """The worker died mid-move; then the old tunnel tripped while m2 still ran in its namespace."""
+        current, staged = self._half_done(docker)
+        _tripped(current)
+        assert docker.named("cashpilot-m2-p3").status == "running"
+        assert proxy_tunnel._finish_staged(docker, staged, current, "cashpilot-tunnel-p3") is staged
+        assert _member_ids(docker, staged) == ["cashpilot-m1-p3", "cashpilot-m2-p3"]
+        assert "cashpilot-m2-p3" in proxy_tunnel.held()
+        assert docker.named("cashpilot-m2-p3").status != "running"
+
+    def test_control_with_no_trip_the_running_copies_move_across_running(self, docker):
+        current, staged = self._half_done(docker)
+        assert proxy_tunnel._finish_staged(docker, staged, current, "cashpilot-tunnel-p3") is staged
+        assert not proxy_tunnel.held()
+        assert docker.named("cashpilot-m2-p3").status == "running"
+
     def test_with_the_working_tunnel_down_the_change_finishes_without_a_start(self, docker):
         """Nothing has an exit to keep, so the staged tunnel is not started just to be judged."""
         current, staged = self._half_done(docker, auth="u1:dead@")
@@ -6444,6 +6460,18 @@ class TestIsolatedTunnel:
             raise APIError("the daemon refused the start")
 
         with patch.object(tunnel, "start", refuse), pytest.raises(APIError):
+            proxy_tunnel.start("bitping", 3, None, None)
+        assert tunnel.status == "exited"
+        assert _gate(docker, tunnel).status != "running"
+
+    def test_a_start_without_settings_whose_inner_never_gets_ready_stops_it_and_its_gate(self, docker):
+        _deploy_isolated()
+        tunnel = docker.named(OWN_TUNNEL)
+        proxy_tunnel.stop("bitping", 3)
+        with (
+            patch.object(docker, "ready", lambda c: c.name != OWN_TUNNEL),
+            pytest.raises(proxy_tunnel.ProxyTunnelError),
+        ):
             proxy_tunnel.start("bitping", 3, None, None)
         assert tunnel.status == "exited"
         assert _gate(docker, tunnel).status != "running"

@@ -46,8 +46,13 @@ fi
 # firewall check; its answer is read on a later pass, and only this loop trips.
 PROBE=/run/cp-watch-probe
 EVERY=${CP_WATCH_PROBE_EVERY:-120}
+# One probe at a time. A probe ends within about 40 s (cp-probe's caps), so
+# one with no result after 2 minutes ended without writing it, or hangs: it is
+# stopped and the next interval probes again, so the checks never stop.
+STALE=24
 rm -f "$PROBE" "$PROBE.rc"
-probing=
+probe_pid=
+probe_at=0
 n=0
 while sleep 5; do
     if [ "$MODE" = firewall ]; then
@@ -60,13 +65,18 @@ while sleep 5; do
             [ "$ip" = "$OWN_IP" ] && trip "a probe through the tunnel left from this box's own address ($ip)"
         fi
         rm -f "$PROBE" "$PROBE.rc"
-        probing=
+        probe_pid=
+    elif [ -n "$probe_pid" ] && [ $((n - probe_at)) -ge "$STALE" ]; then
+        kill "$probe_pid" 2>/dev/null
+        rm -f "$PROBE" "$PROBE.tmp"
+        probe_pid=
     fi
     n=$((n + 1))
-    [ $((n % EVERY)) -eq 0 ] && [ -n "$OWN_IP" ] && [ -z "$probing" ] || continue
-    probing=1
+    [ $((n % EVERY)) -eq 0 ] && [ -n "$OWN_IP" ] && [ -z "$probe_pid" ] || continue
     (
         cp-probe >"$PROBE" 2>/dev/null
         echo $? >"$PROBE.tmp" && mv "$PROBE.tmp" "$PROBE.rc"
     ) &
+    probe_pid=$!
+    probe_at=$n
 done

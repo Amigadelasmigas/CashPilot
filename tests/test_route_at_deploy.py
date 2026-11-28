@@ -1410,8 +1410,10 @@ class TestTheUiDeploysARoute:
                         {},
                     )
                 )
-                for _ in range(50):
+                # Released only once the add waits in the lock's queue, so the order below is the one under test.
+                while not getattr(deploy_lock, "_waiters", None) and not add.done():
                     await asyncio.sleep(0)
+                assert not add.done(), "the add finished without waiting for the deploy lock"
                 steps.append("released")
                 deploy_lock.release()
                 await add
