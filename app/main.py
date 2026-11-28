@@ -316,7 +316,8 @@ async def _get_all_worker_containers(workers: list[dict[str, Any]] | None = None
                             "fatal_at": c.get("fatal_at"),
                             # Why the worker's fence guard keeps this copy stopped, and
                             # what brings it back (lan_fence.guard). Absent when it does not.
-                            "held": c.get("held"),
+                            # In the reader's language when the worker sent its key (i18n.reword).
+                            "held": i18n.reword(c.get("held"), c.get("held_reason")),
                             # What the container was created with, for the drift
                             # check (app/drift.py). None from a worker too old to send it.
                             "shape": c.get("shape"),
@@ -1106,7 +1107,7 @@ async def _proxied_copy_check(workers: list[dict[str, Any]] | None = None) -> No
                         "what": "tunnel_stuck",
                         "tunnel": staged,
                         "age": change.get("age_seconds"),
-                        "reason": str(change.get("reason") or "")[:300],
+                        "reason": str(i18n.reword(change.get("reason"), change.get("reason_wire")) or "")[:300],
                         "copies": [],
                     },
                 )
@@ -1190,8 +1191,8 @@ def _proxied_alert_text(fault: dict[str, Any], since: datetime) -> tuple[str, st
             age = t("alert.proxied.age_hours", h=minutes // 60, m=minutes % 60)
         else:
             age = t("alert.proxied.age_minutes", m=minutes)
-        reason = fault.get("reason", "").strip() or t("alert.proxied.no_reason")
-        reason = reason if reason.endswith((".", "!", "?")) else reason + "."
+        # The message ends the reason with its own full stop, in its own script.
+        reason = fault.get("reason", "").strip().rstrip(".") or t("alert.proxied.no_reason")
         return (
             t("alert.proxied.tunnel_stuck_title", proxy=proxy, box=box),
             t("alert.proxied.tunnel_stuck", proxy=proxy, box=box, age=age, reason=reason, tunnel=tunnel, copies=copies),
@@ -1248,8 +1249,8 @@ def _stall_text(name: str, box: str, stall: traffic_stall.Stall, hours: int) -> 
 
     def mb(rate: float) -> str:
         if rate < 0.1 * traffic_stall.MB:
-            return t("alert.stall.under_tenth_mb")
-        return t("alert.stall.mb", mb=f"{rate / traffic_stall.MB:.1f}")
+            return t("alert.stall.under_tenth_mb", mb=i18n.decimal(0.1))
+        return t("alert.stall.mb", mb=i18n.decimal(rate / traffic_stall.MB))
 
     return (
         t("alert.stall.title", name=name, box=box),
@@ -6026,7 +6027,10 @@ async def _refuse_shared_device_ids(slug: str, svc: dict[str, Any], env: dict[st
             detail={
                 "error": "identity_in_use",
                 "message": t(
-                    "api.already_runs_two_boxes_one", label=label, name=svc.get("name") or slug, names=", ".join(names)
+                    "api.already_runs_two_boxes_one",
+                    label=label,
+                    name=svc.get("name") or slug,
+                    names=i18n.join_and(names),
                 ),
             },
         )
@@ -6493,8 +6497,8 @@ async def _reserve_pending_identities(
         instance = await database.hold_pending_identities(slug, worker_id, copy, env)
     except Exception as exc:
         logger.exception("Could not record the device ids of %s on worker %s", slug, worker_id)
-        what = f"copy {copy_note} and the copies after it were not deployed" if copy_note else "nothing was deployed"
-        raise HTTPException(status_code=503, detail=t("api.device_ids_deploy_sends_could", what=what)) from exc
+        copy_text = str(copy_note) if copy_note else "none"
+        raise HTTPException(status_code=503, detail=t("api.device_ids_deploy_sends_could", copy=copy_text)) from exc
     return (instance, dict(env)) if instance else None
 
 
@@ -13530,7 +13534,7 @@ async def _activity_spikes(workers: list[dict[str, Any]], now: float | None = No
                 what=what,
                 count=int(latest or 0),
                 amount=activity_ui.human_bytes(latest or 0),
-                ratio=str(activity_ui.SPIKE_RATIO),
+                ratio=activity_ui.SPIKE_RATIO,
             )
             await database.record_alert(
                 "activity_spike",
@@ -14865,7 +14869,7 @@ async def api_identity_change(request: Request, identity_id: int) -> dict[str, A
                     "api.already_runs_two_boxes_one_2",
                     label=label,
                     name=svc.get("name") or slug,
-                    value=", ".join(await _worker_names(others)),
+                    value=i18n.join_and(await _worker_names(others)),
                 ),
             },
         )
