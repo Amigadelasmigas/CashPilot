@@ -8511,6 +8511,10 @@
     "text": "não é possível aqui",
     "source": "845f15559082"
   },
+  "layers.load_failed": {
+    "text": "The security layers could not be loaded.",
+    "source": ""
+  },
   "layers.off": {
     "text": "desligado",
     "source": "b4dc66dde806"

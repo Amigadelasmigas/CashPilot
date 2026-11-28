@@ -8511,6 +8511,10 @@
     "text": "여기서는 불가능",
     "source": "845f15559082"
   },
+  "layers.load_failed": {
+    "text": "The security layers could not be loaded.",
+    "source": ""
+  },
   "layers.off": {
     "text": "꺼짐",
     "source": "b4dc66dde806"

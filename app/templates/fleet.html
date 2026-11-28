@@ -227,7 +227,8 @@ CASHPILOT_WORKER_NAME=server-name</code>
 
   let fleetRequest = 0;
   let pendingWorkerPowerSaves = 0;
-  // GET /api/layers: {workers: {id: view}, commands: {install, status, undo} | {error}}.
+  // GET /api/layers: {workers: {id: view}, commands: {install, status, undo} | {error}},
+  // or {failed: true} when the request failed, which the row says, apart from "no layers".
   let _layers = null;
   async function loadFleet() {
     const request = ++fleetRequest;
@@ -235,8 +236,8 @@ CASHPILOT_WORKER_NAME=server-name</code>
       const [summary, workers, layers] = await Promise.all([
         CP.api('/api/fleet/summary'),
         CP.api('/api/workers'),
-        // Security layers (app/layers_ui.py). A failure hides the layer rows, not the page.
-        CP.api('/api/layers').catch(() => null),
+        // Security layers (app/layers_ui.py). A failure shows in the layer rows, not the page.
+        CP.api('/api/layers').catch(() => ({failed: true})),
       ]);
       _layers = layers;
       if (request !== fleetRequest || pendingWorkerPowerSaves) return;
@@ -824,6 +825,11 @@ CASHPILOT_WORKER_NAME=server-name</code>
   }
 
   function renderLayers(w, sysInfo, isOnline) {
+    if (_layers && _layers.failed) {
+      return `<tr class="worker-detail"><td colspan="7"><div class="iso-line">
+        <span class="detail-label">${esc(t('layers.title'))}</span> <span class="text-fail">${esc(t('layers.load_failed'))}</span>
+        <button class="btn btn-ghost btn-sm btn-layers-reload">${esc(t('app.retry'))}</button></div></td></tr>`;
+    }
     const view = _layers && _layers.workers ? _layers.workers[String(w.id)] : null;
     if (!view) return '';
     const iso = sysInfo.isolation || {};
@@ -1419,6 +1425,11 @@ CASHPILOT_WORKER_NAME=server-name</code>
       if (!isNaN(id) && !(_layerBusy[id] && _layerBusy[id].busy)) {
         setLayerRuntime(id, runtimeBtn.dataset.slug, runtimeBtn.dataset.service, runtimeBtn.dataset.choice, runtimeBtn.dataset.running === '1');
       }
+      return;
+    }
+
+    if (e.target.closest('.btn-layers-reload')) {
+      loadFleet();
       return;
     }
 

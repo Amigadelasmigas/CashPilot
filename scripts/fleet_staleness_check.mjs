@@ -592,6 +592,13 @@ check('a saved choice still on the old runtime offers it again',
   onlineLayers.includes('data-choice="gvisor"') && onlineLayers.includes('Run under gVisor again')
   && onlineLayers.includes('data-choice="runc"'), onlineLayers);
 
+// A failed GET /api/layers says so, with a retry, instead of dropping the row
+// the way a worker with no layer report does.
+const failedLayers = buildLayers(esc, CP, {failed: true}, true)({id: 7}, layerInfo, true);
+check('a failed layers request shows the load error with a retry, not an empty row',
+  failedLayers.includes('The security layers could not be loaded.') && failedLayers.includes('btn-layers-reload')
+  && buildLayers(esc, CP, {workers: {}}, true)({id: 7}, layerInfo, true) === '', failedLayers);
+
 // Two default changes in a row: the second waits for the first, so the older
 // value cannot be the one saved last.
 const defaultPosts = [];
