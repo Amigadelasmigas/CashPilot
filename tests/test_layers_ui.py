@@ -595,6 +595,36 @@ class TestTheDeploySendsTheChoice:
         assert sent["runtime_choice"] == "gvisor"
         remember.assert_awaited_once_with(7, "honeygain", "gvisor")
 
+    def test_a_restore_signs_its_approval_only_once_the_deploy_lock_is_held(self):
+        """A deploy ahead of the restore can run for minutes; the approval's lifetime starts at the send."""
+        restore = {"sha256": "ab" * 32, "bundle_b64": "eA==", "passphrase": "p"}
+        sign = patch.object(main.step_up, "sign", return_value="approval")
+
+        async def scenario(signed):
+            locks = main._worker_deploy_locks.setdefault(asyncio.get_running_loop(), {})
+            lock = locks.setdefault((7, "honeygain"), asyncio.Lock())
+            await lock.acquire()
+            task = asyncio.create_task(
+                main._proxy_worker_restore(7, "honeygain", {"image": "honeygain/honeygain"}, restore)
+            )
+            for _ in range(20):
+                await asyncio.sleep(0)
+            assert not signed.called, "signed while another deploy still held the lock"
+            lock.release()
+            await task
+            signed.assert_called_once()
+
+        with (
+            patch.object(main, "_runtime_choice_for", AsyncMock(return_value=None)),
+            patch.object(main, "_remember_runtime_choice", AsyncMock()),
+            patch.object(main, "_image_for_worker", AsyncMock(side_effect=lambda w, s, spec: spec)),
+            patch.object(database, "get_worker", AsyncMock(return_value={"client_id": "c7"})),
+            patch.object(main, "_confirmed_worker_key", AsyncMock(return_value="k" * 32)),
+            patch.object(main, "_proxy_to_worker", AsyncMock(return_value={"state_id": 1})),
+            sign as signed,
+        ):
+            _run(scenario(signed))
+
     def test_desktop_gets_none(self):
         w = _worker(_layers(), device_type="desktop")
         with patch.object(database, "get_worker", AsyncMock(return_value=w)):
