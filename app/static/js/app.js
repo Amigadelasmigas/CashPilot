@@ -342,9 +342,14 @@ const CP = (() => {
     note.style.display = message ? '' : 'none';
   }
 
+  let _ratesLoaded = false;
+
   async function loadExchangeRates() {
     try {
       _exchangeRates = await api('/api/exchange-rates');
+      // The catalog may have drawn its estimates before the first rates came.
+      if (!_ratesLoaded && document.body.dataset.page === 'catalog' && catalogServices.length) filterCatalog();
+      _ratesLoaded = true;
     } catch (err) {
       console.warn('Could not refresh exchange rates, keeping previous values:', err);
     }
@@ -606,7 +611,8 @@ const CP = (() => {
     const host = server.containers.filter(c => c.no_counters).map(c => c.service);
     const parts = [t('app.usage.sum_note')];
     if (host.length) {
-      parts.push(t('app.usage.host_network_some', { names: [...new Set(host)].join(', ') }));
+      const names = [...new Set(host)];
+      parts.push(t('app.usage.host_network_some', { names: names.join(', '), n: names.length }));
     }
     return parts.join(' ');
   }
@@ -4596,9 +4602,14 @@ const CP = (() => {
       </table>`;
   }
 
+  // A catalog estimate is in whole dollars; a bound under a dollar keeps its cents.
+  function estimateAmount(usd) {
+    return formatCurrency(usd, 'USD', Number.isInteger(Number(usd)) ? 0 : 2);
+  }
+
   function renderCatalogCard(svc) {
     const earning = svc.earnings
-      ? t('app.cat.estimate', { low: svc.earnings.monthly_low, high: svc.earnings.monthly_high, per: escapeHtml(svc.earnings.per || t('app.cat.month')) })
+      ? t('app.cat.estimate', { low: estimateAmount(svc.earnings.monthly_low), high: estimateAmount(svc.earnings.monthly_high), per: escapeHtml(svc.earnings.per || t('app.cat.month')) })
       : t('app.cat.varies');
     const isDeployed = svc.deployed || false;
     const broken = svc.status === 'broken';
@@ -4946,7 +4957,7 @@ const CP = (() => {
 
   function renderServiceDetail(svc, workers) {
     const earning = svc.earnings
-      ? t('app.detail.estimate', { low: svc.earnings.monthly_low, high: svc.earnings.monthly_high, per: svc.earnings.per || t('app.cat.month') })
+      ? t('app.detail.estimate', { low: estimateAmount(svc.earnings.monthly_low), high: estimateAmount(svc.earnings.monthly_high), per: svc.earnings.per || t('app.cat.month') })
       : t('app.detail.varies');
 
     const isDeployed = svc.deployed || false;
@@ -5574,6 +5585,8 @@ const CP = (() => {
   // The ledger's rows as HTML. Pure, so the harness can run it: every value
   // arrives masked, and the full one only ever comes from the reveal route.
   function identityRowsHtml(rows) {
+    // How long an unconfirmed deploy or restore holds its id: database.PENDING_IDENTITY_SECONDS.
+    const PENDING_IDENTITY_HOURS = 6;
     if (!Array.isArray(rows) || !rows.length) {
       return `<p class="muted">${t('app.ids.empty')}</p>`;
     }
@@ -5603,9 +5616,9 @@ const CP = (() => {
       const change = r.changeable
         ? `<button class="btn btn-ghost btn-sm" data-action="openIdentityChange" data-a1="${id}">${t('app.ids.change')}</button>` : '';
       const unconfirmed = held && !r.forgettable
-        ? `<div class="credential-health-hint">${t('app.ids.unconfirmed_deploy')}</div>`
+        ? `<div class="credential-health-hint">${t('app.ids.unconfirmed_deploy', { hours: PENDING_IDENTITY_HOURS })}</div>`
         : (backup && r.source === 'pending' && !r.forgettable
-          ? `<div class="credential-health-hint">${t('app.ids.unconfirmed_restore')}</div>` : '');
+          ? `<div class="credential-health-hint">${t('app.ids.unconfirmed_restore', { hours: PENDING_IDENTITY_HOURS })}</div>` : '');
       return `
         <div class="credential-health-item identity-row" data-identity="${id}">
           <div>
@@ -7006,6 +7019,8 @@ const CP = (() => {
         loadServicesTable();
         loadUsagePanel();
       }
+      // The catalog's estimates are drawn in the display currency too.
+      if (document.body.dataset.page === 'catalog') filterCatalog();
       // Also sync settings page dropdown if present
       const settingsSelect = document.getElementById('settings-currency');
       if (settingsSelect) settingsSelect.value = select.value;
