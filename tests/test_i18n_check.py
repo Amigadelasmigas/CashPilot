@@ -1000,6 +1000,18 @@ def test_a_keyword_given_twice_in_one_select_or_plural_fails(tmp_path, kind):
     assert code == 1 and "malformed braces" in out
 
 
+@pytest.mark.parametrize("junk", ["\x02", "\x020\x03", "\x029\x03"])
+def test_the_texts_own_marker_characters_are_text(tmp_path, junk):
+    # The check marks placeholders with \x02<n>\x03, so a string that holds
+    # those characters itself must not be read as a marker.
+    en = write(tmp_path / "en.json", json.dumps({"k": f"a {junk} {{g, select, x {{{{p}}}} other {{b}}}}"}))
+    es = write(tmp_path / "es.json", json.dumps({"k": f"a {junk} {{g, select, x {{{{p}}}} other {{c}}}}"}))
+    assert run(en, es)[0] == 0
+    write(es, json.dumps({"k": f"a {junk} {{g, select, x {{c}} other {{{{p}}}}}}"}))
+    code, out = run(en, es)
+    assert code == 1 and "g = x" in out
+
+
 def test_plural_forms_join_what_they_render_for_each_select_keyword():
     # A language may drop the "one" form and say {p} in "other" instead.
     en = {"k": {"one": "{p}", "other": "{g, select, x {{q}} other {{q}}}"}}
