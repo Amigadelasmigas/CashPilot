@@ -9568,8 +9568,8 @@
     "source": "feb047d466da"
   },
   "secure_vm.cmd.bad_host_name": {
-    "text": "वर्कर का नाम {name} किसी Secure VM के होस्ट का नाम नहीं हो सकता। वर्कर का नाम बदलें: अधिकतम 64 वर्ण, जिनमें केवल अक्षर, अंक, स्पेस, बिंदु, डैश और अंडरस्कोर हों।",
-    "source": "07b126d20986"
+    "text": "The worker name {name} cannot name a Secure VM's host. Rename the worker to at most 64 characters, each a letter from A to Z, a digit, a space, a dot, a dash or an underscore.",
+    "source": "000000000000"
   },
   "secure_vm.cmd.bad_ui_url": {
     "text": "UI का पता एक सामान्य http:// या https:// पता होना चाहिए।",
@@ -9628,8 +9628,8 @@
     "source": "565661c7c5fa"
   },
   "secure_vm.selftest.green": {
-    "text": "स्व-परीक्षण हरा: VM, UI और इंटरनेट तक पहुँचती है, और किसी और चीज़ तक नहीं।",
-    "source": "95ce5bf92a05"
+    "text": "Self-test green: the VM reaches the UI and the internet, and every address it probed on the host, your LAN and your tailnet stayed blocked.",
+    "source": "000000000000"
   },
   "secure_vm.selftest.never": {
     "text": "अभी तक कोई स्व-परीक्षण परिणाम नहीं।",

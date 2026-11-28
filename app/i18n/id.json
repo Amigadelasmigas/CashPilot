@@ -9568,8 +9568,8 @@
     "source": "feb047d466da"
   },
   "secure_vm.cmd.bad_host_name": {
-    "text": "Nama worker {name} tidak dapat dipakai untuk menamai host Secure VM. Ganti nama worker menjadi paling banyak 64 karakter berupa huruf, angka, spasi, titik, tanda hubung, dan garis bawah.",
-    "source": "07b126d20986"
+    "text": "The worker name {name} cannot name a Secure VM's host. Rename the worker to at most 64 characters, each a letter from A to Z, a digit, a space, a dot, a dash or an underscore.",
+    "source": "000000000000"
   },
   "secure_vm.cmd.bad_ui_url": {
     "text": "Alamat UI harus berupa alamat http:// atau https:// biasa.",
@@ -9628,8 +9628,8 @@
     "source": "565661c7c5fa"
   },
   "secure_vm.selftest.green": {
-    "text": "Uji mandiri hijau: VM menjangkau UI dan internet, dan tidak menjangkau apa pun selain itu.",
-    "source": "95ce5bf92a05"
+    "text": "Self-test green: the VM reaches the UI and the internet, and every address it probed on the host, your LAN and your tailnet stayed blocked.",
+    "source": "000000000000"
   },
   "secure_vm.selftest.never": {
     "text": "Belum ada hasil uji mandiri.",
