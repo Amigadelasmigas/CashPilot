@@ -1043,7 +1043,11 @@ def check_target(source: dict, target: dict, hashes: dict | None) -> dict:
         if no_other:
             # Reported even when the English lacks it too: ICU needs "other".
             found["placeholder"].append((key, f"no 'other' branch in {', '.join(no_other)}"))
-        elif s_sig != t_sig:
+        elif s_sig != {x for x in t_sig if x[0] != "plural-number" or x in s_sig}:
+            # A plural may show its count where the English does not: CLDR puts
+            # more than 1 in some locales' "one" (21 in Russian, 0 in French),
+            # so a form the English writes as "it" must say the number there.
+            # Dropping a count the English shows is still a mismatch.
             found["placeholder"].append((key, f"source {_describe(s_sig)}; target {_describe(t_sig)}"))
         if hashes is not None:
             stored = hashes.get(key)
