@@ -46,7 +46,7 @@ python scripts/i18n_check.py app/i18n/en.json app/i18n/*.json --stamp
 
 Do not use the real hash on an English copy, and do not leave the hash out. The check would then pass with no warning, and the English would stay as if it were the finished translation. The sync job records a hash for an entry that has none, so it would never translate that entry either.
 
-When you change the English of a key, its translations go stale, and the sync job translates them again. If the change adds, removes or renames a placeholder, the old translations no longer match the English, and the check fails. Then also replace the text of that key in each locale file with the new English, and keep its old `source` so that the entry stays stale. When you remove a key from `en.json`, remove it from each locale file too.
+When you change the English of a key, its translations go stale, and the sync job translates them again. If the change adds, removes or renames a placeholder, a tag or a link, the old translations no longer match the English, and the check fails. Then also replace that key's entry in each locale file with the new English and the hash that does not match, as for a new key: `{"text": "<the new English>", "source": "000000000000"}`. When you remove a key from `en.json`, remove it from each locale file too.
 
 ## Code Style
 
