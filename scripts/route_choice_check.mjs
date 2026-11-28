@@ -25,7 +25,7 @@ const fns = (names, args = [], values = []) => new Function(
 )(escapeHtml, ...values);
 
 const { runsOn, workerCopies, routeBadge, routeChoiceSection } = fns(
-  ['runsOn', 'workerCopies', 'routeBadge', 'routeChoiceSection'],
+  ['runsOn', 'workerCopies', 'routeBadge', 'routeChoiceSection', 'routeAckText'],
 );
 
 // ---- A routed copy counts as the service on that box -------------------------
@@ -89,13 +89,31 @@ const document = {
 const deploy = new Function(
   'escapeHtml', 'document', 'api', 'toast', '_confirmPreflight', '_imageChoice', '_instancesFor', '_showDeviceLink', 'wizardState',
   '_confirmDeviceRenames',
-  `${grab('_routeSelect')}\n${grab('_routeChoice')}\nconst _walletRequest = () => undefined;\n${grab('_deployToWorkers')}\nreturn _deployToWorkers;`,
+  `${grab('_routeSelect')}\n${grab('_routeChoice')}\n${grab('_routeAcks')}\nconst _walletRequest = () => undefined;\n${grab('_deployToWorkers')}\nreturn _deployToWorkers;`,
 )(escapeHtml, document, api, () => {}, async () => true, () => undefined, () => undefined, () => {}, { deployed: [] },
   async () => false);
-await deploy('honeygain', [1], { routeRoot: formRoot({ value: '3' }) });
+// The Route box's ticked acknowledgements go with the route (the worker refuses a
+// service that needs one without it).
+const ticked = keys => ({
+  querySelectorAll: sel => (sel === 'input[data-route-ack]:checked' ? keys.map(k => ({ dataset: { routeAck: k } })) : []),
+});
+const routeBox = (value, keys) => ({ value, closest: sel => (sel === '.route-choice' ? ticked(keys) : null) });
+await deploy('honeygain', [1], { routeRoot: formRoot(routeBox('3', ['net_raw'])) });
 assert.equal(sent.length, 1);
 assert.equal(sent[0].path, '/api/deploy/honeygain?worker_id=1');
 assert.equal(sent[0].body.route, 3, 'the chosen proxy goes with the deploy');
+assert.deepEqual(sent[0].body.route_acknowledged, ['net_raw'], 'with the ticks of its Route box');
+// Under "Keep" (no route sent) a tick given in the box goes too, and only then.
+sent.length = 0;
+await deploy('honeygain', [1], { routeRoot: formRoot(routeBox('', ['account_risk'])) });
+assert.equal(sent[0].body.route, undefined, 'Keep sends no route');
+assert.deepEqual(sent[0].body.route_acknowledged, ['account_risk'], 'a tick given under Keep goes with the deploy');
+sent.length = 0;
+await deploy('honeygain', [1], { routeRoot: formRoot(routeBox('', [])) });
+assert.equal('route_acknowledged' in sent[0].body, false, 'Keep with nothing ticked keeps the ticks on record');
+sent.length = 0;
+await deploy('honeygain', [1], { routeRoot: formRoot(routeBox('0', ['account_risk'])) });
+assert.equal('route_acknowledged' in sent[0].body, false, 'leaving the route sends no ticks');
 console.log('Deploy: the chosen route is sent; the box\'s own IP sends none.');
 
 // ---- Leaving a route: Direct is its own choice where the service is routed ----
@@ -105,6 +123,15 @@ assert.match(routedForm, /<option value="0">Direct: the box's own IP<\/option>/,
 assert.doesNotMatch(
   routeChoiceSection({ slug: 'honeygain', routes: {} }), /value="0"/, 'nothing routed: Direct is the default, no 0',
 );
+// A route recorded before its service needed a tick: the box shows the ticks under Keep.
+const honeygain = { slug: 'honeygain', name: 'Honeygain', routes: { 1: 3 }, route_needs: ['account_risk'],
+  requirements: { proxy_risk: { source: 'https://support.example.net/terms' } } };
+const keepAsks = routeChoiceSection({ ...honeygain, route_acks_missing: { 1: ['account_risk'] } });
+assert.match(keepAsks, /<div class="route-acks" data-slug="honeygain" data-keep="1">/, 'shown under Keep');
+assert.match(keepAsks, /Your Honeygain account may be suspended/, 'the line names the service');
+assert.match(keepAsks, /https:\/\/support\.example\.net\/terms/, 'and gives its terms');
+assert.match(routeChoiceSection(honeygain), /class="route-acks" data-slug="honeygain" style="display:none;"/,
+  'a recorded route with its ticks shows them only once a proxy is chosen');
 console.log('Route box: where a service is routed, Direct is a choice that leaves the route.');
 
 // ---- The setup wizard offers the Route box too ---------------------------------
@@ -203,7 +230,7 @@ async function pick(routeValue, tick = []) {
   const live = new Function(
     'escapeHtml', 'document', 'api', 'toast', '_confirmPreflight', '_imageChoice', '_instancesFor', '_showDeviceLink',
     'wizardState', '_confirmDeviceRenames',
-    ['_routeSwitchBoxes', '_routeSelect', '_routeChoice', '_selectedWorkerIds', '_rescaledWorkerIds', '_deployToWorkers',
+    ['_routeSwitchBoxes', '_routeSelect', '_routeChoice', '_routeAcks', '_selectedWorkerIds', '_rescaledWorkerIds', '_deployToWorkers',
       'deployServiceToWorkers'].map(grab).join('\n') + '\nconst _walletRequest = () => undefined;'
       + '\nreturn { _routeSwitchBoxes, deployServiceToWorkers };',
   )(escapeHtml, dom, api, () => {}, async () => true, () => undefined, () => undefined, () => {}, { deployed: [] },
@@ -253,6 +280,49 @@ assert.equal(box1(run.dom).disabled, true, 'back on the default it is locked aga
 assert.equal(box1(run.dom).checked, true, 'and ticked again');
 console.log('Route change: a routed box is selectable only once Direct is chosen, and sends it.');
 
+// ---- A routed box whose recorded route lacks a tick sends it under "Keep" -------
+// It runs the service, so it is no new box; freed unticked under Keep, the owner
+// ticks it and the lines, and the ticks go with no route (the server keeps it).
+for (const [tickBox, want] of [
+  [true, [{ path: '/api/deploy/honeygain?worker_id=1', route: undefined, acks: ['account_risk'] }]],
+  [false, []],
+]) {
+  const svc = { ...routedSvc, route_acks_missing: { 1: ['account_risk'] } };
+  const keepRows = workerCheckboxList(svc, [routedBox, directBox], 'deploy-worker-cb').rows;
+  const dom = formDom(keepRows, '');
+  const ack = { dataset: { routeAck: 'account_risk' }, checked: true };
+  const acksDiv = { dataset: { keep: '1' }, style: {} };
+  dom.select.closest = () => ({
+    parentElement: null,
+    querySelector: sel => (sel === '.route-acks' ? acksDiv : null),
+    querySelectorAll: sel => (sel === 'input[data-route-ack]:checked' ? [ack].filter(i => i.checked) : []),
+  });
+  const calls = [];
+  const api = async (path, opts) => { calls.push({ path, route: opts.body.route, acks: opts.body.route_acknowledged }); return {}; };
+  const live = new Function(
+    'escapeHtml', 'document', 'api', 'toast', '_confirmPreflight', '_imageChoice', '_instancesFor', '_showDeviceLink',
+    'wizardState', '_confirmDeviceRenames',
+    ['_routeSwitchBoxes', '_routeSelect', '_routeChoice', '_routeAcks', '_selectedWorkerIds', '_rescaledWorkerIds', '_deployToWorkers',
+      'deployServiceToWorkers'].map(grab).join('\n') + '\nconst _walletRequest = () => undefined;'
+      + '\nreturn { _routeSwitchBoxes, deployServiceToWorkers };',
+  )(escapeHtml, dom, api, () => {}, async () => true, () => undefined, () => undefined, () => {}, { deployed: [] },
+    async () => false);
+  live._routeSwitchBoxes(dom.select);
+  assert.equal(box1(dom).disabled, false, 'under Keep a box that lacks a tick is free');
+  assert.equal(box1(dom).checked, false, 'and unticked: it is sent only by its own tick');
+  assert.equal(dom.boxes.find(b => b.dataset.wid === '2').disabled, true, 'a box running it direct stays locked');
+  if (tickBox) box1(dom).checked = true;
+  await live.deployServiceToWorkers('honeygain');
+  assert.deepEqual(calls, want, tickBox ? 'ticked, it sends the ticks and keeps its route' : 'unticked, nothing is sent');
+}
+{
+  // Control: a routed box with every tick stays locked under Keep.
+  const dom = formDom(workerCheckboxList({ ...routedSvc, route_acks_missing: {} }, [routedBox], 'deploy-worker-cb').rows, '');
+  new Function('document', `${grab('_routeSwitchBoxes')}\nreturn _routeSwitchBoxes;`)(dom)(dom.select);
+  assert.equal(box1(dom).disabled, true, 'a routed box with every tick stays locked under Keep');
+}
+console.log('Keep: a routed box whose route lacks a tick can send it.');
+
 // ---- A changed Instances count never moves a routed box off its route -----------
 // Direct unlocks the routed box unticked; its Instances box can still change.
 for (const [routeValue, want] of [['0', []], ['', [{ path: '/api/deploy/honeygain?worker_id=1', route: undefined }]]]) {
@@ -265,7 +335,7 @@ for (const [routeValue, want] of [['0', []], ['', [{ path: '/api/deploy/honeygai
   const live = new Function(
     'escapeHtml', 'document', 'api', 'toast', '_confirmPreflight', '_imageChoice', '_instancesFor', '_showDeviceLink',
     'wizardState', '_confirmDeviceRenames', 'window',
-    ['_routeSwitchBoxes', '_routeSelect', '_routeChoice', '_selectedWorkerIds', '_rescaledWorkerIds', '_deployToWorkers',
+    ['_routeSwitchBoxes', '_routeSelect', '_routeChoice', '_routeAcks', '_selectedWorkerIds', '_rescaledWorkerIds', '_deployToWorkers',
       'deployServiceToWorkers'].map(grab).join('\n') + '\nconst _walletRequest = () => undefined;'
       + '\nreturn { _routeSwitchBoxes, deployServiceToWorkers };',
   )(escapeHtml, dom, api, () => {}, async () => true, () => undefined, () => undefined, () => {}, { deployed: [] },
@@ -290,7 +360,7 @@ console.log('Instances: a changed count rescales a routed box on its route, neve
   const live = new Function(
     'escapeHtml', 'document', 'api', 'toast', '_confirmPreflight', '_imageChoice', '_instancesFor', '_showDeviceLink',
     'wizardState', '_confirmDeviceRenames',
-    ['_routeSelect', '_routeChoice', '_selectedWorkerIds', '_rescaledWorkerIds', '_deployToWorkers',
+    ['_routeSelect', '_routeChoice', '_routeAcks', '_selectedWorkerIds', '_rescaledWorkerIds', '_deployToWorkers',
       'deployServiceToWorkers', 'deployService'].map(grab).join('\n') + '\nconst _walletRequest = () => undefined;'
       + '\nreturn { deployServiceToWorkers, deployService };',
   )(escapeHtml, dom, api, () => {}, async () => true, () => undefined, () => undefined, () => {}, { deployed: [] },
@@ -303,14 +373,14 @@ console.log('Instances: a changed count rescales a routed box on its route, neve
 
 // ---- The route is read once for every box of one deploy -------------------------
 {
-  const select = { value: '7' };
+  const select = { value: '7', closest: () => null };
   const calls = [];
   // The owner switches the Route box back while the first box deploys.
   const api = async (path, opts) => { calls.push({ path, route: opts.body.route }); select.value = ''; return {}; };
   const deploy = new Function(
     'escapeHtml', 'document', 'api', 'toast', '_confirmPreflight', '_imageChoice', '_instancesFor', '_showDeviceLink',
     'wizardState', '_confirmDeviceRenames',
-    `${grab('_routeSelect')}\n${grab('_routeChoice')}\nconst _walletRequest = () => undefined;\n${grab('_deployToWorkers')}\nreturn _deployToWorkers;`,
+    `${grab('_routeSelect')}\n${grab('_routeChoice')}\n${grab('_routeAcks')}\nconst _walletRequest = () => undefined;\n${grab('_deployToWorkers')}\nreturn _deployToWorkers;`,
   )(escapeHtml, { getElementById: () => null, querySelectorAll: () => [] }, api, () => {},
     async () => { select.value = '7'; return true; }, () => undefined, () => undefined, () => {}, { deployed: [] },
     async () => false);

@@ -6,9 +6,12 @@ DNS, no password in docker inspect) lives in scripts/proxy_leak_test.sh.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import os
 import re
+import signal
+import subprocess
 import tarfile
 import threading
 import time
@@ -1353,12 +1356,15 @@ class TestATunnelLogsOutOfTheTailnetWhenStopped:
 # ---------------------------------------------------------------------------
 
 
-def _run_firewall_step(tmp_path: Path, nft_mode: str) -> tuple[int, str, str]:
+def _run_firewall_step(
+    tmp_path: Path, nft_mode: str, *, gate: bool = False, forwarding: str = "1", inner: bool = True
+) -> tuple[int, str, str]:
     """Run cp-tunnel up to its rules being loaded, with stub ip, stat, nft and curl.
 
     ``nft_mode``: ``match`` (the cgroup rule loads and counts the probe),
     ``no-cgroup`` (nft refuses any rule set naming cgroupv2), ``refuse`` (it
-    refuses every rule set).
+    refuses every rule set). ``gate`` runs it as an isolated copy's gate, with
+    ``forwarding`` in ip_forward and, when ``inner``, a second interface (eth1).
     """
     import subprocess
 
@@ -1367,11 +1373,17 @@ def _run_firewall_step(tmp_path: Path, nft_mode: str) -> tuple[int, str, str]:
     secret.mkdir(parents=True)
     for key, value in {"kind": "socks5", "proxy_ip": "203.0.113.5", "proxy_port": "1080"}.items():
         (secret / key).write_text(value)
+    if gate:
+        (secret / "gate").write_text("1")
     (tmp_path / "cgroup").write_text("0::/docker/abc\n")
+    (tmp_path / "ip_forward").write_text(forwarding + "\n")
+    addrs = "1: lo    inet 127.0.0.1/8 scope host lo\n2: eth0    inet 172.17.0.2/16 scope global eth0\n"
+    if inner:
+        addrs += "3: eth1    inet 10.99.0.2/24 scope global eth1\n"
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     stubs = {
-        "ip": 'echo "default via 172.17.0.1 dev eth0"',
+        "ip": f'case "$*" in *"-o addr"*) printf "{addrs}" ;; *) echo "default via 172.17.0.1 dev eth0" ;; esac',
         "stat": "echo cgroup2fs",
         "curl": "exit 0",
         "nft": f"""
@@ -1396,6 +1408,7 @@ if [ {nft_mode} = match ]; then sed 's/counter/counter packets 1 bytes 60/' "$lo
         head.replace("/run/", f"{run}/")
         .replace("/run\n", f"{run}\n")
         .replace("/proc/self/cgroup", str(tmp_path / "cgroup"))
+        .replace("/proc/sys/net/ipv4/ip_forward", str(tmp_path / "ip_forward"))
     )
     script += f'\necho RULES_LOADED\ncat "{run}/loaded.nft"\n'
     env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
@@ -1421,6 +1434,39 @@ class TestTheTunnelFirewallFallsBack:
         code, out, err = _run_firewall_step(tmp_path, "refuse")
         assert code != 0 and "RULES_LOADED" not in out
         assert "refusing to start" in err
+
+
+class TestTheGateOfAnIsolatedCopy:
+    """A gate forwards what its copy sends into the tunnel, and nothing anywhere else."""
+
+    def test_its_copy_reaches_the_tunnel_only(self, tmp_path):
+        code, out, err = _run_firewall_step(tmp_path, "match", gate=True)
+        assert code == 0, err
+        rules = out.split("RULES_LOADED", 1)[1]
+        chain = rules.split("chain gate_forward {", 1)[1].split("\n    }", 1)[0]
+        lines = [line.strip() for line in chain.strip().splitlines()]
+        assert lines[0] == "type filter hook forward priority 0; policy drop;"
+        assert 'iifname "tun0" oifname "eth1" ct state established,related accept' in lines
+        # The private ranges are dropped before the copy's accept, never after.
+        deny = next(i for i, line in enumerate(lines) if line.startswith('iifname "eth1" oifname "tun0" ip daddr {'))
+        accept = lines.index('iifname "eth1" oifname "tun0" accept')
+        assert lines[deny].endswith("drop") and deny < accept
+        # No rule lets it out of the real interface.
+        assert not [line for line in lines if 'oifname "eth0"' in line]
+        # tun2proxy answers any source: no masquerade into tun0.
+        assert "gate_nat" not in rules and "masquerade" not in chain
+        assert 'oifname "eth1" ip protocol icmp accept' in rules
+
+    def test_a_plain_tunnel_has_no_forward_chain(self, tmp_path):
+        code, out, err = _run_firewall_step(tmp_path, "match")
+        assert code == 0, err
+        assert "gate_forward" not in out and 'oifname "eth1"' not in out
+
+    def test_a_gate_without_forwarding_or_without_its_copys_network_never_starts(self, tmp_path):
+        code, out, err = _run_firewall_step(tmp_path / "a", "match", gate=True, forwarding="0")
+        assert code != 0 and "RULES_LOADED" not in out and "without IP forwarding" in err
+        code, out, err = _run_firewall_step(tmp_path / "b", "match", gate=True, inner=False)
+        assert code != 0 and "RULES_LOADED" not in out and "no interface on its copy's network" in err
 
 
 def _run_until_rules_logged(tmp_path: Path) -> tuple[int, list[str], str]:
@@ -1760,6 +1806,233 @@ class TestTheWholeWayToReadyFitsTheWorkersWait:
         assert '"ip":"203.0.113.7"' in (tmp_path / "ready").read_text()
 
 
+def _run_supervision(tmp_path: Path, watch: str, tunnel: str = "sleep 30") -> tuple[subprocess.CompletedProcess, Path]:
+    """Run cp-tunnel from its watchdog start to its end, with ``watch`` as cp-watch and ``tunnel`` as its process."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "cp-watch").write_text(f"#!/bin/sh\n{watch}\n")
+    (bin_dir / "cp-watch").chmod(0o755)
+    start = _CP_TUNNEL.index("# 5: every rule is loaded")
+    tail = _CP_TUNNEL[start:].replace("/run/", f"{tmp_path}/")
+    ready = tmp_path / "ready"
+    ready.write_text("{}")
+    script = f'die() {{ echo "cp-tunnel: $*" >&2; exit 1; }}\n{tunnel} &\nTPID=$!\n{tail}'
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "T": str(tmp_path)}
+    proc = subprocess.run(["sh", "-c", script], env=env, capture_output=True, text=True, timeout=20)
+    return proc, ready
+
+
+class TestTheTunnelEndsWithItsWatchdog:
+    """The entrypoint waited on the tunnel process only: a watchdog killed or broken left the tunnel
+    ready and carrying traffic with nothing checking its firewall any more."""
+
+    def test_a_watchdog_that_ends_without_a_trip_ends_the_run_not_as_a_trip(self, tmp_path):
+        proc, ready = _run_supervision(tmp_path, "exit 0")
+        assert proc.returncode == 1, proc.stderr
+        assert "the watchdog exited" in proc.stderr
+        assert not ready.exists()
+
+    def test_a_trip_still_ends_the_run_with_86(self, tmp_path):
+        proc, ready = _run_supervision(tmp_path, ': >"$T/tripped"\nrm -f "$T/ready"\nkill "$1"\nexit 86')
+        assert proc.returncode == 86, proc.stderr
+        assert not ready.exists()
+
+    def test_a_tunnel_process_that_exits_ends_the_run(self, tmp_path):
+        proc, _ = _run_supervision(tmp_path, "sleep 5", tunnel="sleep 1")
+        assert proc.returncode == 1
+        assert "the tunnel process exited" in proc.stderr
+
+
+_CP_INNER = (Path(__file__).resolve().parent.parent / "tunnel" / "cp-inner").read_text()
+
+
+def _run_leave(tmp_path: Path, entrypoint: str, watch: str, tunnel: str = "sleep 30") -> subprocess.CompletedProcess:
+    """Run ``leave()`` of ``entrypoint`` as a stop would, with ``watch`` as the running watchdog."""
+    start = entrypoint.index("leave() {")
+    body = entrypoint[start : entrypoint.index("\n}\n", start) + 3].replace("/run/", f"{tmp_path}/")
+    # cp-inner has no tunnel process of its own: nothing would stop that one, and its open pipes would hold the run.
+    if "TPID" not in body:
+        tunnel = "true"
+    script = f"set -eu\nKIND=wireguard\n{body}{tunnel} &\nTPID=$!\n{watch} &\nWPID=$!\nsleep 0.3\nleave\n"
+    env = {**os.environ, "T": str(tmp_path)}
+    return subprocess.run(["sh", "-c", script], env=env, capture_output=True, text=True, timeout=20)
+
+
+# A watchdog in the middle of its trip when the stop comes: it records the trip as it ends.
+_WATCH_FINISHING_A_TRIP = 'sh -c \'trap ": >\\"$T/tripped\\"; exit 86" TERM; while :; do sleep 0.1; done\''
+
+
+@pytest.mark.parametrize("entrypoint", [_CP_TUNNEL, _CP_INNER], ids=["cp-tunnel", "cp-inner"])
+class TestAStopDuringATripKeepsTheTripsExitCode:
+    """leave() exited 0 on a stop: a trip recorded just before the stop read as a plain stop, so the
+    worker's tripped() check after its own stop missed it and the other copies were started again."""
+
+    def test_a_trip_recorded_before_the_stop_ends_with_86(self, tmp_path, entrypoint):
+        (tmp_path / "tripped").write_text("")
+        proc = _run_leave(tmp_path, entrypoint, "sleep 30")
+        assert proc.returncode == 86, proc.stderr
+
+    def test_a_trip_the_watchdog_records_as_it_stops_ends_with_86(self, tmp_path, entrypoint):
+        proc = _run_leave(tmp_path, entrypoint, _WATCH_FINISHING_A_TRIP)
+        assert proc.returncode == 86, proc.stderr
+
+    def test_a_trip_that_already_stopped_the_tunnel_process_ends_with_86(self, tmp_path, entrypoint):
+        """The trip kills the tunnel process first; under set -e the failed kill in leave() ended the run."""
+        (tmp_path / "tripped").write_text("")
+        proc = _run_leave(tmp_path, entrypoint, "sleep 30", tunnel="true")
+        assert proc.returncode == 86, proc.stderr
+
+    def test_a_stop_with_no_trip_ends_with_0(self, tmp_path, entrypoint):
+        proc = _run_leave(tmp_path, entrypoint, "sleep 30")
+        assert proc.returncode == 0, proc.stderr
+        assert not (tmp_path / "tripped").exists()
+
+
+def _inner_probe_deadlines(tmp_path: Path, entrypoint: str) -> list[tuple[int, int]]:
+    """Run cp-inner's probe loop on a stub clock where every probe fails after 10 s: (start, CP_DEADLINE) of each."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    clock, log = tmp_path / "clock", tmp_path / "probes"
+    clock.write_text("1000")
+    stubs = {
+        "date": f"cat {clock}",
+        "sleep": f"echo $(($(cat {clock}) + $1)) >{clock}",
+        "cp-probe": f'echo "$(cat {clock}) $CP_DEADLINE" >>{log}\necho $(($(cat {clock}) + 10)) >{clock}\nexit 1',
+    }
+    for name, body in stubs.items():
+        (bin_dir / name).write_text(f"#!/bin/sh\n{body}\n")
+        (bin_dir / name).chmod(0o755)
+    start = entrypoint.index("\n", entrypoint.index('ip route replace default via "$GATE_IP"')) + 1
+    loop = entrypoint[start : entrypoint.index("\ndone\n", start) + 6].replace("/run/", f"{tmp_path}/")
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    subprocess.run(["sh", "-c", f"OWN_IP=198.51.100.9\n{loop}"], env=env, capture_output=True, text=True, timeout=30)
+    return [(int(a) - 1000, int(b) - 1000) for a, b in (line.split() for line in log.read_text().splitlines())]
+
+
+class TestTheInnersProbesFitTheWorkersWait:
+    """cp-inner gave every probe the 120 s deadline of all its attempts, so a probe started near the worker's 45 s
+    wait ran its full caps and an exit it found was written after the worker had removed the tunnel."""
+
+    def test_a_probe_started_inside_the_wait_ends_by_40_seconds_and_later_ones_get_their_full_time(self, tmp_path):
+        probes = _inner_probe_deadlines(tmp_path, _CP_INNER)
+        assert [d for t, d in probes if t <= 45] == [40] * len([t for t, _ in probes if t <= 45])
+        assert {d for t, d in probes if t > 45} == {120}
+        assert probes[-1][0] < 120
+
+
+_CP_WATCH = (Path(__file__).resolve().parent.parent / "tunnel" / "cp-watch").read_text()
+
+
+def _run_egress_watch(tmp_path: Path, mv_fails_once: bool) -> subprocess.CompletedProcess:
+    """cp-watch in egress mode, a probe every tick, a probe that answers from the box's own IP.
+
+    ``mv_fails_once``: the first probe job cannot publish its result. sleep is a
+    stub that ends the loop after 200 ticks, so a watchdog that stopped probing
+    ends with 0 instead of tripping. Without it, sleep waits up to 10 s for a
+    started probe's result, so the next pass reads it however slow the runner."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (tmp_path / "cashpilot-secret").mkdir()
+    (tmp_path / "cashpilot-secret" / "own_ip").write_text("198.51.100.9")
+    wait_result = (
+        ""
+        if mv_fails_once
+        else f'i=0\nwhile [ "$n" -gt 0 ] && [ ! -e {tmp_path}/cp-watch-probe.rc ] && [ "$i" -lt 1000 ]; do'
+        " /bin/sleep 0.01; i=$((i + 1)); done\n"
+    )
+    stubs = {
+        "sleep": f"n=$(cat {tmp_path}/ticks 2>/dev/null || echo 0); echo $((n + 1)) >{tmp_path}/ticks\n"
+        f'{wait_result}[ "$n" -lt 200 ]',
+        "cp-probe": 'echo \'{"ip":"198.51.100.9"}\'',
+        "mv": (
+            f"if [ ! -e {tmp_path}/mv-failed ]; then : >{tmp_path}/mv-failed; exit 1; fi\n"
+            'PATH=/usr/bin:/bin exec mv "$@"'
+        )
+        if mv_fails_once
+        else 'PATH=/usr/bin:/bin exec mv "$@"',
+    }
+    for name, body in stubs.items():
+        (bin_dir / name).write_text(f"#!/bin/sh\n{body}\n")
+        (bin_dir / name).chmod(0o755)
+    script = _CP_WATCH.replace("/run/", f"{tmp_path}/")
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_WATCH_PROBE_EVERY": "1"}
+    return subprocess.run(
+        ["sh", "-c", script, "cp-watch", "0", "egress"], env=env, capture_output=True, text=True, timeout=60
+    )
+
+
+class TestAProbeThatEndsWithoutItsResultDoesNotEndTheChecks:
+    """A probe job that could not write its result left the watchdog waiting for it for good: in egress mode
+    it then checked nothing more, and a leak from the box's own address never tripped it."""
+
+    def test_the_next_probe_runs_and_trips(self, tmp_path):
+        proc = _run_egress_watch(tmp_path, mv_fails_once=True)
+        assert proc.returncode == 86, proc.stderr
+        assert (tmp_path / "tripped").exists()
+
+    def test_control_a_probe_that_publishes_trips_at_once(self, tmp_path):
+        proc = _run_egress_watch(tmp_path, mv_fails_once=False)
+        assert proc.returncode == 86, proc.stderr
+        # The probe starts after the first sleep and its result is read after the second.
+        assert int((tmp_path / "ticks").read_text()) == 2
+
+
+class TestAHungProbeIsStoppedBeforeTheNextOne:
+    """At 2 minutes with no result cp-watch killed the probe job's shell only: the hung cp-probe in it ran on,
+    and each later interval started one more beside it."""
+
+    def test_only_the_newest_probe_is_left_running(self, tmp_path):
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        (tmp_path / "cashpilot-secret").mkdir()
+        (tmp_path / "cashpilot-secret" / "own_ip").write_text("198.51.100.9")
+        pids = tmp_path / "probe-pids"
+        stubs = {
+            "sleep": f'n=$(cat {tmp_path}/ticks 2>/dev/null || echo 0); echo $((n + 1)) >{tmp_path}/ticks; [ "$n" -lt 80 ]',
+            # A probe that never ends: its pid is the hung process.
+            "cp-probe": f"echo $$ >>{pids}\nexec /bin/sleep 120",
+        }
+        for name, body in stubs.items():
+            (bin_dir / name).write_text(f"#!/bin/sh\n{body}\n")
+            (bin_dir / name).chmod(0o755)
+        script = _CP_WATCH.replace("/run/", f"{tmp_path}/")
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_WATCH_PROBE_EVERY": "1"}
+        started: list[int] = []
+        try:
+            # Output to a file, not a pipe: the newest probe's job, still running, would hold a pipe open.
+            with (tmp_path / "err").open("w") as err:
+                proc = subprocess.run(
+                    ["sh", "-c", script, "cp-watch", "0", "egress"],
+                    env=env,
+                    stdin=subprocess.DEVNULL,
+                    stdout=err,
+                    stderr=err,
+                    timeout=60,
+                )
+            assert proc.returncode == 0, (tmp_path / "err").read_text()
+            time.sleep(0.5)
+            started = [int(p) for p in pids.read_text().split()]
+            # Each probe hangs 24 ticks before it is stopped: 4 in 80 ticks, unless a slow runner killed a job
+            # before its probe ran. Either way at most the newest still runs.
+            assert len(started) >= 2, started
+            alive = [p for p in started if _alive(p)]
+            assert alive in ([], started[-1:]), (started, alive)
+        finally:
+            for p in [int(p) for p in pids.read_text().split()] if pids.exists() else started:
+                with contextlib.suppress(ProcessLookupError):
+                    os.kill(p, signal.SIGKILL)
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    # A killed child of a shell that has ended is reaped by init; until then it is a zombie, which is dead.
+    out = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+    return bool(out) and not out.startswith("Z")
+
+
 def _stub_clock_bin(tmp_path: Path, curl_cases: str) -> tuple[Path, Path]:
     """Stub date, sleep and curl on a clock that a wait moves on; ``curl_cases`` is a case body on the URL ($*)."""
     bin_dir = tmp_path / "bin"
@@ -1803,6 +2076,120 @@ class TestTheProbeNeverRunsPastTheWorkersWait:
         assert proc.returncode == 0, proc.stderr
         assert '"ip":"203.0.113.7"' in proc.stdout
         assert int(clock.read_text()) < proxy_tunnel.READY_TIMEOUT
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            "e",
+            "deadbeef",
+            "1.2.3",
+            "1.2.3.4.5",
+            "256.1.1.1",
+            "1..2.3",
+            "1234.1.1.1",
+            ":::",
+            "1:::2",
+            "1::2::3",
+            ":1::2",
+            "1::2:",
+            "1:2:3",
+            "12345::1",
+            "1:2:3:4:5:6:7:8:9",
+            "1:2:3:4:5:6:7:8::",
+            "::1:2:3:4:5:6:7:8",
+            "1:2:3:4::5:6:7:8",
+            "203.0.113.007",
+            "01.2.3.4",
+            "::ffff:1.2.3",
+            "::ffff:1.2.3.04",
+            "::ffff:1.2.3.4.5",
+            "1:2:3:4:5:6:7:1.2.3.4",
+            "1.2.3.4::",
+        ],
+    )
+    def test_an_answer_that_is_no_address_gives_the_next_endpoint_its_turn(self, tmp_path, answer):
+        """An error page cut down to its hex letters is no exit: the probe never prints it as one."""
+        import subprocess
+
+        bin_dir, clock = _stub_clock_bin(
+            tmp_path,
+            f"*https://api.ipify.org*) echo {answer}; exit 0 ;;\n"
+            "*https://ifconfig.me/ip*) echo 203.0.113.7; exit 0 ;;\n",
+        )
+        clock.write_text("46")
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_DEADLINE": "40"}
+        proc = subprocess.run(["sh", str(bin_dir / "cp-probe")], env=env, capture_output=True, text=True, timeout=30)
+        assert proc.returncode == 0, proc.stderr
+        assert '"ip":"203.0.113.7"' in proc.stdout
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "198.51.100.7\\n8\\n",
+            "<p>198.51.100.7</p>",
+            "ip=198.51.100.7",
+            "198.51.100.7 198.51.100.8",
+            "198.51.100.7 8",
+            "198.51.100.7\\t8",
+            "2001:db8::7 8",
+            "198.51.100.7" + " " * 60 + "x\\n",
+            "198.51.100.7" + "\\n" * 54 + "8",
+        ],
+    )
+    def test_an_answer_with_more_than_an_address_gives_the_next_endpoint_its_turn(self, tmp_path, body):
+        """The probe kept only address characters: a second line "8", or a blank and an "8", made 198.51.100.7
+        into 198.51.100.78; and it cut the answer at 64 bytes, so an address padded past them, with blanks or line
+        breaks, hid what followed."""
+        import subprocess
+
+        bin_dir, clock = _stub_clock_bin(
+            tmp_path,
+            f"*https://api.ipify.org*) printf '{body}'; exit 0 ;;\n"
+            "*https://ifconfig.me/ip*) echo 203.0.113.7; exit 0 ;;\n",
+        )
+        clock.write_text("46")
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_DEADLINE": "40"}
+        proc = subprocess.run(["sh", str(bin_dir / "cp-probe")], env=env, capture_output=True, text=True, timeout=30)
+        assert proc.returncode == 0, proc.stderr
+        assert '"ip":"203.0.113.7"' in proc.stdout
+
+    @pytest.mark.parametrize("body", ["198.51.100.7\\r\\n", " \\t198.51.100.7 \\n\\n", "\\n198.51.100.7"])
+    def test_an_address_with_blanks_or_line_breaks_around_it_is_the_answer(self, tmp_path, body):
+        import subprocess
+
+        bin_dir, clock = _stub_clock_bin(tmp_path, f"*https://api.ipify.org*) printf '{body}'; exit 0 ;;\n")
+        clock.write_text("46")
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_DEADLINE": "40"}
+        proc = subprocess.run(["sh", str(bin_dir / "cp-probe")], env=env, capture_output=True, text=True, timeout=30)
+        assert '"ip":"198.51.100.7"' in proc.stdout
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            "203.0.113.7",
+            "0.0.0.0",
+            "2001:db8::7",
+            "::1",
+            "fe80::",
+            "2001:db8:0:0:0:0:0:7",
+            "::",
+            "1:2:3:4:5:6:7::",
+            "::2:3:4:5:6:7:8",
+            "1:2:3::5:6:7:8",
+            "100.0.0.1",
+            "::ffff:203.0.113.7",
+            "::1.2.3.4",
+            "1:2:3:4:5:6:1.2.3.4",
+        ],
+    )
+    def test_an_address_is_the_answer(self, tmp_path, answer):
+        import subprocess
+
+        bin_dir, clock = _stub_clock_bin(tmp_path, f"*https://api.ipify.org*) echo {answer}; exit 0 ;;\n")
+        clock.write_text("46")
+        env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "CP_DEADLINE": "40"}
+        proc = subprocess.run(["sh", str(bin_dir / "cp-probe")], env=env, capture_output=True, text=True, timeout=30)
+        assert f'"ip":"{answer}"' in proc.stdout
 
     def test_control_after_the_wait_the_country_gets_its_full_time(self, tmp_path):
         """Nobody waits any more: the country lookup gets its 8 s and labels the answer."""

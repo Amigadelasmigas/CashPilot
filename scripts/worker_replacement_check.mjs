@@ -34,6 +34,7 @@ function dashboard(action, { accepts = true, fresh = false, mixed = false } = {}
     confirm,
     document: { getElementById: () => ({ value: 'image:2', style: {}, dataset: {} }), querySelectorAll: () => [] },
     _routeChoice: () => undefined,
+    _routeAcks: () => [],
     _confirmPreflight: async () => true,
     _confirmDeviceRenames: async () => accepts,
     _deviceRenameLines: async () => ({ ids: [1], copyIds: [], copyLines: [] }),

@@ -26,6 +26,12 @@ or read its connections. Direct earners are kept apart on the bridge
 (enable_icc off), and a routed service, which runs in place of a direct one,
 keeps that separation. Its tunnel works exactly as a shared one with one copy.
 
+A copy that holds NET_ADMIN or NET_RAW (its owner acknowledged it) never shares
+a namespace with a tunnel's firewall. Its tunnel is **isolated**: the container
+the earner joins (cp-inner) sits only on an internal network of its own, and
+its one way out is a **gate** beside it, a cp-tunnel that forwards into the
+proxy. See "Isolated tunnels" below.
+
 A copy the owner (or the cap) stopped is written down in ``HELD_MARKER``: its
 tunnel may stay up for the other copies, so a stopped earner beside a ready
 tunnel no longer means "stopped by a reboot or a crash", and the heartbeat
@@ -77,6 +83,8 @@ from app.constants import (
     LABEL_SERVICE,
     LABEL_VERSION,
     PROXIED_FORBIDDEN_CAPS,
+    PROXIED_ISOLATED_CAPS,
+    PROXIED_ISOLATED_DEVICES,
     ROLE_TUNNEL,
     TUNNEL_PREFIX,
 )
@@ -767,6 +775,23 @@ def _wait_ready(container: Any, timeout: float = READY_TIMEOUT) -> dict[str, Any
     )
 
 
+def _ready_with_gate(client: Any, container: Any) -> dict[str, Any]:
+    """_wait_ready, and for an isolated tunnel a gate that still runs after it.
+
+    An inner's /run/ready outlives its gate: one that went down during the
+    wait leaves a ready file and no way out."""
+    exit_info = _wait_ready(container)
+    try:
+        gate_up = not is_isolated(container) or _gate_running(client, container)
+    except APIError as exc:
+        # Unread is down: the callers undo a change on ProxyTunnelError only.
+        logger.warning("Could not read the gate of %s: %s", container.name, redact(str(exc)))
+        gate_up = False
+    if not gate_up:
+        raise ProxyTunnelError(t("err.proxy_tunnel.tunnel_did_not_reach_internet", timeout=int(READY_TIMEOUT)))
+    return exit_info
+
+
 def _is_ip(value: Any) -> bool:
     """cp-probe keeps only IP characters of what an echo site answered, so an
     error page can still come through as "e"; only a real address counts."""
@@ -795,6 +820,234 @@ def _remove_quietly(container: Any, stop_timeout: int = SIDECAR_STOP_SECONDS, *,
     # reuses it, and Docker refuses to remove it while another container still uses it.
     if secrets_volume:
         secret_env.remove_volume(container.client, secrets_volume)
+    if tag := _labels(container).get(LABEL_GATE):
+        # An isolated tunnel's gate and network go with it: nothing else uses them.
+        _drop_gate(orchestrator._get_client(), tag)
+
+
+# ---------------------------------------------------------------------------
+# Isolated tunnels
+# ---------------------------------------------------------------------------
+#
+# A copy that holds NET_ADMIN or NET_RAW could rewrite or bypass a firewall in
+# its own namespace (it could flush nft, or send raw frames past it), so it
+# never joins one that holds a tunnel's firewall. Its tunnel container (the
+# one the earner joins, which the rest of this module treats as any tunnel)
+# runs cp-inner and sits only on an internal macvlan network with no parent:
+# Docker gives it a dummy interface that drops everything sent to it, so that
+# network reaches neither the host, nor its LAN, nor any other container. The
+# one other container on it is the tunnel's gate, a cp-tunnel with its
+# firewall in its own namespace, which forwards what arrives from the copy
+# into the proxy and nowhere else. Whatever the copy does to its own
+# namespace, its packets reach the gate or nothing.
+#
+# The gate is made fresh, from the tunnel's own settings files, every time
+# the tunnel starts (_gate_up), and goes with it (_remove_quietly). Both carry
+# LABEL_GATE's tag, and the gate and the network are named after it, so a
+# rename of the tunnel (staged, retired) never loses them.
+
+#: On an isolated tunnel: the tag of its gate and network.
+LABEL_GATE = "cashpilot.gate"
+#: On a gate: the tag of the tunnel it serves.
+LABEL_GATE_OF = "cashpilot.gate-of"
+#: The service label of every gate.
+GATE_SLUG = "proxy-gate"
+#: The key of a copy's own isolated tunnel (never shared with another copy):
+#: the service's slug plus this.
+ISOLATED_SUFFIX = ".own"
+#: The exit status cp-tunnel and cp-inner end with when cp-watch tripped.
+TRIP_EXIT = 86
+
+
+def gate_name(tag: str) -> str:
+    """The gate's container name, and its network's. Under TUNNEL_PREFIX, so it counts as a tunnel."""
+    return f"{TUNNEL_PREFIX}gate-{tag}"
+
+
+def is_isolated(tunnel: Any | None) -> bool:
+    return bool(_labels(tunnel).get(LABEL_GATE))
+
+
+def needs_isolation(cap_add: Any, devices: Any = None) -> bool:
+    """Whether an earner with these capabilities and devices runs only in an isolated tunnel."""
+    caps = {str(c).upper().removeprefix("CAP_") for c in cap_add or []}
+    return bool(caps & PROXIED_ISOLATED_CAPS) or bool(devices)
+
+
+def _member_needs_isolation(member: Any) -> bool:
+    hc = (getattr(member, "attrs", None) or {}).get("HostConfig") or {}
+    return needs_isolation(hc.get("CapAdd"), hc.get("Devices"))
+
+
+def _gate_of(client: Any, tunnel: Any) -> Any | None:
+    tag = _labels(tunnel).get(LABEL_GATE)
+    gate = _get(client, gate_name(tag)) if tag else None
+    return gate if gate is not None and _labels(gate).get(LABEL_GATE_OF) == tag else None
+
+
+def _exited_tripped(container: Any | None) -> bool:
+    state = ((getattr(container, "attrs", None) or {}).get("State") or {}) if container is not None else {}
+    return getattr(container, "status", "") == "exited" and state.get("ExitCode") == TRIP_EXIT
+
+
+def tripped(client: Any, tunnel: Any | None) -> bool:
+    """Whether cp-watch stopped this tunnel (or its gate): its firewall changed, or it left from the box's own IP."""
+    if tunnel is None:
+        return False
+    return _exited_tripped(tunnel) or (is_isolated(tunnel) and _exited_tripped(_gate_of(client, tunnel)))
+
+
+def _hold_others_if_tripped(client: Any, tunnel: Any | None, chosen: str | None) -> None:
+    """Before a tripped ``tunnel`` runs again for copy ``chosen``: hold and stop every other copy in it.
+
+    A deploy or a Start of one copy is no Start of the others, and the
+    heartbeat, which holds them (_hold_tripped), may not have seen the trip yet.
+    With no ``chosen`` (a migration, which is nobody's Start) every copy is held."""
+    if not tripped(client, tunnel):
+        return
+    _hold_others(client, tunnel, chosen)
+
+
+def _hold_others(client: Any, tunnel: Any, chosen: str | None) -> None:
+    """Hold and stop every copy in ``tunnel`` but ``chosen`` (every one when None)."""
+    for member in _members(client, tunnel):
+        if str(member.name) != chosen:
+            _set_held(str(member.name), True, strict=True)
+            if getattr(member, "status", "") in _LIVE:
+                member.stop(timeout=orchestrator._get_stop_timeout(_labels(member).get(LABEL_SERVICE) or ""))
+
+
+def _gate_running(client: Any, tunnel: Any) -> bool:
+    gate = _gate_of(client, tunnel)
+    return gate is not None and getattr(gate, "status", "") == "running"
+
+
+def _drop_gate(client: Any, tag: str) -> None:
+    gate = _get(client, gate_name(tag))
+    if gate is not None and _labels(gate).get(LABEL_GATE_OF) == tag:
+        with contextlib.suppress(Exception):
+            gate.stop(timeout=SIDECAR_STOP_SECONDS)
+        with contextlib.suppress(NotFound):
+            gate.remove(force=True, v=True)
+    with contextlib.suppress(Exception):
+        net = client.networks.get(gate_name(tag))
+        if (net.attrs.get("Labels") or {}).get(LABEL_GATE_OF) == tag:
+            net.remove()
+
+
+def _gate_network(client: Any, tag: str) -> Any:
+    name = gate_name(tag)
+    try:
+        net = client.networks.get(name)
+    except NotFound:
+        # No parent: Docker gives an internal macvlan network a dummy one, which
+        # drops what it is sent. The host has no address on it, and a macvlan
+        # child never reaches its parent's host: the copy reaches the gate only.
+        return client.networks.create(
+            name,
+            driver="macvlan",
+            internal=True,
+            labels={LABEL_MANAGED: "true", LABEL_DEPLOYED_BY: "worker", LABEL_GATE_OF: tag},
+        )
+    if (net.attrs.get("Labels") or {}).get(LABEL_GATE_OF) != tag:
+        raise ProxyTunnelError(t("err.proxy_tunnel.network_named_cashpilot_did_not", name=name))
+    return net
+
+
+def _gate_up(client: Any, tunnel: Any) -> None:
+    """Before an isolated ``tunnel`` starts: a new gate on its settings, ready, and its address in the tunnel.
+
+    Nothing for a tunnel that is not isolated. The tunnel must be stopped: the
+    gate's address it reads (gate_ip) is written here. A gate that fails is
+    removed and the start fails, so the tunnel stays down with no way out."""
+    tag = _labels(tunnel).get(LABEL_GATE)
+    if not tag:
+        return
+    secrets: list[str] = []
+    # A Docker error here, the read of the settings just written included, is a
+    # gate that could not start, as one below is: the caller rolls back to the
+    # old settings on it (_in_place), never mistakes it for a broken tunnel.
+    try:
+        files = {key: _read_secret_file_or_raise(tunnel, key) or "" for key in SECRET_KEYS}
+        files["gate"] = "1"
+        secrets = [files.get("auth_key", ""), *_auth_secrets(files.get("proxy_auth", ""))]
+        old = _get(client, gate_name(tag))
+        if old is not None:
+            if _labels(old).get(LABEL_GATE_OF) != tag:
+                raise ProxyTunnelError(t("err.proxy_tunnel.container_named_cashpilot_did_not", final=gate_name(tag)))
+            old.stop(timeout=SIDECAR_STOP_SECONDS)
+            old.remove(force=True, v=True)
+        net = _gate_network(client, tag)
+        network = orchestrator.container_network("bridge")
+        kwargs = sidecar_kwargs(gate_name(tag), GATE_SLUG, None, network, hostname=_hostname(gate_name(tag)))
+        kwargs.pop("detach")
+        kwargs["labels"][LABEL_GATE_OF] = tag
+        kwargs["sysctls"]["net.ipv4.ip_forward"] = "1"
+        gate = client.containers.create(**kwargs)
+    except ProxyTunnelError:
+        raise
+    except Exception as exc:
+        detail = orchestrator.proxy_refusal(exc) or str(exc)
+        raise ProxyTunnelError(redact(t("err.proxy_tunnel.gate_could_not_start", detail=detail), secrets)) from None
+    try:
+        net.connect(gate)
+        if not gate.put_archive(SECRET_DIR, _secret_tar(files)):
+            raise ProxyTunnelError(t("err.proxy_tunnel.could_not_hand_gate_settings"))
+        gate.start()
+        _wait_ready(gate)
+        gate.reload()
+        nets = ((gate.attrs or {}).get("NetworkSettings") or {}).get("Networks") or {}
+        address = str((nets.get(gate_name(tag)) or {}).get("IPAddress") or "")
+        if not _is_ip(address):
+            raise ProxyTunnelError(t("err.proxy_tunnel.gate_got_no_address"))
+        if not tunnel.put_archive(SECRET_DIR, _secret_tar({"gate_ip": address})):
+            raise ProxyTunnelError(t("err.proxy_tunnel.could_not_hand_gate_address"))
+    except Exception as exc:
+        with contextlib.suppress(Exception):
+            gate.stop(timeout=SIDECAR_STOP_SECONDS)
+        with contextlib.suppress(NotFound, APIError):
+            gate.remove(force=True, v=True)
+        if isinstance(exc, ProxyTunnelError):
+            raise ProxyTunnelError(redact(str(exc), secrets), exc.status_code) from None
+        detail = orchestrator.proxy_refusal(exc) or str(exc)
+        raise ProxyTunnelError(redact(t("err.proxy_tunnel.gate_could_not_start", detail=detail), secrets)) from None
+
+
+def _sweep_gates(client: Any) -> None:
+    """Remove a gate whose tunnel is gone (a worker that died between the two), with its network."""
+    try:
+        gates = client.containers.list(all=True, filters={"label": [f"{LABEL_GATE_OF}"]})
+        tags = {_labels(c).get(LABEL_GATE) for c in client.containers.list(all=True, filters={"label": [LABEL_GATE]})}
+    except Exception:  # noqa: BLE001 - the next heartbeat looks again
+        return
+    for gate in gates:
+        tag = _labels(gate).get(LABEL_GATE_OF)
+        if tag and tag not in tags and _age_seconds(gate) >= STAGED_STALE_SECONDS:
+            # One that cannot go never stops the heartbeat: the next one tries again.
+            try:
+                _drop_gate(client, tag)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Could not remove the orphan gate %s: %s", gate_name(tag), redact(str(exc)))
+    # A gate network whose tunnel and gate are both gone (a worker that died
+    # between creating it and creating the tunnel). Not a young one, which a
+    # deploy may be filling.
+    gated = {_labels(g).get(LABEL_GATE_OF) for g in gates}
+    try:
+        networks = client.networks.list(filters={"label": [LABEL_GATE_OF]})
+    except Exception:  # noqa: BLE001 - the next heartbeat looks again
+        return
+    for net in networks:
+        attrs = getattr(net, "attrs", None) or {}
+        tag = (attrs.get("Labels") or {}).get(LABEL_GATE_OF)
+        if (
+            tag
+            and tag not in tags
+            and tag not in gated
+            and net.name == gate_name(tag)
+            and _age_seconds(net) >= STAGED_STALE_SECONDS
+        ):
+            with contextlib.suppress(Exception):
+                net.remove()
 
 
 def _get(client: Any, name: str) -> Any | None:
@@ -817,8 +1070,11 @@ def start_sidecar(
     files: dict[str, str] | None = None,
     tunnel_for: str | None = None,
     deadline: float | None = None,
+    isolated: bool = False,
 ) -> tuple[Any, dict[str, Any]]:
     """Create, provision and start a tunnel, then wait for its exit. Removed on any failure.
+
+    ``isolated`` makes it an isolated tunnel, with a gate ("Isolated tunnels").
 
     ``label`` names the tunnel on the tailnet (``cashpilot-<label>``).
     ``files`` hands over settings already read from another tunnel (the
@@ -845,12 +1101,24 @@ def start_sidecar(
             logger.warning("Could not pull %s: %s (trying the local copy)", image, exc)
     kwargs = sidecar_kwargs(name, slug, proxy_id, network, hostname=hostname or _hostname(name), tunnel_for=tunnel_for)
     kwargs.pop("detach")
-    container = client.containers.create(**kwargs)
+    if isolated:
+        # On its gate's network only, and needing no tunnel device of its own.
+        tag = uuid.uuid4().hex[:12]
+        kwargs.update(network=_gate_network(client, tag).name, dns=None, devices=[])
+        kwargs["labels"][LABEL_GATE] = tag
+        files = {**files, "role": "inner"}
+    try:
+        container = client.containers.create(**kwargs)
+    except Exception:
+        if isolated:
+            _drop_gate(client, tag)
+        raise
     try:
         if not container.put_archive(SECRET_DIR, _secret_tar(files)):
             raise ProxyTunnelError(t("err.proxy_tunnel.could_not_hand_proxy_settings"))
+        _gate_up(client, container)
         container.start()
-        exit_info = _wait_ready(container)
+        exit_info = _ready_with_gate(client, container)
     except Exception as exc:
         _remove_quietly(container, SIDECAR_STOP_SECONDS)
         if isinstance(exc, ProxyTunnelError):
@@ -1111,7 +1379,8 @@ def _clone_into(
     expected = _move_expected(client, member, target)
     service = _labels(member).get(LABEL_SERVICE)
     was_running = getattr(member, "status", "") in _LIVE
-    _refuse_unmovable(member)
+    isolated = is_isolated(tunnel)
+    _refuse_unmovable(member, isolated=isolated)
     staged = name + STAGED_SUFFIX
     aside = name + MOVING_SUFFIX
     optional = {
@@ -1130,13 +1399,29 @@ def _clone_into(
         "cpu_shares": hc.get("CpuShares") or None,
         "log_config": hc.get("LogConfig") or None,
         # Volumes the image declares (an earner may keep its device id in
-        # one) go with the copy: a fresh one would make it a new device.
+        # one) go with the copy: a fresh one would make it a new device. So do
+        # host folders, which a routed service may keep (proxies.refusal): left
+        # behind, it would start empty, as a new node.
         "volumes": {
-            m["Name"]: {"bind": m["Destination"], "mode": "rw" if m.get("RW", True) else "ro"}
+            (m["Name"] if m.get("Type") == "volume" else m["Source"]): {
+                "bind": m["Destination"],
+                "mode": "rw" if m.get("RW", True) else "ro",
+            }
             for m in attrs.get("Mounts") or []
-            if m.get("Type") == "volume" and m.get("Name") and m.get("Destination")
+            if m.get("Destination")
+            and (
+                (m.get("Type") == "volume" and m.get("Name"))
+                or (m.get("Type") == "bind" and str(m.get("Source") or "").startswith("/"))
+            )
         }
         or None,
+        # Only into an isolated tunnel, and only /dev/net/tun (_refuse_unmovable).
+        "devices": [
+            f"{d['PathOnHost']}:{d.get('PathInContainer') or d['PathOnHost']}:{d.get('CgroupPermissions') or 'rwm'}"
+            for d in hc.get("Devices") or []
+        ]
+        if isolated
+        else None,
     }
     # Older copies may have inherited NVIDIA settings from their image. A
     # replacement must explicitly hide NVIDIA devices like a fresh deploy.
@@ -1212,7 +1497,7 @@ def _clone_into(
     return clone
 
 
-def _refuse_unmovable(member: Any) -> None:
+def _refuse_unmovable(member: Any, *, isolated: bool = False) -> None:
     """Refuse to move ``member`` into a tunnel when it holds what a proxied copy never gets.
 
     The worker API gives a proxied copy no host devices and none of
@@ -1225,15 +1510,17 @@ def _refuse_unmovable(member: Any) -> None:
     hc = (getattr(member, "attrs", None) or {}).get("HostConfig") or {}
     name = str(member.name)
     held, caps = "", ""
-    if hc.get("Devices"):
+    forbidden = PROXIED_FORBIDDEN_CAPS - PROXIED_ISOLATED_CAPS if isolated else PROXIED_FORBIDDEN_CAPS
+    devices = hc.get("Devices") or []
+    if devices and not (
+        isolated and all(isinstance(d, dict) and d.get("PathOnHost") in PROXIED_ISOLATED_DEVICES for d in devices)
+    ):
         held = "devices"
     elif hc.get("DeviceRequests"):
         held = "requests"
     elif gpu.grant(_labels(member).get(LABEL_SERVICE)):
         held = "gpu"
-    elif risky := sorted(
-        {str(c).upper().removeprefix("CAP_") for c in hc.get("CapAdd") or []} & PROXIED_FORBIDDEN_CAPS
-    ):
+    elif risky := sorted({str(c).upper().removeprefix("CAP_") for c in hc.get("CapAdd") or []} & forbidden):
         held, caps = "caps", ", ".join(risky)
     if held:
         raise ProxyTunnelError(t("err.proxy_tunnel.holds_which_proxied_copy_never", name=name, held=held, caps=caps))
@@ -1305,9 +1592,16 @@ def _ensure_tunnel(
     keep: str | None = None,
     expected_container: str | None = None,
     move_target: _StartApproval | None = None,
+    isolated: bool | None = None,
+    starting: str | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """The proxy's shared tunnel, running on the given settings and ready; with
-    ``slug``, the routed service's own tunnel through the proxy instead.
+    ``slug``, the routed service's own tunnel through the proxy instead (or a
+    copy's own isolated one, "<slug>.own").
+
+    ``isolated`` asks for an isolated tunnel or for one that is not; None keeps
+    what the current one is (a new one is isolated only for an "<slug>.own"
+    key). A tunnel that is the other kind is replaced, as for a new image.
 
     Its earners are never recreated for a settings change. A container's state
     lives in its writable layer (proxied copies have no volumes), and several
@@ -1347,6 +1641,8 @@ def _ensure_tunnel(
     current = _get(client, final)
     if current is not None and not _is_tunnel_for(current, proxy_id, slug):
         raise ProxyTunnelError(t("err.proxy_tunnel.container_named_cashpilot_did_not", final=final))
+    if isolated is None:
+        isolated = is_isolated(current) if current is not None else bool(slug and slug.endswith(ISOLATED_SUFFIX))
     leftover = _get(client, staged)
     if (
         _is_tunnel_for(leftover, proxy_id, slug)
@@ -1357,13 +1653,25 @@ def _ensure_tunnel(
             raise ProxyTunnelError(t("err.proxy_tunnel.wait_worker_recover_previous_tunnel"))
         # A change that died after it began moving copies: finish it first.
         with _swap_lock:
-            current = _finish_staged(client, leftover, current, final, target=move_target)
+            current = _finish_staged(client, leftover, current, final, target=move_target, chosen=keep or starting)
+    # A tunnel its watchdog stopped holds its copies until their owner starts
+    # each one (_hold_tripped), and the heartbeat may not have seen the trip
+    # yet. A deploy of one copy is no Start of the others: their holds go in
+    # before this tunnel runs again. ``starting`` is the copy the owner's Start
+    # is for, which is no Start of the others either.
+    tripped_before = tripped(client, current)
+    _hold_others_if_tripped(client, current, keep or starting)
     broken = False
     # An older worker's tunnel, which Docker restarts on its own, is never used
     # as it is: replaced before any earner starts in it (_restarts_by_itself).
-    if current is not None and not _restarts_by_itself(current) and (_image_of(current) == image or not upgrade):
+    if (
+        current is not None
+        and not _restarts_by_itself(current)
+        and (_image_of(current) == image or not upgrade)
+        and is_isolated(current) == isolated
+    ):
         try:
-            return _in_place(client, current, proxy, own_ip, files, secrets, deadline=deadline)
+            return _in_place(client, current, proxy, own_ip, files, secrets, deadline=deadline, chosen=keep or starting)
         except _Broken as exc:
             # Not refused for a retired name in the way, as below: the tunnel is
             # down now and Docker cannot start it, so its earners run again only
@@ -1379,7 +1687,7 @@ def _ensure_tunnel(
             # copy that can never move (_refuse_unmovable) would only have it
             # thrown away, on every try.
             for member in members:
-                _refuse_unmovable(member)
+                _refuse_unmovable(member, isolated=isolated)
             if expected_container is None:
                 _check_move_targets(client, members, move_target)
         # Before anything changes: the replacement must carry the recorded address.
@@ -1406,11 +1714,20 @@ def _ensure_tunnel(
         files=files,
         tunnel_for=slug,
         deadline=deadline,
+        isolated=isolated,
     )
     retired = False
     try:
         with _swap_lock:
             if current is not None:
+                # A trip of the old tunnel while start_sidecar proved the new
+                # one: this deploy holds the proxy's lock, so the heartbeat could
+                # not hold the other copies (_hold_tripped), and the move below
+                # would start them in the new tunnel. Held first, as in place.
+                with contextlib.suppress(APIError):
+                    current.reload()
+                if not tripped_before and tripped(client, current):
+                    _hold_others(client, current, keep or starting)
                 members = _members(client, current)
                 if expected_container is not None and any(m.id != expected_container for m in members):
                     raise ProxyTunnelError(t("err.proxy_tunnel.deploy_cannot_replace_other_containers"))
@@ -1421,6 +1738,17 @@ def _ensure_tunnel(
                     if expected_container is not None and members:
                         raise ProxyTunnelError(t("err.proxy_tunnel.could_not_keep_approved_container"))
                     _move_members(client, current, new, target=move_target)
+                    # A trip of the old tunnel during the move: the copies that
+                    # moved are held before it goes, or nothing would show it.
+                    # One that cannot be read counts as tripped.
+                    try:
+                        current.reload()
+                        trip = not tripped_before and tripped(client, current)
+                    except APIError as exc:
+                        logger.warning("Could not read %s after the move: %s", current.name, redact(str(exc)))
+                        trip = True
+                    if trip:
+                        _hold_others(client, new, keep or starting)
                     _remove_quietly(current, SIDECAR_STOP_SECONDS)
             new.rename(final)
     except Exception:
@@ -1531,11 +1859,13 @@ def _in_place(
     secrets: list[str],
     *,
     deadline: float | None = None,
+    chosen: str | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """Bring ``current`` up on ``files`` without replacing the container. See _ensure_tunnel.
 
     Raises _Broken when Docker refuses the container itself (a daemon restart
-    can leave one that cannot start), so the caller replaces it.
+    can leave one that cannot start), so the caller replaces it. ``chosen`` is
+    the copy this deploy or Start is for (see _hold_others_if_tripped).
     """
     current.reload()
     running = current.status == "running"
@@ -1555,9 +1885,13 @@ def _in_place(
         not files.get("own_ip") or _read_secret_file(current, "own_ip") == files["own_ip"]
     )
     if running and same:
-        with contextlib.suppress(ProxyTunnelError):
-            return current, _wait_ready(current)
-        logger.warning("The tunnel %s runs but has no exit; restarting it", current.name)
+        # An isolated tunnel's /run/ready outlives its gate: reused only while the gate runs.
+        if not is_isolated(current) or _gate_running(client, current):
+            with contextlib.suppress(ProxyTunnelError):
+                return current, _ready_with_gate(client, current)
+            logger.warning("The tunnel %s runs but has no exit; restarting it", current.name)
+        else:
+            logger.warning("The gate of %s is down; restarting the tunnel with a new gate", current.name)
         previous = None
     elif running:
         _prove(client, proxy, own_ip, files, deadline=deadline)
@@ -1579,15 +1913,33 @@ def _in_place(
             # Files written under a running tunnel would be recorded as its
             # settings while it still runs on the old ones.
             raise ProxyTunnelError(t("err.proxy_tunnel.docker_did_not_stop_settings", name=current.name))
+        # A trip while the new settings were proven (_prove): this deploy holds
+        # the proxy's lock, so the heartbeat could not hold the copies
+        # (_hold_tripped), and the restart below would start them again.
+        if tripped(client, current):
+            _hold_others(client, current, chosen)
+    else:
+        # Exited after _ensure_tunnel looked and before the reload above: the
+        # same rule as there, or the start below would clear the trip's exit
+        # code with the other copies free to start again.
+        _hold_others_if_tripped(client, current, chosen)
     # Replacing the tunnel recreates every copy in it (a new device to each
     # provider), so a Docker error gets a second try first: only a container
     # Docker refuses twice is taken for broken.
+    gate_failed: ProxyTunnelError | None = None
     for attempt in (1, 2):
         try:
             # An own_ip _carry_own_ip left out could not be read: its file stays as it is.
             written = {key: files.get(key, "") for key in SECRET_KEYS if key != "own_ip" or "own_ip" in files}
             if not current.put_archive(SECRET_DIR, _secret_tar(written)):
                 raise _Broken(t("err.proxy_tunnel.docker_did_not_take_settings"))
+            try:
+                _gate_up(client, current)
+            except ProxyTunnelError as exc:
+                # Not Docker refusing the tunnel: the new settings failed in the
+                # gate, so the old ones go back, as for a tunnel with no exit.
+                gate_failed = exc
+                break
             current.start()
             break
         except (APIError, _Broken) as exc:
@@ -1598,21 +1950,39 @@ def _in_place(
             )
             time.sleep(2)
     try:
-        exit_info = _wait_ready(current)
+        if gate_failed is not None:
+            raise gate_failed
+        exit_info = _ready_with_gate(client, current)
     except ProxyTunnelError as exc:
         try:
             if previous is not None:
                 # Proven a moment ago, failed here: back to what ran before,
-                # and its copies back inside it.
+                # and its copies back inside it. A trip while the new settings
+                # came up (still under the proxy's lock, so the heartbeat could
+                # not hold the copies) holds them first: the restart below then
+                # leaves them stopped. Read after the stop, as above: a trip up
+                # to the stop keeps its exit status, and none can land after it.
                 current.stop(timeout=SIDECAR_STOP_SECONDS)
+                with contextlib.suppress(APIError):
+                    current.reload()
+                if tripped(client, current):
+                    _hold_others(client, current, chosen)
                 current.put_archive(SECRET_DIR, _secret_tar(previous))
+                _gate_up(client, current)
                 current.start()
-                _wait_ready(current)
+                _ready_with_gate(client, current)
                 _restart_members(client, current)
             elif not running:
                 # Down, not leaking: its earners have no way out. Stopped so it
-                # does not hold a tailnet device or a proxy session for nothing.
+                # does not hold a tailnet device or a proxy session for nothing,
+                # and its gate with it.
                 current.stop(timeout=SIDECAR_STOP_SECONDS)
+                _stop_gate(client, current)
+            else:
+                # It ran before this restart (with no exit, or its gate down),
+                # and the restart brought a new gate up: down with it unless a
+                # copy in it should run, for which the heartbeat tries again.
+                _stop_if_unwanted(client, current)
         except Exception as undo:  # noqa: BLE001 - the tunnel stays down, failing closed
             logger.warning("Could not put the old settings back into %s: %s", current.name, redact(str(undo), secrets))
         raise ProxyTunnelError(redact(str(exc), secrets), exc.status_code) from None
@@ -1751,7 +2121,13 @@ def _moving(client: Any, proxy_id: str) -> list[str]:
 
 
 def _finish_staged(
-    client: Any, staged: Any, current: Any | None, final: str, *, target: _StartApproval | None = None
+    client: Any,
+    staged: Any,
+    current: Any | None,
+    final: str,
+    *,
+    target: _StartApproval | None = None,
+    chosen: str | None = None,
 ) -> Any:
     """Finish a tunnel change a worker died in: the staged tunnel had proved its
     exit before any copy moved into it, so the copies left in ``current`` move
@@ -1760,7 +2136,10 @@ def _finish_staged(
     instead (see _undo_staged).
 
     Refused while a copy of the proxy is still half moved: recover_moves must
-    settle it first, or its container aside would be taken for a copy."""
+    settle it first, or its container aside would be taken for a copy.
+
+    ``chosen`` is the copy a deploy or Start is for (_hold_others_if_tripped):
+    when ``current`` tripped, every other copy in it moves across held."""
     if half := _moving(client, _labels(staged).get(LABEL_PROXY, "")):
         raise RecoveryConflict(
             t(
@@ -1771,6 +2150,16 @@ def _finish_staged(
         )
     members = _members(client, current) if current is not None else []
     _check_move_targets(client, members, target)
+    if current is not None and tripped(client, staged):
+        # Its watchdog (or its gate's) stopped it: a new gate here would clear
+        # that. Its copies are held, as the heartbeat holds a tripped tunnel's,
+        # and go back into the current tunnel stopped, for their owner's Start.
+        for member in _members(client, staged):
+            _set_held(str(member.name), True, strict=True)
+            if getattr(member, "status", "") in _LIVE:
+                member.stop(timeout=orchestrator._get_stop_timeout(_labels(member).get(LABEL_SERVICE) or ""))
+                member.reload()
+        return _undo_staged(client, staged, current, f"The new tunnel of {final} tripped its watchdog")
     run = getattr(staged, "status", "") == "running"
     if current is not None and (
         getattr(current, "status", "") in _LIVE or any(getattr(m, "status", "") in _LIVE for m in members)
@@ -1781,16 +2170,44 @@ def _finish_staged(
         # its probe time to write /run/ready again.
         try:
             if not run:
+                _gate_up(client, staged)
                 staged.start()
             _wait_ready(staged)
+            # An inner's /run/ready outlives its gate: with the gate down it has no way out.
+            if is_isolated(staged) and not _gate_running(client, staged):
+                raise RuntimeError("the staged tunnel's gate is down")
         except Exception:  # noqa: BLE001 - the detail may hold the proxy's secrets
             # Stopped, so it holds no proxy login while nothing can use it.
             with contextlib.suppress(Exception):
                 staged.stop(timeout=SIDECAR_STOP_SECONDS)
+            # A trip while it was proven (its gate down from one, too): its
+            # copies are held and stopped before they move back, as above.
+            # Read after the stop, which keeps a trip's exit code.
+            with contextlib.suppress(Exception):
+                staged.reload()
+            if tripped(client, staged):
+                _hold_others(client, staged, None)
             why = "runs but has no exit" if run else "could not start"
             return _undo_staged(client, staged, current, f"The new tunnel of {final} {why}")
         run = True
     if current is not None:
+        # The current tunnel tripped with a copy still running in its old
+        # namespace: once moved, nothing would show the trip. Its copies are
+        # held first, as the heartbeat holds a tripped tunnel's, and move
+        # across stopped, for their owner's Start. It is stopped before the
+        # read, so no trip can land after it, while a copy starts in the
+        # staged tunnel: the stop keeps a trip's exit code, and a stopped run
+        # trips no more. Its copies lose their way out a moment early. A stop
+        # or a read that fails leaves the trip unknown, so they are held then too.
+        try:
+            current.stop(timeout=SIDECAR_STOP_SECONDS)
+            current.reload()
+            trip = tripped(client, current)
+        except APIError as exc:
+            logger.warning("Could not stop or read %s; its copies move held: %s", current.name, redact(str(exc)))
+            trip = True
+        if trip:
+            _hold_others(client, current, chosen)
         members = _members(client, current)
         _check_move_targets(client, members, target)
         for member in members:
@@ -1916,7 +2333,11 @@ def _deploy(
     deadline: float,
 ) -> dict:
     client = orchestrator._get_client()
-    key = slug if own_tunnel else None
+    # A copy that holds NET_ADMIN or NET_RAW gets a namespace of its own, never
+    # the proxy's shared one ("Isolated tunnels"). A routed service already has
+    # its own tunnel; it is made isolated, or back, to match.
+    isolated = needs_isolation(earner.get("cap_add"), earner.get("devices"))
+    key = slug if own_tunnel else (slug + ISOLATED_SUFFIX if isolated else None)
     # Checked first: settings that cannot work (a host that does not resolve,
     # no tunnel image) fail fast, before a tunnel is created.
     secret_files(proxy, own_ip, shared_label(proxy_id, key))
@@ -1942,6 +2363,11 @@ def _deploy(
     ]
     old = _get(client, name)
     old_tunnel = _tunnel_of(client, old if _is_ours(old, slug, proxy_id) else None, slug, proxy_id)
+    # A route that replaces a copy, or a copy that replaces a route: the old
+    # earner's live mounts are the other one's identity (the copy's <vol>-p<id>,
+    # the service's own <vol>), so none is kept, and the spec's volumes are
+    # mounted (deploy_raw keep_targets). With its tunnel gone it cannot be told.
+    switched = old_tunnel is not None and (_own_key(old_tunnel) == slug) != own_tunnel
     # The earner's image is pulled before anything changes, as a direct deploy
     # pulls before it touches the old container, and before the tunnel: a new
     # tunnel image recreates this copy's earner in a new tunnel (_ensure_tunnel),
@@ -1968,6 +2394,7 @@ def _deploy(
         deadline=deadline,
         keep=name,
         expected_container=expected_container,
+        isolated=isolated,
     )
     # The old tunnel a new tunnel image left running with the old earner inside
     # (keep): removed below once the new earner runs, renamed back on a failure.
@@ -2034,6 +2461,10 @@ def _deploy(
             image=earner["image"],
             env=earner.get("env") or {},
             network_mode=f"container:{tunnel.id}",
+            # Named volumes only, each the copy's own (app/proxies.earner_spec).
+            volumes=earner.get("volumes") or None,
+            moved_mounts=earner.get("moved_mounts") or None,
+            keep_targets=set() if switched else None,
             cap_add=earner.get("cap_add"),
             devices=earner.get("devices"),
             command=earner.get("command"),
@@ -2374,18 +2805,24 @@ def _stop(slug: str, proxy_id: int) -> dict[str, Any]:
         # error: the cap would read it as "could not stop" and never mark the
         # copy, and a second stop finds it held (was_running False), so its
         # reset would never start it again.
-        ran, half_failure = _halt(client, slug, earner, tunnel, tunnel_live, was_running, halves)
+        ran, half_failure, gate_failure = _halt(client, slug, earner, tunnel, tunnel_live, was_running, halves)
         warning = (
             f"{name} was stopped, but the stop may not survive a power cut. {exc}. Stop it again once the disk "
             "is healthy."
         )
-        return _stopped(name, ran, half_failure, warning, durable=False)
-    ran, half_failure = _halt(client, slug, earner, tunnel, tunnel_live, was_running, halves)
-    return _stopped(name, ran, half_failure)
+        return _stopped(name, ran, half_failure, warning, durable=False, gate_failure=gate_failure)
+    ran, half_failure, gate_failure = _halt(client, slug, earner, tunnel, tunnel_live, was_running, halves)
+    return _stopped(name, ran, half_failure, gate_failure=gate_failure)
 
 
 def _stopped(
-    name: str, was_running: bool, half_failure: Exception | None, warning: str | None = None, *, durable: bool = True
+    name: str,
+    was_running: bool,
+    half_failure: Exception | None,
+    warning: str | None = None,
+    *,
+    durable: bool = True,
+    gate_failure: Exception | None = None,
 ) -> dict[str, Any]:
     """The answer of a stop that stopped the copy: ``was_running``, and ``durable`` False and a ``warning`` when due.
 
@@ -2393,12 +2830,17 @@ def _stopped(
     an error: the copy and its tunnel are down and the stop is in the marker, so
     an error would make the cap read "could not stop" and never mark the copy,
     and a second stop finds it held (was_running False), so its reset would
-    never start it again."""
+    never start it again. A gate that could not stop (``gate_failure``) is a warning for the same reason."""
     out: dict[str, Any] = {"was_running": was_running}
     notes = [warning] if warning else []
     if half_failure is not None:
         notes.append(
             f"{name} was stopped, but what an interrupted move or redeploy left of it could not be stopped ({half_failure}). "
+            "Stop it again."
+        )
+    if gate_failure is not None:
+        notes.append(
+            f"{name} was stopped, but the gate of its tunnel could not be stopped ({redact(str(gate_failure))}). "
             "Stop it again."
         )
     if not durable:
@@ -2410,7 +2852,7 @@ def _stopped(
 
 def _halt(
     client: Any, slug: str, earner: Any, tunnel: Any, tunnel_live: bool, was_running: bool, halves: tuple[Any, ...] = ()
-) -> tuple[bool, Exception | None]:
+) -> tuple[bool, Exception | None, Exception | None]:
     """_stop's work once the stop is in the marker: the earner down, and its tunnel when no copy in it should run.
 
     ``halves`` are what a move a worker died in, or a failed redeploy, left of the copy (_stop): down too.
@@ -2419,8 +2861,13 @@ def _halt(
     is not started) never makes the stop an error: its first failure is
     returned with ``was_running``, for the answer's warning (_stopped). One
     that still runs is raised once the earner and the tunnel are down, as a
-    failure to stop the earner is: the copy still runs, so the cap must retry."""
+    failure to stop the earner is: the copy still runs, so the cap must retry.
+
+    A gate that cannot stop is returned third, for a warning, never raised: the
+    copy and its tunnel are down, and an error would make the cap's retry find
+    the copy down and never mark it for its reset."""
     half_failure = None
+    gate_failure = None
     live_failure = None
     for half in halves:
         was_live = getattr(half, "status", "") in _LIVE
@@ -2435,29 +2882,39 @@ def _halt(
                 half_failure = half_failure or exc
     if tunnel is not None and not _is_shared(tunnel):
         tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
+        try:
+            _stop_gate(client, tunnel, strict=True)
+        except Exception as exc:  # noqa: BLE001 - a warning; the earner still stops
+            gate_failure = exc
         if earner is not None:
             earner.stop(timeout=orchestrator._get_stop_timeout(slug))
         if live_failure is not None:
             raise live_failure
-        return was_running, half_failure
+        return was_running, half_failure, gate_failure
     failure = live_failure
     if earner is not None:
         try:
             earner.stop(timeout=orchestrator._get_stop_timeout(slug))
         except Exception as exc:  # noqa: BLE001 - raised below, after the tunnel
             failure = failure or exc
-    if tunnel is not None and tunnel_live:
+    if tunnel is not None:
         # Also when the earner did not stop: with no copy that should run left,
-        # stopping the tunnel cuts the earner's way out all the same.
+        # stopping the tunnel cuts the earner's way out all the same. The gate
+        # stops also when its tunnel already exited.
         try:
             stopped = held()
         except OSError:
             stopped = None  # the tunnel keeps running: safe, and the next stop tries again
         if stopped is not None and not any(str(m.name) not in stopped for m in _members(client, tunnel)):
-            tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
+            if tunnel_live:
+                tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
+            try:
+                _stop_gate(client, tunnel, strict=True)
+            except Exception as exc:  # noqa: BLE001 - a warning, as above
+                gate_failure = exc
     if failure is not None:
         raise failure
-    return was_running, half_failure
+    return was_running, half_failure, gate_failure
 
 
 def start(
@@ -2554,8 +3011,15 @@ def _start(
     if tunnel is not None and not _is_shared(tunnel) and proxy is None:
         return _start_legacy(slug, earner, tunnel, name)
     if proxy is not None:
-        # A routed service keeps its own tunnel; anything else is a shared copy.
-        key = _own_key(tunnel) if _is_shared(tunnel) else (slug if _routed_here(slug, proxy_id) else None)
+        # A routed service keeps its own tunnel; anything else is a shared copy,
+        # or one with an isolated tunnel of its own when it holds NET_ADMIN or NET_RAW.
+        isolated = _member_needs_isolation(earner)
+        if _is_shared(tunnel):
+            key = _own_key(tunnel)
+        elif _routed_here(slug, proxy_id):
+            key = slug
+        else:
+            key = slug + ISOLATED_SUFFIX if isolated else None
         final = shared_tunnel_name(proxy_id, key)
         _reclaim_retired(client, proxy_id, key, final)
         retired = _get(client, final + RETIRED_SUFFIX)
@@ -2579,7 +3043,9 @@ def _start(
             # replaces both.
             files, secrets = _tunnel_settings(proxy, own_ip, shared_label(proxy_id, key))
             try:
-                shared, exit_info = _in_place(client, retired, proxy, own_ip, files, secrets, deadline=_pull_deadline())
+                shared, exit_info = _in_place(
+                    client, retired, proxy, own_ip, files, secrets, deadline=_pull_deadline(), chosen=name
+                )
             except _Broken as exc:
                 raise ProxyTunnelError(
                     t("err.proxy_tunnel.docker_could_not_start_not", name=retired.name, exc=exc, name2=name)
@@ -2588,7 +3054,15 @@ def _start(
             if _tunnel_id_of(earner) != getattr(_get(client, final), "id", None):
                 _move_expected(client, earner, target)
             shared, exit_info = _ensure_tunnel(
-                client, proxy_id, proxy, own_ip, slug=key, deadline=_pull_deadline(), move_target=target
+                client,
+                proxy_id,
+                proxy,
+                own_ip,
+                slug=key,
+                deadline=_pull_deadline(),
+                move_target=target,
+                isolated=isolated,
+                starting=name,
             )
     else:
         if tunnel is None:
@@ -2605,10 +3079,36 @@ def _start(
                 # The ready run read below must be the one the earner joins.
                 raise ProxyTunnelError(t("err.proxy_tunnel.not_started_not_tunnel_proved", name=name))
         else:
+            if tunnel.status == "running" and is_isolated(tunnel) and not _gate_running(client, tunnel):
+                # An isolated tunnel's /run/ready outlives its gate (as in
+                # _in_place): a new run with a new gate, never the old file.
+                logger.warning("The gate of %s is down; restarting the tunnel with a new gate", tunnel.name)
+                with contextlib.suppress(APIError):
+                    tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
+                tunnel.reload()
+                if tunnel.status == "running":
+                    raise ProxyTunnelError(t("err.proxy_tunnel.docker_did_not_stop_gate_down", name=tunnel.name))
             if tunnel.status != "running":
+                _hold_others_if_tripped(client, tunnel, name)
                 refresh_proxy_ip(tunnel)
-                tunnel.start()
-            exit_info = _wait_ready(tunnel)
+                _gate_up(client, tunnel)
+                try:
+                    tunnel.start()
+                except Exception:
+                    # As the heartbeat does: the new gate holds a proxy session
+                    # or a tailnet device, so it goes down again unless the
+                    # inner runs after all (a start that timed out).
+                    with contextlib.suppress(Exception):
+                        tunnel.reload()
+                        if tunnel.status not in _LIVE:
+                            _stop_gate(client, tunnel)
+                    raise
+            try:
+                exit_info = _ready_with_gate(client, tunnel)
+            except ProxyTunnelError:
+                # As below: down again with its gate unless another copy in it should run.
+                _stop_if_unwanted(client, tunnel)
+                raise
     current = shared if proxy is not None else tunnel
     try:
         if proxy is not None:
@@ -2685,6 +3185,7 @@ def _stop_if_unwanted(client: Any, tunnel: Any) -> None:
         stopped = held()
         if not any(str(m.name) not in stopped for m in _members(client, tunnel)):
             tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
+            _stop_gate(client, tunnel)
 
 
 def _started_or_raise(earner: Any, tunnel: Any, slug: str, *, restart: bool = False) -> None:
@@ -3234,6 +3735,10 @@ def _read_exit(sidecar: Any) -> dict[str, Any] | None:
     if sidecar.status != "running":
         return None
     try:
+        # An isolated tunnel's /run/ready stays after its gate is gone: no exit
+        # then, nor when the gate cannot be read.
+        if is_isolated(sidecar) and not _gate_running(orchestrator._get_client(), sidecar):
+            return None
         code, out = sidecar.exec_run(["cat", "/run/ready"], demux=False)
     except Exception:  # noqa: BLE001 - unknown is the honest answer
         return None
@@ -3534,6 +4039,22 @@ def _status(collect_stats: bool) -> list[dict[str, Any]]:
         if tunnel.id not in used and not _is_shared(tunnel):
             labels = _labels(tunnel)
             pairs.setdefault((labels.get(LABEL_SERVICE, ""), labels.get(LABEL_PROXY, "")), (None, tunnel))
+    # A tunnel cp-watch stopped (its firewall changed while it ran, or a probe
+    # left from the box's own IP) holds its copies stopped, so nothing starts
+    # them again until their owner does. An isolated tunnel whose gate went
+    # down otherwise is stopped, so the heartbeat starts both again together.
+    trips: set[str] = set()
+    for key, (earner, sidecar) in pairs.items():
+        if sidecar is None or key in unproven:
+            continue
+        try:
+            if tripped(client, sidecar) and _hold_tripped(sidecar, earner, key[1]):
+                trips.add(sidecar.id)
+            elif is_isolated(sidecar) and sidecar.status == "running" and not _gate_running(client, sidecar):
+                _stop_gateless(sidecar, key[1])
+        except Exception as exc:  # noqa: BLE001 - the next beat looks again
+            logger.warning("Could not check the watchdog of %s: %s", sidecar.name, redact(str(exc)))
+    _sweep_gates(client)
     # Which copies the owner or the cap stopped, so the UI can tell them from
     # ones that died. Unreadable: not said, and the UI alerts on what is gone only.
     try:
@@ -3613,6 +4134,10 @@ def _status(collect_stats: bool) -> list[dict[str, Any]]:
                 "tunnel_container_id": sidecar.short_id if sidecar is not None else "",
                 "tunnel_started_at": _started_at(sidecar) if sidecar is not None else "",
                 "tunnel_shared": bool(sidecar is not None and _is_shared(sidecar)),
+                # Its own namespace behind a gate (it holds NET_ADMIN or NET_RAW).
+                "isolated": is_isolated(sidecar),
+                # cp-watch stopped its tunnel; it stays stopped until its owner starts it.
+                "tripped": sidecar is not None and sidecar.id in trips,
                 "net_rx_bytes": rx,
                 "net_tx_bytes": tx,
                 "exit_ip": (exit_info or {}).get("ip"),
@@ -3634,6 +4159,87 @@ def _status(collect_stats: bool) -> list[dict[str, Any]]:
         if sidecar is None and earner is not None and (change := stuck.get(_tunnel_id_of(earner))):
             out[-1]["tunnel_change"] = dict(change)
     return out
+
+
+def _hold_tripped(tunnel: Any, earner: Any | None, proxy_id: str) -> bool:
+    """Hold the copy of a tripped tunnel stopped, and stop what still runs of both. Under the proxy's lock.
+
+    False when the tunnel, read again under the lock, is no longer tripped (its
+    owner's Start got there first). True otherwise, also when the lock is busy
+    and nothing was done this beat."""
+    lock = _deploy_lock(int(proxy_id)) if proxy_id.isdigit() else None
+    if lock is None or not lock.acquire(blocking=False):
+        return True
+    try:
+        tunnel.reload()
+        client = orchestrator._get_client()
+        if not tripped(client, tunnel):
+            return False
+        # The beat listed this earner before the lock: a deploy may have
+        # replaced it since, under the same name, in another tunnel. The hold
+        # is for this container in this tunnel only.
+        if earner is not None:
+            try:
+                earner.reload()
+            except NotFound:
+                earner = None
+            else:
+                if _tunnel_id_of(earner) != tunnel.id:
+                    earner = None
+        if earner is not None:
+            name = str(earner.name)
+            if name not in held():
+                _set_held(name, True, strict=True)
+                logger.warning(
+                    "%s was stopped: the watchdog of its tunnel %s tripped (its firewall changed, or traffic left "
+                    "from this box's own address). It starts again only when its owner starts it.",
+                    name,
+                    tunnel.name,
+                )
+            earner.reload()
+            if earner.status in _LIVE:
+                earner.stop(timeout=orchestrator._get_stop_timeout(_labels(earner).get(LABEL_SERVICE) or ""))
+                # docker-py keeps the status it read until a reload: this beat reports it too.
+                earner.reload()
+        tunnel.reload()
+        if tunnel.status in _LIVE:
+            tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
+            tunnel.reload()
+        _stop_gate(client, tunnel)
+        return True
+    finally:
+        lock.release()
+
+
+def _stop_gate(client: Any, tunnel: Any, *, strict: bool = False) -> None:
+    """Stop the gate of an isolated ``tunnel``, so it holds no proxy session while the tunnel is down.
+
+    Its network stays: the next start makes a new gate on it (_gate_up). A gate
+    that does not stop is logged, and raised when ``strict`` (a Stop, which says so)."""
+    gate = _gate_of(client, tunnel) if is_isolated(tunnel) else None
+    if gate is not None and getattr(gate, "status", "") in _LIVE:
+        try:
+            gate.stop(timeout=SIDECAR_STOP_SECONDS)
+        except Exception as exc:
+            logger.warning("Could not stop the gate of %s: %s", tunnel.name, redact(str(exc)))
+            if strict:
+                raise
+
+
+def _stop_gateless(tunnel: Any, proxy_id: str) -> None:
+    """Stop an isolated tunnel whose gate is down, so the next start brings both up. Under the proxy's lock."""
+    lock = _deploy_lock(int(proxy_id)) if proxy_id.isdigit() else None
+    if lock is None or not lock.acquire(blocking=False):
+        return
+    try:
+        tunnel.reload()
+        if tunnel.status == "running" and not _gate_running(orchestrator._get_client(), tunnel):
+            logger.warning("The gate of %s is down; stopping it so both start again together", tunnel.name)
+            tunnel.stop(timeout=SIDECAR_STOP_SECONDS)
+            # docker-py keeps the status it read until a reload: this beat starts it again.
+            tunnel.reload()
+    finally:
+        lock.release()
 
 
 def _failed_or_unknown(earner: Any) -> bool:
@@ -3701,12 +4307,18 @@ def _replace_restarting(
         if not _is_tunnel_for(target, pid, key) or _restarts_by_itself(target):
             raise ProxyTunnelError(t("err.proxy_tunnel.replaced_once_runs_worker_s", name=tunnel.name, final=final))
         for member in _members(client, tunnel):
-            _refuse_unmovable(member)  # before the target is started for them
+            _refuse_unmovable(member, isolated=is_isolated(target))  # before the target is started for them
+        if target.status != "running" and tripped(client, target):
+            # Its watchdog stopped it: only its owner's Start runs it again
+            # (_hold_tripped), so the move waits for that.
+            _hold_others(client, target, None)
+            raise ProxyTunnelError(t("err.proxy_tunnel.replaced_once_ready", name=tunnel.name, final=final))
         if target.status != "running":
             # Down, as when every copy in it was stopped: started on the
             # settings it holds, as a start does, since a copy moving in should
             # run. Nothing else starts it, so the move would wait for good.
             refresh_proxy_ip(target)
+            _gate_up(client, target)
             target.start()
             try:
                 _wait_ready(target)
@@ -3903,7 +4515,7 @@ def _start_down_tunnel(tunnel: Any, proxy_id: str, name: str) -> None:
     lock = _deploy_lock(int(proxy_id)) if str(proxy_id).isdigit() else None
     if lock is None or not lock.acquire(blocking=False):
         return
-    started = False
+    handed = False
     try:
         try:
             if name in held():
@@ -3914,18 +4526,45 @@ def _start_down_tunnel(tunnel: Any, proxy_id: str, name: str) -> None:
         tunnel.reload()
         if tunnel.status != "exited" or _restarts_by_itself(tunnel):
             return
-        refresh_proxy_ip(tunnel)
-        tunnel.start()
-        started = True
-        logger.info("Started %s, which was down while a copy in it should run", tunnel.name)
+        client = orchestrator._get_client()
+        # Tripped: only its owner's Start brings it back (_hold_tripped).
+        if tripped(client, tunnel):
+            return
+
+        # In the background, holding the lock until done: an isolated tunnel's
+        # gate is waited for (_gate_up, up to READY_TIMEOUT), which would hold
+        # the heartbeat's status pass past its interval.
+        def work() -> None:
+            started = False
+            try:
+                refresh_proxy_ip(tunnel)
+                _gate_up(client, tunnel)
+                tunnel.start()
+                started = True
+                logger.info("Started %s, which was down while a copy in it should run", tunnel.name)
+            except Exception as exc:  # noqa: BLE001 - the next beat tries again
+                logger.warning("Could not start %s: %s", tunnel.name, redact(str(exc)))
+                # The gate made for it holds a proxy session or a tailnet device:
+                # down again unless the inner runs after all (a start that timed out).
+                with contextlib.suppress(Exception):
+                    tunnel.reload()
+                    if tunnel.status not in _LIVE:
+                        _stop_gate(client, tunnel)
+            finally:
+                lock.release()
+            if started:
+                # Its bridge address is new: give it its exception to an exit node or
+                # proxy on one of the owner's lines now, as _wait_ready does for a deploy.
+                lan_fence.tunnel_started()
+
+        # The work releases the lock; a thread that did not start never ran it.
+        _in_background(work)
+        handed = True
     except Exception as exc:  # noqa: BLE001 - the next beat tries again
         logger.warning("Could not start %s: %s", tunnel.name, redact(str(exc)))
     finally:
-        lock.release()
-    if started:
-        # Its bridge address is new: give it its exception to an exit node or
-        # proxy on one of the owner's lines now, as _wait_ready does for a deploy.
-        lan_fence.tunnel_started()
+        if not handed:
+            lock.release()
 
 
 def test(proxy: dict[str, Any], own_ip: str | None) -> dict[str, Any]:

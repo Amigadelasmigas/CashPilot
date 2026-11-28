@@ -2211,6 +2211,17 @@ const CP = (() => {
       ? `<option value="">${t('app.route.keep')}</option>
           <option value="0">${t('app.route.direct')}</option>`
       : `<option value="">${t('app.route.direct')}</option>`;
+    // What lowers its isolation behind a proxy: one checkbox each, shown once a
+    // proxy is chosen. The server refuses the route without every one of them.
+    // Under "Keep" too where a box's recorded route lacks one (recorded before
+    // its service needed it): the ticks given there add to the recorded ones.
+    const needs = svc.route_needs || [];
+    const keepAsks = routed && Object.values(svc.route_acks_missing || {}).some((missing) => (missing || []).length);
+    const acks = needs.length ? `
+        <div class="route-acks" data-slug="${slug}"${keepAsks ? ' data-keep="1"' : ' style="display:none;"'}>
+          <div class="form-hint">${t('app.route.ack_title')}</div>
+          ${needs.map((key) => `<label class="form-hint" style="display:block;"><input type="checkbox" data-route-ack="${escapeHtml(key)}"> ${escapeHtml(routeAckText(key, svc))}</label>`).join('')}
+        </div>` : '';
     return `
       <div class="form-group route-choice">
         <label class="form-label" for="route-select-${slug}">${t('app.route.label')}</label>
@@ -2218,7 +2229,28 @@ const CP = (() => {
           ${choices}
         </select>
         <div class="form-hint">${t('app.route.hint')}</div>
+        ${svc.route_udp ? `<div class="form-hint">${t('app.route.udp_hint')}</div>` : ''}
+        ${acks}
       </div>`;
+  }
+
+  // ``svc`` names the service whose terms the account risk is about, and links them.
+  function routeAckText(key, svc = {}) {
+    const risk = ((svc.requirements || {}).proxy_risk) || {};
+    return {
+      net_admin: t('app.route.ack.net_admin'),
+      net_raw: t('app.route.ack.net_raw'),
+      tun_device: t('app.route.ack.tun_device'),
+      no_inbound: t('app.route.ack.no_inbound'),
+      account_risk: t('app.route.ack.account_risk', { name: svc.name || svc.slug || '', source: risk.source || '' }),
+    }[key] || key;
+  }
+
+  // The acknowledgements ticked in ``slug``'s Route box, sent with a route to a proxy.
+  function _routeAcks(root, slug) {
+    const select = _routeSelect(root, slug);
+    const box = select && select.closest('.route-choice');
+    return box ? [...box.querySelectorAll('input[data-route-ack]:checked')].map((el) => el.dataset.routeAck) : [];
   }
 
   // The Route box of ``slug`` inside ``root``, the form that owns it. The setup
@@ -2256,9 +2288,13 @@ const CP = (() => {
   function _routeSwitchBoxes(select) {
     const scope = (select.closest && select.closest('.route-choice') || {}).parentElement || document;
     const switching = select.value === '0';
+    const acks = select.closest && select.closest('.route-choice') && select.closest('.route-choice').querySelector('.route-acks');
+    if (acks) acks.style.display = parseInt(select.value, 10) > 0 || (select.value === '' && acks.dataset.keep === '1') ? '' : 'none';
     for (const cb of scope.querySelectorAll(`input[data-routed="1"][data-slug="${select.dataset.slug}"]`)) {
-      cb.disabled = !switching;
-      cb.checked = !switching;
+      // A box whose recorded route lacks a tick is free under "Keep" too, to send it.
+      const free = switching || (select.value === '' && cb.dataset.keepNeeds === '1');
+      cb.disabled = !free;
+      cb.checked = !free;
     }
   }
 
@@ -2296,6 +2332,9 @@ const CP = (() => {
       const proxiedOnly = (w.system_info || {}).proxied_only === true;
       // It can still leave its route here (_routeSwitchBoxes), so the form stays.
       const routed = deployed && Boolean((svc.routes || {})[w.id]);
+      // Its recorded route lacks a tick: under "Keep" it is free, unticked, so the
+      // owner can tick it and send the ticks (_routeSwitchBoxes).
+      const keepNeeds = routed && ((svc.route_acks_missing || {})[w.id] || []).length > 0;
       if (!deployed || routed) allDeployed = false;
       let instancesBox = '';
       if (maxInstances) {
@@ -2312,7 +2351,7 @@ const CP = (() => {
       }
       rows += `
       <label class="worker-pick">
-        <input type="checkbox" class="${checkboxClass}" data-slug="${svc.slug}" data-wid="${w.id}"${routed ? ' data-routed="1"' : ''} ${deployed ? 'disabled checked' : (onlyChoice ? 'checked' : '')}>
+        <input type="checkbox" class="${checkboxClass}" data-slug="${svc.slug}" data-wid="${w.id}"${routed ? ' data-routed="1"' : ''}${keepNeeds ? ' data-keep-needs="1"' : ''} ${deployed && !keepNeeds ? 'disabled checked' : (onlyChoice && !deployed ? 'checked' : '')}>
         <span class="worker-pick-name${deployed ? ' is-deployed' : ''}">${escapeHtml(w.name)}</span>
         ${isDesktopWorker(w) ? `<span class="badge" title="${t('app.dep.desktop_title')}">Desktop</span>` : ''}
         ${proxiedOnly ? `<span class="badge" title="${t('app.dep.proxy_only_title')}">${t('app.dep.proxy_only')}</span>` : ''}
@@ -4374,6 +4413,8 @@ const CP = (() => {
     // Read once, before anything waits: a Route box changed while the first
     // box deploys must not send another route (or none) to the next one.
     const route = _routeChoice(routeRoot, slug);
+    // Under "Keep" (no route) only ticks given there go, and add to the recorded ones.
+    const routeAcks = route === 0 ? [] : _routeAcks(routeRoot, slug);
     if (workerIds.length === 0) {
       toast(t('app.dep.pick_worker'), 'warning');
       if (statusEl) statusEl.textContent = t('app.dep.pick_node');
@@ -4452,6 +4493,7 @@ const CP = (() => {
         const instances = _instancesFor(slug, wid);
         if (instances !== undefined) body.instances = instances;
         if (route !== undefined) body.route = route;
+        if (route > 0 || (route === undefined && routeAcks.length)) body.route_acknowledged = routeAcks;
         const res = await api(`/api/deploy/${slug}?worker_id=${wid}`, { method: 'POST', body });
         ok++;
         if (res && res.wallet && res.wallet.phrase) newWallets.push({ wid, wallet: res.wallet });

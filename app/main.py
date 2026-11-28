@@ -4337,6 +4337,7 @@ async def api_services_available(request: Request) -> list[dict[str, Any]]:
             worker_node_counts[slug].add(node)
 
     recorded_routes = await _recorded_routes()
+    worker_specs = await database.list_worker_specs()
     locale = i18n.current()
     available = []
     for svc in services:
@@ -4358,8 +4359,10 @@ async def api_services_available(request: Request) -> list[dict[str, Any]]:
         # The grade and its top cons, computed from the published criteria.
         svc["rating_result"] = ratings.for_service(svc)
         # The wizard's Route box, as on the detail page (api_get_service).
-        svc["route_refusal"] = proxies.refusal(svc)
+        svc["route_refusal"] = proxies.refusal(svc, routed=True)
+        svc["route_needs"] = proxies.acknowledgements(svc)
         svc["routes"] = recorded_routes.get(slug, {})
+        svc["route_acks_missing"] = _route_acks_missing(svc, slug, worker_specs)
         available.append(svc)
     return available
 
@@ -4403,9 +4406,31 @@ async def api_get_service(request: Request, slug: str) -> dict[str, Any]:
     svc["rating_result"] = ratings.for_service(None if svc.get("custom") else svc)
     # The deploy form's Route box: why it must stay direct, and the worker id ->
     # proxy id of each box where it is recorded as routed.
-    svc["route_refusal"] = proxies.refusal(svc)
+    svc["route_refusal"] = proxies.refusal(svc, routed=True)
+    # What the Route box asks the owner to acknowledge (proxies.ACK_KEYS), and
+    # whether a SOCKS5 or HTTP proxy cannot carry it (UDP).
+    svc["route_needs"] = proxies.acknowledgements(svc)
+    svc["route_udp"] = bool((svc.get("docker") or {}).get("udp_port_range"))
     svc["routes"] = (await _recorded_routes(slug)).get(slug, {})
+    svc["route_acks_missing"] = _route_acks_missing(svc, slug, await database.list_worker_specs(slug))
     return svc
+
+
+def _route_acks_missing(svc: dict[str, Any], slug: str, rows: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """Worker id -> the ticks its recorded route of ``slug`` lacks (one recorded
+    before its service needed them): the Route box asks for them under "Keep" too,
+    and frees that box to send them. ``rows`` are list_worker_specs rows."""
+    return {
+        str(row["worker_id"]): missing
+        for row in rows
+        if row["slug"] == slug
+        and proxies.route_of(row["spec"]) is not None
+        and (
+            missing := proxies.missing_acknowledgements(
+                svc, ((row["spec"] or {}).get("route") or {}).get("acknowledged")
+            )
+        )
+    }
 
 
 async def _recorded_routes(slug: str | None = None) -> dict[str, dict[str, int]]:
@@ -4603,6 +4628,9 @@ class DeployRequest(BaseModel):
     # redeploy from a form or a script that never showed the choice cannot move
     # a routed service onto the box's own IP (docs/proxies.md).
     route: int | None = None
+    # What the owner acknowledged lowers the routed service's isolation
+    # (proxies.ACK_KEYS). None keeps what its route record says.
+    route_acknowledged: list[str] | None = None
     # The owner saw that a device id in this deploy already runs on another
     # box and deploys anyway (see _refuse_shared_device_ids).
     allow_shared_identity: bool = False
@@ -4925,6 +4953,17 @@ async def _deploy(
     elif asked_route < 0:
         raise HTTPException(status_code=400, detail=t("api.route_proxy_id_0_worker"))
     route = recorded_route if asked_route is None else (asked_route or None)
+    route_acks = getattr(body, "route_acknowledged", None)
+    recorded_acks = ((recorded or {}).get("route") or {}).get("acknowledged") if route == recorded_route else None
+    recorded_acks = [str(a) for a in recorded_acks] if isinstance(recorded_acks, list) else []
+    # "Keep" sends no route: the route on record runs on, with the ticks on record.
+    kept = asked_route is None and route is not None
+    if route_acks is None:
+        route_acks = recorded_acks
+    elif kept:
+        # A tick given under "Keep" (a route recorded before its service needed
+        # one) adds to the ticks on record; it takes none of them back.
+        route_acks = sorted({*recorded_acks, *(str(a) for a in route_acks)})
 
     # What the operator actually TYPED on this deploy. The dashboard has no
     # separate redeploy action: it posts the deploy form, and the form posts
@@ -4970,7 +5009,7 @@ async def _deploy(
     instances = body.instances if body.instances is not None else int((recorded or {}).get("instances") or 1)
     _instance_param(instances)
     if route is not None:
-        await _check_route(slug, svc, worker_id, route, recorded_route, instances)
+        await _check_route(slug, svc, worker_id, route, recorded_route, instances, acknowledged=route_acks, kept=kept)
     expected = body.expected_containers or {}
     if body.replace_existing and body.expected_containers is None and restore is None:
         keys = [f"p{route}"] if route is not None else [str(n) for n in range(1, instances + 1)]
@@ -5225,6 +5264,9 @@ async def _deploy(
                     rename_copies=bool(device_renames and body.rename_devices),
                     expected=expected,
                     request=request,
+                    acknowledged=route_acks,
+                    moved_mounts=moved_mounts,
+                    approve=approve,
                 )
             # A service routed through a proxy on this worker leaves the route only with
             # the owner's password, and its routed copy goes first: both run the same
@@ -5404,7 +5446,11 @@ async def _deploy(
     # No sweep of the other copies' rows here: running_copies comes from the last
     # heartbeat, which may predate a copy, so only a confirmed removal retires one.
     if device_renames and body.rename_devices:
-        divergence.extend(await _refresh_proxied_copies(slug, worker_id, svc, docker_conf, spec, expected=expected))
+        divergence.extend(
+            await _refresh_proxied_copies(
+                slug, worker_id, svc, docker_conf, spec, expected=expected, approve=bool(options.get("approve"))
+            )
+        )
     metrics.record_container_lifecycle("deploy", slug)
     _spawn(_run_collection())
     response: dict[str, Any] = {"status": "deployed", "container_id": container_id}
@@ -5581,6 +5627,7 @@ async def _copies_to_rename(slug: str, worker_id: int) -> list[str]:
 
 @app.post("/api/deploy/{slug}/device-names/copies")
 async def api_rename_proxied_copies(
+    request: Request,
     slug: str,
     body: DeployRequest | None = None,
     worker_id: int | None = None,
@@ -5603,6 +5650,11 @@ async def api_rename_proxied_copies(
     if body and body.replace_existing and body.expected_containers is None:
         keys = await _proxied_rebuild_targets(slug, worker_id, proxies.route_of(recorded), pending_only=True)
         await _confirm_deploy_targets(worker_id, slug, keys)
+    # Each copy keeps its own wallet or node identity: on another image it is
+    # rebuilt only with the owner's password, as its copy-add asked.
+    approve = await _step_up_critical(
+        request, slug, svc, recorded.get("custom_image") or "", body.step_up_password if body else None
+    )
     notes = await _refresh_proxied_copies(
         slug,
         worker_id,
@@ -5611,6 +5663,7 @@ async def api_rename_proxied_copies(
         recorded,
         pending_only=True,
         expected=body.expected_containers if body else None,
+        approve=approve,
     )
     return {"status": "renamed", "kept_from_previous_deployment": notes}
 
@@ -5630,11 +5683,21 @@ async def _check_route(
     route: int,
     recorded_route: int | None,
     instances: int,
+    *,
+    acknowledged: list[str] | None = None,
+    kept: bool = False,
 ) -> None:
-    """Refuse a deploy through ``route`` that cannot run as one routed service on this worker."""
+    """Refuse a deploy through ``route`` that cannot run as one routed service on this worker.
+
+    ``kept``: the deploy keeps the route on record (no route sent). A route
+    recorded before its service needed a tick has none, and the deploys that
+    send no Route choice (an identity change, a restore) cannot give one, so
+    the refusal says where to give it."""
     name = svc.get("name") or slug
-    if why := proxies.refusal(svc):
+    if why := proxies.refusal(svc, routed=True):
         raise HTTPException(status_code=400, detail=why)
+    if missing := proxies.missing_acknowledgements(svc, acknowledged):
+        raise _acknowledge_refusal(name, missing, kept=kept)
     if f"-{slug}".endswith(("-next", "-moving")):
         # Its own tunnel would be cashpilot-tunnel-p<id>-<slug>, which reads as a
         # staged or aside tunnel (proxy_tunnel.STAGED_SUFFIX, MOVING_SUFFIX) and
@@ -5673,10 +5736,44 @@ async def _check_route(
     proxy = await _proxy_or_404(route)
     if proxy["state"].get("capped_at"):
         raise HTTPException(status_code=409, detail=proxy["state"].get("cap_reason") or t("api.proxy_reached_cap"))
-    if "route_at_deploy" not in await _worker_features(worker_id):
+    if why := proxies.refusal(svc, routed=True, kind=(proxy.get("definition") or {}).get("kind")):
+        raise HTTPException(status_code=400, detail=why)
+    features = await _worker_features(worker_id)
+    if "route_at_deploy" not in features:
         raise HTTPException(
             status_code=409,
             detail=t("api.worker_too_old_deploy_service"),
+        )
+    await _require_isolation_feature(svc, features)
+
+
+def _acknowledge_refusal(name: str, missing: list[str], *, kept: bool = False) -> HTTPException:
+    """The 400 a deploy or a copy gets without an acknowledgement it needs; the form lists ``needs``.
+
+    ``kept``: for a route kept from its record, which names where the ticks are."""
+    return HTTPException(
+        status_code=400,
+        detail={
+            "error": "acknowledge_reduced_isolation",
+            "needs": missing,
+            "message": t("api.route_kept_needs_tick", name=name)
+            if kept
+            else t("api.lowers_isolation_tick_each", name=name),
+        },
+    )
+
+
+async def _require_isolation_feature(svc: dict[str, Any], features: Any) -> None:
+    """A service with volumes, or one that needs an acknowledgement, runs behind a proxy only on a worker that can."""
+    docker_conf = svc.get("docker") or {}
+    # The account risk asks a worker nothing new to run it. An older worker
+    # takes it on this UI's check alone; an updated one checks the tick too, and
+    # tells a dashboard older than it, which cannot send the tick, to update.
+    isolation = [key for key in proxies.acknowledgements(svc) if key != "account_risk"]
+    if (docker_conf.get("volumes") or isolation) and "proxied_isolation" not in features:
+        raise HTTPException(
+            status_code=409,
+            detail=t("api.worker_too_old_isolation", name=svc.get("name") or svc.get("slug") or ""),
         )
 
 
@@ -5692,6 +5789,9 @@ async def _deploy_routed(
     rename_copies: bool = False,
     expected: dict[str, str] | None = None,
     request: Request | None = None,
+    acknowledged: list[str] | None = None,
+    moved_mounts: list[str] | None = None,
+    approve: bool = False,
 ) -> dict[str, Any]:
     """Deploy ``slug`` on a worker through one of the owner's proxies, never from the worker's own IP.
 
@@ -5705,7 +5805,7 @@ async def _deploy_routed(
     the deployment record (database._forget_deployment).
     """
     docker_conf = svc.get("docker") or {}
-    earner = proxies.routed_spec(spec)
+    earner = proxies.routed_spec({**spec, "moved_mounts": moved_mounts or []})
     if not spec.get("custom_image") and isinstance(docker_conf.get("image_by_arch"), dict):
         worker = await database.get_worker(worker_id) or {}
         arch_image = _image_for_arch(docker_conf, _safe_json(worker.get("system_info", "{}"), {}).get("arch"))
@@ -5727,7 +5827,7 @@ async def _deploy_routed(
             had_record = any(
                 c["worker_id"] == worker_id and c["slug"] == slug for c in await database.list_proxied_copies(proxy_id)
             )
-            await database.save_proxied_copy(proxy_id, worker_id, slug)
+            await database.save_proxied_copy(proxy_id, worker_id, slug, acknowledged)
         # As on the direct path: the ids are held before the worker can start
         # anything, and a hold that cannot be written sends nothing.
         try:
@@ -5739,17 +5839,28 @@ async def _deploy_routed(
         # A redeploy is one whose record already routes it through this proxy;
         # a plain copy through it leaves a copy record too, but no such route.
         redeploy = proxies.route_of(await database.get_deployment_spec(slug, worker_id=worker_id)) == proxy_id
-        record = {**spec, "route": {"proxy_id": proxy_id}}
+        acks = sorted(set(acknowledged or []))
+        record = {**spec, "route": {"proxy_id": proxy_id, **({"acknowledged": acks} if acks else {})}}
         record.pop("instances", None)
         try:
+            # A wallet or node identity on a spec other than the catalog's goes
+            # out with the owner's approval, as on the direct path
+            # (_step_up_critical); the worker checks it against this exact earner.
+            # Signed by _send_worker_deploy, just before the send.
             result = await _send_worker_deploy(
                 worker_id,
                 slug,
-                {"earner": earner, "proxy": proxies.worker_proxy_spec(definition), "routed": True},
+                {
+                    "earner": earner,
+                    "proxy": proxies.worker_proxy_spec(definition),
+                    "routed": True,
+                    **({"acknowledged": acks} if acks else {}),
+                },
                 expected=(expected or {}).get(f"p{proxy_id}", "none"),
                 proxy_id=proxy_id,
                 definition=definition,
                 timeout=180,
+                sign_earner=approve,
             )
         except HTTPException as exc:
             if _outcome_unknown(exc) or _worker_error(exc) == "routed_copy_may_exist":
@@ -5795,7 +5906,9 @@ async def _deploy_routed(
         # A confirmed rename reaches its plain copies through other proxies too,
         # as on the direct path: rebuilt, or marked for the retry. The routed
         # copy itself was just built from the new names.
-        divergence.extend(await _refresh_proxied_copies(slug, worker_id, svc, docker_conf, record, expected=expected))
+        divergence.extend(
+            await _refresh_proxied_copies(slug, worker_id, svc, docker_conf, record, expected=expected, approve=approve)
+        )
     metrics.record_container_lifecycle("deploy", slug)
     _spawn(_run_collection())
     exit_info = result.get("exit") if isinstance(result.get("exit"), dict) else {}
@@ -8286,8 +8399,16 @@ async def _send_worker_deploy(
     definition: dict[str, Any] | None = None,
     timeout: float = 30,
     desktop_json: dict[str, Any] | None = None,
+    sign_earner: bool = False,
 ) -> dict[str, Any]:
-    """Send the exact expectation on every deploy. Serialize the legacy fallback on this dashboard."""
+    """Send the exact expectation on every deploy. Serialize the legacy fallback on this dashboard.
+
+    ``sign_earner``: the owner's password was checked (_step_up_critical), so the
+    proxied ``earner`` goes out with its signed approval (_approve_spec). It is
+    minted here, after this deploy lock and the target lookup, just before the
+    send: another deploy of the service on this worker can hold the lock for
+    minutes, and an approval minted before that wait could expire.
+    """
     if not isinstance(expected, str) or not _DEPLOY_TARGET_ID.fullmatch(expected):
         raise HTTPException(status_code=422, detail=t("api.expected_container_id_none"))
     instance = _copy_number(spec) or 1
@@ -8337,6 +8458,8 @@ async def _send_worker_deploy(
         if not checked and current != "none" and proxy_id is None:
             # The intermediate worker protocol also requires this flag.
             body["replace_existing"] = True
+        if sign_earner:
+            body["earner"] = await _approve_spec(worker_id, slug, body["earner"])
         result = await send(checked=checked)
         # The worker took it: a default this earner inherited is now its own (app/layers_ui.py).
         await _remember_runtime_choice(worker_id, slug, sent)
@@ -8488,6 +8611,11 @@ class ProxyCopyRequest(BaseModel):
     worker_id: int
     slug: str
     expected_containers: dict[str, str] | None = None
+    # What the owner acknowledged lowers this copy's isolation (proxies.ACK_KEYS).
+    acknowledged: list[str] = []
+    # The owner's password, re-entered for a copy of a wallet or node-identity
+    # service the worker would refuse without a signed approval (_step_up_critical).
+    step_up_password: str | None = None
 
 
 async def _proxy_or_404(proxy_id: int) -> dict[str, Any]:
@@ -8767,8 +8895,13 @@ async def _refresh_proxied_copies(
     *,
     pending_only: bool = False,
     expected: dict[str, str] | None = None,
+    approve: bool = False,
 ) -> list[str]:
     """Redeploy this worker's proxied copies of ``slug`` after a confirmed device rename.
+
+    ``approve``: the caller checked the owner's password for this service
+    (_step_up_critical), so each copy goes out with its own signed approval, as
+    the worker asks of a wallet or node-identity service on another image.
 
     Each copy is named from its original (``<name>-p<proxy id>``), so a renamed
     original leaves its copies on the old shared name until they are rebuilt
@@ -8830,6 +8963,10 @@ async def _refresh_proxied_copies(
         try:
             if why := proxies.refusal(svc):
                 raise ValueError(why)
+            if missing := proxies.missing_acknowledgements(svc, copy.get("acknowledged")):
+                raise ValueError(
+                    f"it now needs an acknowledgement it does not have ({', '.join(missing)}); add it again"
+                )
             if "proxied_if_running" not in await _worker_features(worker_id):
                 raise ValueError(t("api.worker_too_old_rebuild_without"))
             earner = await _proxied_earner(recorded, docker_conf, worker_id, pid)
@@ -8876,11 +9013,14 @@ async def _refresh_proxied_copies(
                         "earner": earner,
                         "proxy": proxies.worker_proxy_spec(proxy["definition"]),
                         "only_if_running": True,
+                        **({"acknowledged": copy["acknowledged"]} if copy.get("acknowledged") else {}),
                     },
                     expected=approved,
                     proxy_id=pid,
                     definition=proxy["definition"],
                     timeout=180,
+                    # Signed just before the send, so it never expires waiting.
+                    sign_earner=approve,
                 )
                 # Still under the lock, so no other deploy of this copy lands
                 # between this one and its mark. Cleared only if ``recorded``
@@ -8902,9 +9042,31 @@ async def _refresh_proxied_copies(
     return notes
 
 
+@app.get("/api/proxies/{proxy_id}/copies/needs")
+async def api_proxied_copy_needs(
+    proxy_id: int, slug: str, _auth: dict[str, Any] = Depends(_require_owner)
+) -> dict[str, Any]:
+    """What the copy form shows for ``slug`` through this proxy: why it cannot run, or
+    what lowers its isolation (each a checkbox) and the volumes of its own it gets."""
+    proxy = await _proxy_or_404(proxy_id)
+    svc = catalog.get_service(slug) or await _custom_service(slug, reveal=False)
+    if not svc:
+        raise HTTPException(status_code=404, detail=t("api.service_not_found", slug=slug))
+    refusal = proxies.refusal(svc, kind=(proxy.get("definition") or {}).get("kind"))
+    risk = (svc.get("requirements") or {}).get("proxy_risk")
+    return {
+        "refusal": refusal,
+        "needs": [] if refusal else proxies.acknowledgements(svc),
+        "volumes": [] if refusal else proxies.copy_volume_names(svc, proxy_id),
+        # For the account risk's line: whose terms, and where they are.
+        "name": svc.get("name") or slug,
+        "risk_source": str(risk.get("source") or "") if isinstance(risk, dict) else "",
+    }
+
+
 @app.post("/api/proxies/{proxy_id}/copies")
 async def api_add_proxied_copy(
-    proxy_id: int, body: ProxyCopyRequest, _auth: dict[str, Any] = Depends(_require_owner)
+    request: Request, proxy_id: int, body: ProxyCopyRequest, _auth: dict[str, Any] = Depends(_require_owner)
 ) -> dict[str, Any]:
     """Run a copy of a service already deployed on a worker through this proxy.
 
@@ -8923,10 +9085,15 @@ async def api_add_proxied_copy(
         raise HTTPException(status_code=409, detail=t("api.service_no_longer_available_deployment_2", slug=slug))
     if wallet_seed.seed_key(svc) and await _worker_is_desktop(body.worker_id):
         raise _desktop_wallet_refusal(svc)
-    if why := proxies.refusal(svc):
+    if why := proxies.refusal(svc, kind=definition.get("kind")):
         raise HTTPException(status_code=400, detail=why)
+    if missing := proxies.missing_acknowledgements(svc, body.acknowledged):
+        raise _acknowledge_refusal(svc.get("name") or slug, missing)
+    # Only what this service needs is kept: a stale tick from another service never travels.
+    acknowledged = [key for key in proxies.acknowledgements(svc) if key in set(body.acknowledged)]
     worker_id = await _resolve_worker_id(body.worker_id)
     await _require_proxy_feature(worker_id)
+    await _require_isolation_feature(svc, await _worker_features(worker_id))
     recorded = await database.get_deployment_spec(slug, worker_id=worker_id)
     if not recorded:
         raise HTTPException(
@@ -8942,6 +9109,12 @@ async def api_add_proxied_copy(
         earner = await _proxied_earner(recorded, docker_conf, worker_id, proxy_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"{svc.get('name') or slug}: {exc}") from exc
+    # A copy keeps its own wallet or node identity once it has run, so the worker
+    # checks it as a direct deploy (_validate_critical_spec): on another image it
+    # runs only with the owner's password, asked here before anything is recorded.
+    # The approval itself is signed by _send_worker_deploy, after the copy's lock,
+    # its deploy lock and the target lookup, so no wait can let it expire.
+    approve = await _step_up_critical(request, slug, svc, recorded.get("custom_image") or "", body.step_up_password)
     # The record goes in before the worker is asked, under the proxy's lock: a
     # deploy that times out may still finish on the worker, and a copy with no
     # record would be outside the cap and the delete guard.
@@ -8957,7 +9130,7 @@ async def api_add_proxied_copy(
         had_record = any(
             c["worker_id"] == worker_id and c["slug"] == slug for c in await database.list_proxied_copies(proxy_id)
         )
-        await database.save_proxied_copy(proxy_id, worker_id, slug)
+        await database.save_proxied_copy(proxy_id, worker_id, slug, acknowledged)
     # Under the copy's lock, as a rename's rebuild of it: whichever deploy
     # reaches the worker last also sets the mark last. Built from the record
     # read above, so a copy a rename left on the old device name is on the new
@@ -8996,11 +9169,16 @@ async def api_add_proxied_copy(
             result = await _send_worker_deploy(
                 worker_id,
                 slug,
-                {"earner": earner, "proxy": proxies.worker_proxy_spec(definition)},
+                {
+                    "earner": earner,
+                    "proxy": proxies.worker_proxy_spec(definition),
+                    **({"acknowledged": acknowledged} if acknowledged else {}),
+                },
                 expected=(body.expected_containers or {}).get(f"p{proxy_id}", "none"),
                 proxy_id=proxy_id,
                 definition=definition,
                 timeout=180,
+                sign_earner=approve,
             )
         except HTTPException as exc:
             # A 504 says the worker may still be deploying: the record stays, so
@@ -14500,9 +14678,20 @@ async def api_identity_change(request: Request, identity_id: int) -> dict[str, A
     # now. The new id already runs, so a failure here is a note, never an error.
     try:
         fresh = await database.get_deployment_spec(slug, worker_id=worker_id)
+        # _deploy checked the password of a wallet or node-identity service
+        # (_step_up_critical), so its copies go out signed too.
+        approve = (
+            bool(deploy.step_up_password) and not svc.get("custom") and bool(catalog.critical_volume_targets(slug))
+        )
         notes = (
             await _refresh_proxied_copies(
-                slug, worker_id, svc, svc.get("docker") or {}, fresh, expected=deploy.expected_containers
+                slug,
+                worker_id,
+                svc,
+                svc.get("docker") or {},
+                fresh,
+                expected=deploy.expected_containers,
+                approve=approve,
             )
             if fresh
             else []
